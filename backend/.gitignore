@@ -1,0 +1,10 @@
+# Global ignores
+node_modules/
+.env
+.env.local
+.env.*.local
+
+
+# Backend
+node_modules/
+.env
