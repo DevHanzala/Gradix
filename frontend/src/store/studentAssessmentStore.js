@@ -3,7 +3,7 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import useStudentAnalyticsStore from "./useStudentAnalyticsStore.js";
 
-const API_URL = import.meta.env.VITE_API_URL || "https://gradeadmin.techmiresolutions.com/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 const useStudentAssessmentStore = create((set, get) => ({
   assessmentQuestions: [],

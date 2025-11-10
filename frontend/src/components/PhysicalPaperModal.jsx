@@ -300,7 +300,7 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
 
     try {
       const token = localStorage.getItem("token");
-      const API_URL = import.meta.env.VITE_API_URL || "https://gradeadmin.techmiresolutions.com/api";
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
       const { data } = await axios.get(`${API_URL}/taking/assessments/${assessmentId}/print`, {
         headers: { Authorization: `Bearer ${token}` }
       });

@@ -5,7 +5,7 @@ import { signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "../config/firebase.js";
 
 // Get the API base URL from environment variables
-const API_BASE_URL = import.meta.env.VITE_API_URL || "https://gradeadmin.techmiresolutions.com/api";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 // Configure Axios defaults for all requests
 axios.defaults.baseURL = API_BASE_URL;

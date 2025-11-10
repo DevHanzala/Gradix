@@ -10,7 +10,7 @@ import toast from "react-hot-toast";
 import axios from "axios";
 import { FaInfoCircle, FaCalendarAlt, FaLink, FaQuestionCircle, FaFileAlt, FaExclamationCircle, FaEdit, FaUsers, FaPrint } from "react-icons/fa";
 
-const API_URL = import.meta.env.VITE_API_URL || "https://gradeadmin.techmiresolutions.com/api";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 function AssessmentDetail() {
   const { id } = useParams();
