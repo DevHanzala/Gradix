@@ -1,113 +1,119 @@
-import { useState } from "react"
-import { Link, useLocation } from "react-router-dom"
-import useAuthStore from "../store/authStore.js"
+import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import useAuthStore from "../store/authStore.js";
 
 function Navbar() {
-  const { user, logout } = useAuthStore()
-  const location = useLocation()
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const { user, logout } = useAuthStore();
+  const location = useLocation();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const getDashboardLink = () => {
-    if (!user) return "/login"
-    switch (user.role) {
-      case "admin":
-        return "/admin/assessments"
-      case "instructor":
-        return "/instructor/assessments"
-      case "student":
-        return "/student/assessments"
-      default:
-        return "/"
-    }
-  }
-
+  // Define navigation links per role - CLEAN & ACCURATE
   const getNavLinks = () => {
     if (!user) {
       return [
         { name: "Home", href: "/" },
         { name: "Login", href: "/login" },
         { name: "Sign Up", href: "/signup" },
-      ]
+      ];
     }
 
-    const baseLinks = [
-      { name: "Assessments", href: getDashboardLink() },
-      { name: "Profile", href: "/profile" },
-    ]
+    // Base for all logged-in users
+    const links = [{ name: "Profile", href: "/profile" }];
 
-    // Role-specific links
+    if (user.role === "super_admin") {
+      return [
+        { name: "Dashboard", href: "/super-admin/dashboard" },
+        ...links,
+      ];
+    }
+
     if (user.role === "admin") {
-      baseLinks.splice(1, 0, { name: "Manage Users", href: "/admin/assessments" })
-    } else if (user.role === "instructor") {
-      baseLinks.splice(1, 0, { name: "Manage Students", href: "/instructor/students" })
-      baseLinks.splice(2, 0, { name: "My Assessments", href: "/instructor/assessments" })
-    } else if (user.role === "student") {
-      baseLinks.splice(1, 0, { name: "Available Assessments", href: "/student/assessments" })
+      return [
+        { name: "Dashboard", href: "/admin/dashboard" },
+                ...links,
+      ];
     }
 
-    return baseLinks
-  }
+    if (user.role === "instructor") {
+      return [
+        { name: "Dashboard", href: "/instructor/dashboard" },
+        { name: "My Assessments", href: "/instructor/assessments" },
+        { name: "Create Assessment", href: "/instructor/assessments/create" },
+        { name: "Manage Students", href: "/instructor/students" },
+        { name: "Resources", href: "/instructor/resources" },
+        ...links,
+      ];
+    }
+
+    if (user.role === "student") {
+      return [
+        { name: "Dashboard", href: "/student/dashboard" },
+        { name: "Analytics", href: "/student/analytics" },
+        ...links,
+      ];
+    }
+
+    return links;
+  };
+
+  const navLinks = getNavLinks();
 
   const isActiveLink = (href) => {
-    return location.pathname === href
-  }
+    return location.pathname === href || location.pathname.startsWith(href + "/");
+  };
 
-  const handleMobileMenuToggle = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen)
-  }
-
-  const closeMobileMenu = () => {
-    setIsMobileMenuOpen(false)
-  }
-
+  const handleMobileMenuToggle = () => setIsMobileMenuOpen(!isMobileMenuOpen);
+  const closeMobileMenu = () => setIsMobileMenuOpen(false);
   const handleLogout = () => {
-    logout()
-    closeMobileMenu()
-  }
+    logout();
+    closeMobileMenu();
+  };
 
   return (
     <nav className="bg-white shadow-lg border-b border-gray-200 sticky top-0 z-50">
-      <div className="w-full px-4 sm:px-3 lg:px-6 xl:px-8">
+      <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo */}
+          
           <div className="flex items-center">
-            <Link to="/" className="flex items-center space-x-2" onClick={closeMobileMenu}>
-              <div className="text-2xl">📚</div>
+            <Link to="/" className="flex items-center space-x-3" onClick={closeMobileMenu}>
+              <div className="text-3xl">📚</div>
               <span className="text-xl font-bold text-blue-600">Gradewise AI</span>
             </Link>
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
-            {getNavLinks().map((link) => (
+          <div className="hidden md:flex items-center space-x-1">
+            {navLinks.map((link) => (
               <Link
                 key={link.name}
                 to={link.href}
-                className={`px-3 py-2 rounded-md text-sm font-medium transition duration-200 ${
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                   isActiveLink(link.href)
-                    ? "bg-blue-100 text-blue-700"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                    ? "bg-blue-100 text-blue-700 shadow-sm"
+                    : "text-gray-700 hover:text-gray-900 hover:bg-gray-100"
                 }`}
               >
                 {link.name}
               </Link>
             ))}
 
-            {/* User Info & Logout */}
+            {/* User Info + Logout */}
             {user && (
-              <div className="flex items-center space-x-4 pl-4 border-l border-gray-200">
-                <div className="flex items-center space-x-2">
-                  <div className="text-lg">
-                    {user.role === "admin" ? "👑" : user.role === "instructor" ? "📝" : "👨‍🎓"}
+              <div className="flex items-center space-x-4 pl-6 border-l border-gray-300 ml-4">
+                <div className="flex items-center space-x-3">
+                  <div className="text-2xl">
+                    {user.role === "super_admin" ? "👑" : 
+                     user.role === "admin" ? "👑" : 
+                     user.role === "instructor" ? "👨‍🏫" : "🎓"}
                   </div>
-                  <div className="text-sm">
-                    <div className="font-medium text-gray-900">{user.name}</div>
-                    <div className="text-gray-500 capitalize">{user.role}</div>
+                  <div>
+                    <div className="text-sm font-semibold text-gray-900">{user.name}</div>
+                    <div className="text-xs text-gray-500 capitalize">{user.role.replace("_", " ")}</div>
                   </div>
                 </div>
                 <button
                   onClick={handleLogout}
-                  className="bg-red-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-red-700 transition duration-200"
+                  className="bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-700 transition"
                 >
                   Logout
                 </button>
@@ -115,82 +121,78 @@ function Navbar() {
             )}
           </div>
 
-          {/* Mobile menu button */}
+          {/* Mobile Menu Button */}
           <div className="md:hidden">
             <button
               onClick={handleMobileMenuToggle}
-              className="inline-flex items-center justify-center p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition duration-200"
-              aria-expanded="false"
+              className="p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition"
             >
-              <span className="sr-only">Open main menu</span>
-              {/* Hamburger icon */}
-              <svg
-                className={`${isMobileMenuOpen ? "hidden" : "block"} h-6 w-6`}
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-              {/* Close icon */}
-              <svg
-                className={`${isMobileMenuOpen ? "block" : "hidden"} h-6 w-6`}
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <span className="sr-only">Open menu</span>
+              {isMobileMenuOpen ? (
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              )}
             </button>
           </div>
         </div>
 
-        {/* Mobile Navigation Menu */}
-        <div className={`md:hidden ${isMobileMenuOpen ? "block" : "hidden"}`}>
-          <div className="px-2 pt-2 pb-3 space-y-1 bg-gray-50 border-t border-gray-200">
-            {getNavLinks().map((link) => (
-              <Link
-                key={link.name}
-                to={link.href}
-                onClick={closeMobileMenu}
-                className={`block px-3 py-2 rounded-md text-base font-medium transition duration-200 ${
-                  isActiveLink(link.href)
-                    ? "bg-blue-100 text-blue-700"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                }`}
-              >
-                {link.name}
-              </Link>
-            ))}
-
-            {/* Mobile User Info */}
-            {user && (
-              <div className="pt-4 pb-3 border-t border-gray-200">
-                <div className="flex items-center px-3 mb-3">
-                  <div className="text-2xl mr-3">
-                    {user.role === "admin" ? "👑" : user.role === "instructor" ? "📝" : "👨‍🎓"}
-                  </div>
-                  <div>
-                    <div className="text-base font-medium text-gray-900">{user.name}</div>
-                    <div className="text-sm text-gray-500">{user.email}</div>
-                    <div className="text-sm text-blue-600 capitalize">{user.role}</div>
-                  </div>
-                </div>
-                <button
-                  onClick={handleLogout}
-                  className="block w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-600 hover:text-red-900 hover:bg-red-50 transition duration-200"
+        {/* Mobile Menu */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden border-t border-gray-200 bg-gray-50">
+            <div className="px-2 pt-2 pb-4 space-y-1">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.name}
+                  to={link.href}
+                  onClick={closeMobileMenu}
+                  className={`block px-4 py-3 rounded-lg text-base font-medium transition ${
+                    isActiveLink(link.href)
+                      ? "bg-blue-100 text-blue-700"
+                      : "text-gray-700 hover:bg-gray-100"
+                  }`}
                 >
-                  Logout
-                </button>
-              </div>
-            )}
+                  {link.name}
+                </Link>
+              ))}
+
+              {user && (
+                <>
+                  <div className="border-t border-gray-300 my-3"></div>
+                  <div className="px-4 py-3">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <div className="text-2xl">
+                        {user.role === "super_admin" ? "👑" : 
+                         user.role === "admin" ? "👑" : 
+                         user.role === "instructor" ? "👨‍🏫" : "🎓"}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-gray-900">{user.name}</div>
+                        <div className="text-sm text-gray-600">{user.email}</div>
+                        <div className="text-xs text-blue-600 capitalize mt-1">
+                          {user.role.replace("_", " ")}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full text-left px-4 py-3 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition"
+                    >
+                      Logout
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </nav>
-  )
+  );
 }
 
-export default Navbar
+export default Navbar;

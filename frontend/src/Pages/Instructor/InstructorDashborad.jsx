@@ -23,7 +23,7 @@ import {
   FaChartLine
 } from "react-icons/fa";
 
-// NEW: Import Physical Paper Modal
+// Physical Paper Modal
 import PhysicalPaperModal from "../../components/PhysicalPaperModal.jsx";
 
 function InstructorDashboard() {
@@ -34,7 +34,6 @@ function InstructorDashboard() {
   const [modal, setModal] = useState({ isOpen: false, type: "info", title: "", message: "" });
   const [isLoading, setIsLoading] = useState(true);
 
-  // NEW: State for Physical Paper Modal
   const [paperModal, setPaperModal] = useState({
     isOpen: false,
     assessmentId: null,
@@ -51,7 +50,7 @@ function InstructorDashboard() {
         ]);
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error);
-        const errorMessage = error.response?.data?.message || error.message || "Failed to fetch dashboard data. Please try again.";
+        const errorMessage = error.response?.data?.message || error.message || "Failed to fetch dashboard data.";
         setModal({ isOpen: true, type: "error", title: "Error", message: errorMessage });
         toast.error(errorMessage);
         if (error.response?.status === 403 || error.message === "No authentication token found") {
@@ -70,7 +69,6 @@ function InstructorDashboard() {
     toast[type === "success" ? "success" : "error"](message);
   };
 
-  // NEW: Open Physical Paper Modal
   const openPaperModal = (assessment) => {
     setPaperModal({
       isOpen: true,
@@ -79,7 +77,6 @@ function InstructorDashboard() {
     });
   };
 
-  // ICONS USING react-icons/fa
   const quickActions = [
     {
       title: "Create Assessment",
@@ -113,7 +110,7 @@ function InstructorDashboard() {
       title: "View Analytics",
       description: "Analyze assessment performance",
       icon: <FaChartLine className="w-8 h-8" />,
-      link: "/instructor/assessments/:assessmentId/analytics",
+      link: "/instructor/assessments",
       color: "bg-indigo-500 hover:bg-indigo-600",
     },
   ];
@@ -138,21 +135,21 @@ function InstructorDashboard() {
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               <Card>
-                <CardContent className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">{overview.assessments || 0}</div>
-                  <div className="text-gray-600">My Assessments</div>
+                <CardContent className="text-center py-8">
+                  <div className="text-4xl font-bold text-blue-600">{overview.assessments || 0}</div>
+                  <div className="text-gray-600 mt-2">My Assessments</div>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="text-center">
-                  <div className="text-3xl font-bold text-green-600">{overview.resources || 0}</div>
-                  <div className="text-gray-600">Resources</div>
+                <CardContent className="text-center py-8">
+                  <div className="text-4xl font-bold text-green-600">{overview.resources || 0}</div>
+                  <div className="text-gray-600 mt-2">Resources</div>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="text-center">
-                  <div className="text-3xl font-bold text-purple-600">{overview.executedAssessments || 0}</div>
-                  <div className="text-gray-600">Executed Assessments</div>
+                <CardContent className="text-center py-8">
+                  <div className="text-4xl font-bold text-purple-600">{overview.executedAssessments || 0}</div>
+                  <div className="text-gray-600 mt-2">Executed Assessments</div>
                 </CardContent>
               </Card>
             </div>
@@ -160,21 +157,21 @@ function InstructorDashboard() {
             {/* Quick Actions */}
             <Card className="mb-8">
               <CardHeader>
-                <h2 className="text-xl font-semibold text-gray-900">Quick Actions</h2>
+                <h2 className="text-2xl font-semibold text-gray-900">Quick Actions</h2>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                   {quickActions.map((action, index) => (
                     <Link
                       key={index}
                       to={action.link}
-                      className={`${action.color} text-white p-6 rounded-lg transition duration-200 block text-center`}
+                      className={`${action.color} text-white p-8 rounded-2xl transition duration-300 shadow-lg hover:shadow-2xl transform hover:-translate-y-1 text-center`}
                     >
-                      <div className="flex justify-center mb-2">
+                      <div className="flex justify-center mb-4">
                         {action.icon}
                       </div>
-                      <h3 className="font-semibold text-lg mb-1">{action.title}</h3>
-                      <p className="text-sm opacity-90">{action.description}</p>
+                      <h3 className="font-bold text-lg">{action.title}</h3>
+                      <p className="text-sm opacity-90 mt-1">{action.description}</p>
                     </Link>
                   ))}
                 </div>
@@ -182,65 +179,69 @@ function InstructorDashboard() {
             </Card>
 
             {/* Recent Assessments */}
-            <Card className="mb-8">
+            <Card>
               <CardHeader>
                 <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-semibold text-gray-900">Recent Assessments</h2>
-                  <Link to="/instructor/assessments" className="text-blue-600 hover:text-blue-800">
-                    View All
+                  <h2 className="text-2xl font-semibold text-gray-900">Recent Assessments</h2>
+                  <Link to="/instructor/assessments" className="text-blue-600 hover:text-blue-800 font-medium">
+                    View All →
                   </Link>
                 </div>
               </CardHeader>
               <CardContent>
                 {!assessments || assessments.length === 0 ? (
-                  <div className="text-center py-8">
-                    <FaPen className="text-6xl text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Assessments Yet</h3>
-                    <p className="text-gray-600 mb-4">Create your first assessment to get started.</p>
+                  <div className="text-center py-16">
+                    <FaPen className="text-7xl text-gray-300 mx-auto mb-6" />
+                    <h3 className="text-2xl font-bold text-gray-900 mb-3">No Assessments Yet</h3>
+                    <p className="text-gray-600 mb-6">Create your first assessment to get started.</p>
                     <Link
                       to="/instructor/assessments/create"
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-200"
+                      className="px-8 py-4 bg-blue-600 text-white text-lg font-semibold rounded-xl hover:bg-blue-700 transition shadow-lg"
                     >
-                      Create Your First Assessment
+                      Create Assessment
                     </Link>
                   </div>
                 ) : (
-                  <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 rounded-lg">
-
-                    {/* === RESPONSIVE RECENT ASSESSMENTS === */}
-                    <div className="overflow-x-auto -mx-4 sm:mx-0">
-                      {/* Desktop Table - hidden on mobile */}
-                      <table className="min-w-full divide-y divide-gray-200 hidden lg:table">
+                  <>
+                    {/* Desktop Table - Hidden on Mobile */}
+                    <div className="hidden lg:block overflow-x-auto rounded-lg border border-gray-200">
+                      <table className="min-w-full divide-y divide-gray-300">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                               Assessment Title
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Created
+                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
+                              Created On
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
                               Actions
                             </th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {assessments.filter(a => a && a.id).slice(0, 5).map((assessment) => (
-                            <tr key={assessment.id} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap font-medium">{assessment.title}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {new Date(assessment.created_at).toLocaleDateString()}
+                          {assessments.slice(0, 5).map((assessment) => (
+                            <tr key={assessment.id} className="hover:bg-gray-50 transition">
+                              <td className="px-6 py-4 font-medium text-gray-900">
+                                {assessment.title}
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <div className="flex items-center gap-3 flex-wrap">
-                                  <Link to={`/instructor/assessments/${assessment.id}`} className="text-blue-600 hover:text-blue-800 flex items-center">
+                              <td className="px-6 py-4 text-sm text-gray-600">
+                                {new Date(assessment.created_at).toLocaleDateString("en-US", {
+                                  year: "numeric",
+                                  month: "short",
+                                  day: "numeric",
+                                })}
+                              </td>
+                              <td className="px-6 py-4 text-sm">
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <Link to={`/instructor/assessments/${assessment.id}`} className="text-blue-600 hover:text-blue-800 font-medium">
                                     View
                                   </Link>
-                                  <Link to={`/instructor/assessments/${assessment.id}/enroll`} className="text-green-600 hover:text-green-800 flex items-center">
+                                  <Link to={`/instructor/assessments/${assessment.id}/enroll`} className="text-green-600 hover:text-green-800 font-medium">
                                     Enroll
                                   </Link>
                                   {!assessment.is_executed && (
-                                    <Link to={`/instructor/assessments/edit/${assessment.id}`} className="text-indigo-600 hover:text-indigo-800 flex items-center">
+                                    <Link to={`/instructor/assessments/edit/${assessment.id}`} className="text-indigo-600 hover:text-indigo-800 font-medium">
                                       Edit
                                     </Link>
                                   )}
@@ -249,23 +250,23 @@ function InstructorDashboard() {
                                       onClick={() => {
                                         if (window.confirm(`Delete "${assessment.title}"?`)) {
                                           useAssessmentStore.getState().deleteAssessment(assessment.id)
-                                            .then(() => showModal("success", "Success", "Assessment deleted"))
-                                            .catch(err => showModal("error", "Error", err.message || "Failed"));
+                                            .then(() => showModal("success", "Deleted!", "Assessment removed successfully"))
+                                            .catch(() => showModal("error", "Error", "Failed to delete"));
                                         }
                                       }}
-                                      className="text-red-600 hover:text-red-900 flex items-center"
+                                      className="text-red-600 hover:text-red-800 font-medium"
                                     >
                                       Delete
                                     </button>
                                   )}
                                   {assessment.is_executed && (
-                                    <Link to={`/instructor/assessments/${assessment.id}/analytics`} className="text-purple-600 hover:text-purple-800 flex items-center">
+                                    <Link to={`/instructor/assessments/${assessment.id}/analytics`} className="text-purple-600 hover:text-purple-800 font-medium">
                                       Analytics
                                     </Link>
                                   )}
                                   <button
                                     onClick={() => openPaperModal(assessment)}
-                                    className="text-orange-600 hover:text-orange-900 flex items-center"
+                                    className="text-orange-600 hover:text-orange-800 font-medium flex items-center gap-1"
                                   >
                                     Physical Paper
                                   </button>
@@ -275,39 +276,77 @@ function InstructorDashboard() {
                           ))}
                         </tbody>
                       </table>
-
-                      {/* Mobile Cards - visible only on mobile/tablet */}
-                      <div className="lg:hidden space-y-4">
-                        {assessments.filter(a => a && a.id).slice(0, 5).map((assessment) => (
-                          <div key={assessment.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-                            <div className="flex justify-between items-start mb-2">
-                              <h4 className="font-semibold text-gray-900">{assessment.title}</h4>
-                              <span className="text-xs text-gray-500">
-                                {new Date(assessment.created_at).toLocaleDateString()}
-                              </span>
-                            </div>
-                            <div className="flex flex-wrap gap-2 mt-3 text-sm">
-                              <Link to={`/instructor/assessments/${assessment.id}`} className="text-blue-600 hover:underline">View</Link>
-                              <Link to={`/instructor/enroll/${assessment.id}`} className="text-green-600 hover:underline">Enroll</Link>
-                              {!assessment.is_executed && (
-                                <Link to={`/instructor/assessments/edit/${assessment.id}`} className="text-indigo-600 hover:underline">Edit</Link>
-                              )}
-                              {!assessment.is_executed && (
-                                <button onClick={() => window.confirm(`Delete "${assessment.title}"?`) && useAssessmentStore.getState().deleteAssessment(assessment.id)}
-                                  className="text-red-600 hover:underline">Delete</button>
-                              )}
-                              {assessment.is_executed && (
-                                <Link to={`/instructor/assessments/${assessment.id}/analytics`} className="text-purple-600 hover:underline">Analytics</Link>
-                              )}
-                              <button onClick={() => openPaperModal(assessment)} className="text-orange-600 hover:underline">
-                                Physical Paper
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
                     </div>
-                  </div>
+
+                    {/* Mobile Cards - Clean & Beautiful */}
+                    <div className="lg:hidden space-y-4">
+                      {assessments.slice(0, 5).map((assessment) => (
+                        <div
+                          key={assessment.id}
+                          className="bg-white border border-gray-200 rounded-2xl p-6 shadow-md hover:shadow-lg transition-shadow"
+                        >
+                          <div className="flex justify-between items-start mb-4">
+                            <h3 className="text-lg font-bold text-gray-900 pr-2">
+                              {assessment.title}
+                            </h3>
+                            <span className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                              {new Date(assessment.created_at).toLocaleDateString("en-US", {
+                                month: "short",
+                                day: "numeric",
+                              })}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap gap-3 text-sm">
+                            <Link
+                              to={`/instructor/assessments/${assessment.id}`}
+                              className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg font-medium hover:bg-blue-200 transition"
+                            >
+                              View
+                            </Link>
+                            <Link
+                              to={`/instructor/assessments/${assessment.id}/enroll`}
+                              className="px-4 py-2 bg-green-100 text-green-700 rounded-lg font-medium hover:bg-green-200 transition"
+                            >
+                              Enroll
+                            </Link>
+                            {!assessment.is_executed && (
+                              <Link
+                                to={`/instructor/assessments/edit/${assessment.id}`}
+                                className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg font-medium hover:bg-indigo-200 transition"
+                              >
+                                Edit
+                              </Link>
+                            )}
+                            {!assessment.is_executed && (
+                              <button
+                                onClick={() => window.confirm(`Delete "${assessment.title}"?`) &&
+                                  useAssessmentStore.getState().deleteAssessment(assessment.id)
+                                }
+                                className="px-4 py-2 bg-red-100 text-red-700 rounded-lg font-medium hover:bg-red-200 transition"
+                              >
+                                Delete
+                              </button>
+                            )}
+                            {assessment.is_executed && (
+                              <Link
+                                to={`/instructor/assessments/${assessment.id}/analytics`}
+                                className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg font-medium hover:bg-purple-200 transition"
+                              >
+                                Analytics
+                              </Link>
+                            )}
+                            <button
+                              onClick={() => openPaperModal(assessment)}
+                              className="px-4 py-2 bg-orange-100 text-orange-700 rounded-lg font-medium hover:bg-orange-200 transition flex items-center gap-1"
+                            >
+                              Physical Paper
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -317,7 +356,7 @@ function InstructorDashboard() {
 
       <Footer />
 
-      {/* NEW: Physical Paper Modal */}
+      {/* Physical Paper Modal */}
       <PhysicalPaperModal
         isOpen={paperModal.isOpen}
         onClose={() => setPaperModal({ ...paperModal, isOpen: false })}
@@ -325,7 +364,7 @@ function InstructorDashboard() {
         assessmentTitle={paperModal.title}
       />
 
-      {/* Existing Modal */}
+      {/* Error/Success Modal */}
       <Modal
         isOpen={modal.isOpen}
         onClose={() => setModal({ ...modal, isOpen: false })}
