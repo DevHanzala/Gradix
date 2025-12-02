@@ -10,11 +10,11 @@ import Navbar from "../../components/Navbar.jsx";
 import Footer from "../../components/Footer.jsx";
 import toast from "react-hot-toast";
 import axios from "axios";
-import { 
-  FaEye, 
-  FaEdit, 
-  FaTrash, 
-  FaChartBar, 
+import {
+  FaEye,
+  FaEdit,
+  FaTrash,
+  FaChartBar,
   FaFilePdf,
   FaPen,
   FaBook,
@@ -121,7 +121,7 @@ function InstructorDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Instructor Dashboard</h1>
@@ -206,76 +206,107 @@ function InstructorDashboard() {
                   </div>
                 ) : (
                   <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 rounded-lg">
-                    <table className="min-w-full divide-y divide-gray-300">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">
-                            Assessment Title
-                          </th>
-                          <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                            Created
-                          </th>
-                          <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
-                            <span className="sr-only">Actions</span>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200 bg-white">
-                        {assessments.filter(assessment => assessment && assessment.id).slice(0, 5).map((assessment) => (
-                          <tr key={assessment.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-                              {assessment.title}
-                            </td>
-                            <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                              {new Date(assessment.created_at).toLocaleDateString()}
-                            </td>
-                            <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6 flex justify-end space-x-4">
-                              <Link to={`/instructor/assessments/${assessment.id}`} className="text-blue-600 hover:text-blue-900 flex items-center">
-                                <FaEye className="mr-1" /> <span className="hidden sm:inline">View</span>
-                              </Link>
-                              <Link to={`/instructor/assessments/${assessment.id}/enroll`} className="text-green-600 hover:text-green-900 flex items-center">
-                                <FaFilePdf className="mr-1" /> <span className="hidden sm:inline">Enroll</span>
-                              </Link>
+
+                    {/* === RESPONSIVE RECENT ASSESSMENTS === */}
+                    <div className="overflow-x-auto -mx-4 sm:mx-0">
+                      {/* Desktop Table - hidden on mobile */}
+                      <table className="min-w-full divide-y divide-gray-200 hidden lg:table">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Assessment Title
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Created
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {assessments.filter(a => a && a.id).slice(0, 5).map((assessment) => (
+                            <tr key={assessment.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap font-medium">{assessment.title}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {new Date(assessment.created_at).toLocaleDateString()}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <div className="flex items-center gap-3 flex-wrap">
+                                  <Link to={`/instructor/assessments/${assessment.id}`} className="text-blue-600 hover:text-blue-800 flex items-center">
+                                    View
+                                  </Link>
+                                  <Link to={`/instructor/assessments/${assessment.id}/enroll`} className="text-green-600 hover:text-green-800 flex items-center">
+                                    Enroll
+                                  </Link>
+                                  {!assessment.is_executed && (
+                                    <Link to={`/instructor/assessments/edit/${assessment.id}`} className="text-indigo-600 hover:text-indigo-800 flex items-center">
+                                      Edit
+                                    </Link>
+                                  )}
+                                  {!assessment.is_executed && (
+                                    <button
+                                      onClick={() => {
+                                        if (window.confirm(`Delete "${assessment.title}"?`)) {
+                                          useAssessmentStore.getState().deleteAssessment(assessment.id)
+                                            .then(() => showModal("success", "Success", "Assessment deleted"))
+                                            .catch(err => showModal("error", "Error", err.message || "Failed"));
+                                        }
+                                      }}
+                                      className="text-red-600 hover:text-red-900 flex items-center"
+                                    >
+                                      Delete
+                                    </button>
+                                  )}
+                                  {assessment.is_executed && (
+                                    <Link to={`/instructor/assessments/${assessment.id}/analytics`} className="text-purple-600 hover:text-purple-800 flex items-center">
+                                      Analytics
+                                    </Link>
+                                  )}
+                                  <button
+                                    onClick={() => openPaperModal(assessment)}
+                                    className="text-orange-600 hover:text-orange-900 flex items-center"
+                                  >
+                                    Physical Paper
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+
+                      {/* Mobile Cards - visible only on mobile/tablet */}
+                      <div className="lg:hidden space-y-4">
+                        {assessments.filter(a => a && a.id).slice(0, 5).map((assessment) => (
+                          <div key={assessment.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                            <div className="flex justify-between items-start mb-2">
+                              <h4 className="font-semibold text-gray-900">{assessment.title}</h4>
+                              <span className="text-xs text-gray-500">
+                                {new Date(assessment.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <div className="flex flex-wrap gap-2 mt-3 text-sm">
+                              <Link to={`/instructor/assessments/${assessment.id}`} className="text-blue-600 hover:underline">View</Link>
+                              <Link to={`/instructor/enroll/${assessment.id}`} className="text-green-600 hover:underline">Enroll</Link>
                               {!assessment.is_executed && (
-                                <Link to={`/instructor/assessments/${assessment.id}/edit`} className="text-yellow-600 hover:text-yellow-900 flex items-center">
-                                  <FaEdit className="mr-1" /> <span className="hidden sm:inline">Edit</span>
-                                </Link>
+                                <Link to={`/instructor/assessments/edit/${assessment.id}`} className="text-indigo-600 hover:underline">Edit</Link>
                               )}
                               {!assessment.is_executed && (
-                                <button
-                                  onClick={() => {
-                                    if (window.confirm(`Are you sure you want to delete "${assessment.title}"?`)) {
-                                      useAssessmentStore.getState().deleteAssessment(assessment.id).then(() => {
-                                        showModal("success", "Success", "Assessment deleted successfully");
-                                      }).catch((err) => {
-                                        showModal("error", "Error", err.message || "Failed to delete assessment");
-                                      });
-                                    }
-                                  }}
-                                  className="text-red-600 hover:text-red-900 flex items-center"
-                                >
-                                  <FaTrash className="mr-1" /> <span className="hidden sm:inline">Delete</span>
-                                </button>
+                                <button onClick={() => window.confirm(`Delete "${assessment.title}"?`) && useAssessmentStore.getState().deleteAssessment(assessment.id)}
+                                  className="text-red-600 hover:underline">Delete</button>
                               )}
                               {assessment.is_executed && (
-                                <Link to={`/instructor/assessments/${assessment.id}/analytics`} className="text-indigo-600 hover:text-indigo-900 flex items-center">
-                                  <FaChartBar className="mr-1" /> <span className="hidden sm:inline">Analytics</span>
-                                </Link>
+                                <Link to={`/instructor/assessments/${assessment.id}/analytics`} className="text-purple-600 hover:underline">Analytics</Link>
                               )}
-
-                              {/* Physical Paper Button */}
-                              <button
-                                onClick={() => openPaperModal(assessment)}
-                                className="text-orange-600 hover:text-orange-900 flex items-center"
-                              >
-                                <FaFilePdf className="mr-1" />
-                                <span className="hidden sm:inline">Physical Paper</span>
+                              <button onClick={() => openPaperModal(assessment)} className="text-orange-600 hover:underline">
+                                Physical Paper
                               </button>
-                            </td>
-                          </tr>
+                            </div>
+                          </div>
                         ))}
-                      </tbody>
-                    </table>
+                      </div>
+                    </div>
                   </div>
                 )}
               </CardContent>

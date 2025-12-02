@@ -35,7 +35,6 @@ import AssessmentAnalytics from "./Pages/Instructor/AssessmentManagement/Assessm
 import StudentDashboard from "./Pages/Student/StudentDashborad";
 import TakeAssessment from "./Pages/Student/AssesmentManagement/TakeAssessment";
 import StudentAnalytics from "./Pages/Student/StudentAnalytics";
-import SubmissionResult from "./Pages/Student/AssesmentManagement/SubmissionResult";
 
 import ProtectedRoute from "./components/ProtectedRoutes";
 
@@ -187,14 +186,6 @@ function App() {
             element={
               <ProtectedRoute requiredRole="student">
                 <TakeAssessment />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/student/submissions/:submissionId"
-            element={
-              <ProtectedRoute requiredRole="student">
-                <SubmissionResult />
               </ProtectedRoute>
             }
           />

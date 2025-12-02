@@ -20,13 +20,11 @@ function AssessmentList() {
       try {
         await getInstructorAssessments();
       } catch (error) {
-        console.error("Failed to fetch assessments:", error);
         showModal("error", "Error", "Failed to fetch assessments. Please try again.");
       } finally {
         setIsLoading(false);
       }
     };
-
     fetchData();
   }, [getInstructorAssessments]);
 
@@ -36,174 +34,183 @@ function AssessmentList() {
   };
 
   const handleDeleteAssessment = async (assessmentId, assessmentTitle) => {
-    if (window.confirm(`Are you sure you want to delete "${assessmentTitle}"? This action cannot be undone.`)) {
+    if (window.confirm(`Are you sure you want to delete "${assessmentTitle}"?`)) {
       try {
         await deleteAssessment(assessmentId);
         showModal("success", "Success", "Assessment deleted successfully!");
-        setTimeout(() => {
-          getInstructorAssessments();
-        }, 1000);
+        await getInstructorAssessments();
       } catch (error) {
-        console.error("Failed to delete assessment:", error);
-        showModal("error", "Error", "Failed to delete assessment. Please try again.");
+        showModal("error", "Error", "Failed to delete assessment.");
       }
     }
   };
 
-  const filteredAssessments =
-    assessments?.filter((assessment) => {
-      if (!assessment || !assessment.id) {
-        console.warn("⚠️ Invalid assessment in filteredAssessments:", assessment);
-        return false;
-      }
-      const matchesSearch =
-        assessment.title.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesSearch;
-    }) || [];
+  const filteredAssessments = assessments?.filter(a => 
+    a && a.id && a.title?.toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full mx-auto px-4 sm:px-4 lg:px-8 xl:px-10 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">My Assessments</h1>
-              <p className="text-gray-600">Manage your assessments.</p>
-            </div>
-            <Link
-              to="/instructor/assessments/create"
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-200"
-            >
-              Create Assessment
-            </Link>
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">My Assessments</h1>
+            <p className="text-gray-600 mt-1">Manage and view all your assessments</p>
           </div>
+          <Link
+            to="/instructor/assessments/create"
+            className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-md text-sm font-medium"
+          >
+            + Create Assessment
+          </Link>
         </div>
 
-        {/* Filters */}
-        <Card className="mb-8">
-          <CardContent className="py-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <input
-                  type="text"
-                  placeholder="Search assessments..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
+        {/* Search */}
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <input
+              type="text"
+              placeholder="Search assessments by title..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+            />
           </CardContent>
         </Card>
 
-        {/* Assessment List */}
+        {/* Loading or Content */}
         {isLoading || loading ? (
-          <div className="flex justify-center items-center h-64">
+          <div className="flex justify-center items-center py-20">
             <LoadingSpinner size="lg" />
             <span className="ml-3 text-gray-600">Loading assessments...</span>
           </div>
-        ) : (
+        ) : filteredAssessments.length === 0 ? (
           <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold text-gray-900">Assessments ({filteredAssessments.length})</h2>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {filteredAssessments.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="text-6xl mb-4">📝</div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    {searchTerm ? "No matching assessments" : "No assessments yet"}
-                  </h3>
-                  <p className="text-gray-600 mb-4">
-                    {searchTerm
-                      ? "Try adjusting your search criteria."
-                      : "Create your first assessment to get started."}
-                  </p>
-                  {!searchTerm && (
-                    <Link
-                      to="/instructor/assessments/create"
-                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-200"
-                    >
-                      Create Your First Assessment
-                    </Link>
-                  )}
-                </div>
-              ) : (
-                <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 rounded-lg">
-                  <table className="min-w-full divide-y divide-gray-300">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th
-                          scope="col"
-                          className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6"
-                        >
-                          Assessment Title
-                        </th>
-                        <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                          Created
-                        </th>
-                        <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">
-                          Question Blocks
-                        </th>
-                        <th scope="col" className="relative py-3.5 pl-3 pr-4 sm:pr-6">
-                          <span className="sr-only">Actions</span>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200 bg-white">
-                      {filteredAssessments.map((assessment) => (
-                        <tr key={assessment.id}>
-                          <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-900 sm:pl-6">
-                            {assessment.title}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                            {new Date(assessment.created_at).toLocaleDateString()}
-                          </td>
-                          <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                            {assessment.question_blocks?.length || 0}
-                          </td>
-                          <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                            {assessment.id ? (
-                              <>
-                                <Link
-                                  to={`/instructor/assessments/${assessment.id}`}
-                                  className="text-blue-600 hover:text-blue-900 mr-4"
-                                  onClick={() => console.log(`🔗 Navigating to assessment ID: ${assessment.id}`)}
-                                >
-                                  View
-                                </Link>
-                                {!assessment.is_executed && (
-                                  <Link
-                                    to={`/instructor/assessments/${assessment.id}/edit`}
-                                    className="text-green-600 hover:text-green-900 mr-4"
-                                    onClick={() => console.log(`🔗 Navigating to edit assessment ID: ${assessment.id}`)}
-                                  >
-                                    Edit
-                                  </Link>
-                                )}
-                              </>
-                            ) : (
-                              <span className="text-gray-500">Invalid ID</span>
-                            )}
-                            <button
-                              onClick={() => handleDeleteAssessment(assessment.id, assessment.title)}
-                              className="text-red-600 hover:text-red-900"
-                            >
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            <CardContent className="text-center py-16">
+              <div className="text-6xl mb-4">No assessments</div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                {searchTerm ? "No assessments found" : "No assessments yet"}
+              </h3>
+              <p className="text-gray-600 mb-6">
+                {searchTerm ? "Try a different search term" : "Start by creating your first assessment"}
+              </p>
+              {!searchTerm && (
+                <Link
+                  to="/instructor/assessments/create"
+                  className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+                >
+                  Create Your First Assessment
+                </Link>
               )}
             </CardContent>
           </Card>
+        ) : (
+          <>
+            {/* Desktop Table - Hidden on Mobile */}
+            <div className="hidden lg:block">
+              <Card>
+                <CardHeader>
+                  <h2 className="text-xl font-semibold text-gray-900">
+                    All Assessments ({filteredAssessments.length})
+                  </h2>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-300">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Title
+                          </th>
+                          <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Created
+                          </th>
+                          <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Questions
+                          </th>
+                          <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider pr-8">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {filteredAssessments.map((a) => (
+                          <tr key={a.id} className="hover:bg-gray-50 transition">
+                            <td className="px-6 py-4 font-medium text-gray-900">{a.title}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {new Date(a.created_at).toLocaleDateString()}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {a.question_blocks?.length || 0}
+                            </td>
+                            <td className="px-6 py-4 text-right text-sm font-medium">
+                              <Link to={`/instructor/assessments/${a.id}`} className="text-blue-600 hover:text-blue-800 mr-4">
+                                View
+                              </Link>
+                              {!a.is_executed && (
+                                <Link to={`/instructor/assessments/${a.id}/edit`} className="text-green-600 hover:text-green-800 mr-4">
+                                  Edit
+                                </Link>
+                              )}
+                              <button
+                                onClick={() => handleDeleteAssessment(a.id, a.title)}
+                                className="text-red-600 hover:text-red-900"
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Mobile Cards - Only visible on mobile/tablet */}
+            <div className="lg:hidden space-y-4">
+              {filteredAssessments.map((a) => (
+                <Card key={a.id} className="shadow-sm hover:shadow-md transition">
+                  <CardContent className="p-5">
+                    <div className="flex justify-between items-start mb-3">
+                      <h3 className="font-semibold text-lg text-gray-900">{a.title}</h3>
+                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                        {a.question_blocks?.length || 0} Qs
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-4">
+                      Created: {new Date(a.created_at).toLocaleDateString()}
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      <Link
+                        to={`/instructor/assessments/${a.id}`}
+                        className="text-blue-600 hover:text-blue-800 font-medium text-sm"
+                      >
+                        View
+                      </Link>
+                      {!a.is_executed && (
+                        <Link
+                          to={`/instructor/assessments/${a.id}/edit`}
+                          className="text-green-600 hover:text-green-800 font-medium text-sm"
+                        >
+                          Edit
+                        </Link>
+                      )}
+                      <button
+                        onClick={() => handleDeleteAssessment(a.id, a.title)}
+                        className="text-red-600 hover:text-red-900 font-medium text-sm"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </>
         )}
       </div>
 

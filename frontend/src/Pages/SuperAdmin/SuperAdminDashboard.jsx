@@ -112,7 +112,7 @@ function SuperAdminDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-purple-900 mb-2">Super Admin Dashboard</h1>
@@ -190,137 +190,172 @@ function SuperAdminDashboard() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <FaUser className="mr-2 inline" /> User
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <FaUser className="mr-2 inline" /> Role
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <FaCheckCircle className="mr-2 inline" /> Status
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <FaUser className="mr-2 inline" /> Provider
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <FaClock className="mr-2 inline" /> Joined
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <FaChartBar className="mr-2 inline" /> Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                {/* === RESPONSIVE USERS LIST === */}
+                <div className="overflow-x-auto -mx-4 sm:mx-0">
+                  {/* Desktop Table - Visible only on lg+ screens */}
+                  <table className="min-w-full divide-y divide-gray-200 hidden lg:table">
+                    {/* ← Your exact original table code starts here */}
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <FaUser className="mr-2 inline" /> User
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <FaUser className="mr-2 inline" /> Role
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <FaCheckCircle className="mr-2 inline" /> Status
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <FaUser className="mr-2 inline" /> Provider
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <FaClock className="mr-2 inline" /> Joined
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <FaChartBar className="mr-2 inline" /> Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {filteredUsers.map((userData) => (
+                        <tr key={userData.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div>
+                              <div className="text-sm font-medium text-gray-900">{userData.name}</div>
+                              <div className="text-sm text-gray-500">{userData.email}</div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadgeColor(userData.role)}`}>
+                              {userData.role}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${userData.verified ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}`}>
+                              {userData.verified ? "Verified" : "Pending"}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getProviderBadgeColor(userData.provider)}`}>
+                              {userData.provider}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(userData.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <div className="flex flex-wrap gap-3">
+                              {userData.role === "student" && (
+                                <button
+                                  onClick={() => handleRoleChange(userData.id, "admin", userData.name, userData.email)}
+                                  disabled={actionLoading === `role-${userData.id}`}
+                                  className="text-red-600 hover:text-red-900 disabled:opacity-50 flex items-center text-xs"
+                                >
+                                  {actionLoading === `role-${userData.id}` ? <LoadingSpinner size="sm" /> : <><FaArrowUp className="w-4 h-4 mr-1" /> Promote</>}
+                                </button>
+                              )}
+                              {userData.role === "admin" && (
+                                <>
+                                  <button
+                                    onClick={() => handleRoleChange(userData.id, "student", userData.name, userData.email)}
+                                    disabled={actionLoading === `role-${userData.id}`}
+                                    className="text-green-600 hover:text-green-800 disabled:opacity-50 flex items-center text-xs"
+                                  >
+                                    {actionLoading === `role-${userData.id}` ? <LoadingSpinner size="sm" /> : <><FaArrowDown className="w-4 h-4 mr-1" /> Demote</>}
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteUser(userData.id, userData.name)}
+                                    disabled={actionLoading === `delete-${userData.id}`}
+                                    className="text-red-600 hover:text-red-900 disabled:opacity-50 flex items-center text-xs"
+                                  >
+                                    {actionLoading === `delete-${userData.id}` ? <LoadingSpinner size="sm" /> : <><FaTrash className="w-4 h-4 mr-1" /> Delete</>}
+                                  </button>
+                                </>
+                              )}
+                              {userData.role === "instructor" && (
+                                <span className="text-gray-400 text-xs italic">No actions</span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {/* Mobile Card View - Visible only below lg */}
+                  <div className="lg:hidden space-y-4 px-4 sm:px-0">
                     {filteredUsers.map((userData) => (
-                      <tr key={userData.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">{userData.name}</div>
-                            <div className="text-sm text-gray-500">{userData.email}</div>
+                      <Card key={userData.id} className="shadow-md hover:shadow-lg transition-shadow">
+                        <CardContent className="p-5">
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <h3 className="font-semibold text-gray-900">{userData.name}</h3>
+                              <p className="text-sm text-gray-500">{userData.email}</p>
+                            </div>
+                            <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getRoleBadgeColor(userData.role)}`}>
+                              {userData.role}
+                            </span>
                           </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadgeColor(
-                              userData.role,
-                            )}`}
-                          >
-                            {userData.role}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              userData.verified ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"
-                            }`}
-                          >
-                            {userData.verified ? "Verified" : "Pending"}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getProviderBadgeColor(
-                              userData.provider,
-                            )}`}
-                          >
-                            {userData.provider}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(userData.created_at).toLocaleDateString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                          <div className="flex space-x-2">
-                            {/* Super Admin can only promote students to admin or demote admins to student */}
+
+                          <div className="grid grid-cols-2 gap-3 text-sm mb-4">
+                            <div>
+                              <span className="text-gray-500">Status:</span>
+                              <span className={`ml-2 px-2 py-1 rounded-full text-xs ${userData.verified ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}`}>
+                                {userData.verified ? "Verified" : "Pending"}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">Provider:</span>
+                              <span className={`ml-2 px-2 py-1 rounded-full text-xs ${getProviderBadgeColor(userData.provider)}`}>
+                                {userData.provider}
+                              </span>
+                            </div>
+                            <div className="col-span-2">
+                              <span className="text-gray-500">Joined:</span>
+                              <span className="ml-2 text-gray-700">
+                                {new Date(userData.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-200">
                             {userData.role === "student" && (
                               <button
                                 onClick={() => handleRoleChange(userData.id, "admin", userData.name, userData.email)}
                                 disabled={actionLoading === `role-${userData.id}`}
-                                className="text-red-600 hover:text-red-900 disabled:opacity-50 flex items-center"
-                                title="Promote to Admin"
+                                className="text-red-600 hover:text-red-800 font-medium flex items-center gap-1 text-sm"
                               >
-                                {actionLoading === `role-${userData.id}` ? (
-                                  <LoadingSpinner size="sm" />
-                                ) : (
-                                  <>
-                                    <FaArrowUp className="w-4 h-4 mr-1" />
-                                    Promote to Admin
-                                  </>
-                                )}
+                                {actionLoading === `role-${userData.id}` ? "..." : <><FaArrowUp className="w-4 h-4" /> Promote to Admin</>}
                               </button>
                             )}
-
                             {userData.role === "admin" && (
                               <>
                                 <button
-                                  onClick={() =>
-                                    handleRoleChange(userData.id, "student", userData.name, userData.email)
-                                  }
+                                  onClick={() => handleRoleChange(userData.id, "student", userData.name, userData.email)}
                                   disabled={actionLoading === `role-${userData.id}`}
-                                  className="text-green-600 hover:text-green-900 disabled:opacity-50 flex items-center"
-                                  title="Demote to Student"
+                                  className="text-green-600 hover:text-green-800 font-medium flex items-center gap-1 text-sm"
                                 >
-                                  {actionLoading === `role-${userData.id}` ? (
-                                    <LoadingSpinner size="sm" />
-                                  ) : (
-                                    <>
-                                      <FaArrowDown className="w-4 h-4 mr-1" />
-                                      Demote to Student
-                                    </>
-                                  )}
+                                  {actionLoading === `role-${userData.id}` ? "..." : <><FaArrowDown className="w-4 h-4" /> Demote to Student</>}
                                 </button>
-
                                 <button
                                   onClick={() => handleDeleteUser(userData.id, userData.name)}
                                   disabled={actionLoading === `delete-${userData.id}`}
-                                  className="text-red-600 hover:text-red-900 disabled:opacity-50 flex items-center"
-                                  title="Delete Admin"
+                                  className="text-red-600 hover:text-red-800 font-medium flex items-center gap-1 text-sm"
                                 >
-                                  {actionLoading === `delete-${userData.id}` ? (
-                                    <LoadingSpinner size="sm" />
-                                  ) : (
-                                    <>
-                                      <FaTrash className="w-4 h-4 mr-1" />
-                                      Delete
-                                    </>
-                                  )}
+                                  {actionLoading === `delete-${userData.id}` ? "..." : <><FaTrash className="w-4 h-4" /> Delete User</>}
                                 </button>
                               </>
                             )}
-
-                            {/* No actions for instructors - Super Admin cannot change instructor roles */}
                             {userData.role === "instructor" && (
-                              <span className="text-gray-400 text-sm italic">No actions available</span>
+                              <span className="text-gray-400 italic text-sm">No actions available</span>
                             )}
                           </div>
-                        </td>
-                      </tr>
+                        </CardContent>
+                      </Card>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                </div>
               </div>
             )}
           </CardContent>

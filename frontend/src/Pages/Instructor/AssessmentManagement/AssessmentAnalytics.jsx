@@ -10,27 +10,34 @@ import { FaList, FaTable, FaUser, FaCalendarAlt, FaPercentage, FaClock, FaCheckC
 function AssessmentAnalytics() {
   const { assessmentId } = useParams();
   const navigate = useNavigate();
-  const { loading, error, assessments, students, fetchAssessments, fetchAssessmentStudents, fetchStudentQuestions, studentQuestions, selectedStudentId } = useInstructorAnalyticsStore();
+  const {
+    loading,
+    error,
+    assessments,
+    students,
+    fetchAssessments,
+    fetchAssessmentStudents,
+    fetchStudentQuestions,
+    studentQuestions,
+    selectedStudentId,
+  } = useInstructorAnalyticsStore();
+
   const [selectedAssessment, setSelectedAssessment] = useState(null);
 
   useEffect(() => {
-    console.log("🔄 Fetching assessments...");
     fetchAssessments();
   }, [fetchAssessments]);
 
   useEffect(() => {
-    const isValidAssessmentId = assessmentId && !isNaN(assessmentId) && assessmentId !== ':assessmentId';
-    if (isValidAssessmentId) {
-      console.log(`🔄 Fetching students for assessment ${assessmentId}`);
+    const isValid = assessmentId && !isNaN(assessmentId) && assessmentId !== ":assessmentId";
+    if (isValid) {
       fetchAssessmentStudents(assessmentId);
       const assessment = assessments.find(a => a.id === Number(assessmentId));
       setSelectedAssessment(assessment || null);
     } else {
       setSelectedAssessment(null);
     }
-  }, [assessmentId, fetchAssessmentStudents, assessments]);
-
-  console.log("🌐 Rendering with:", { assessmentId, assessments, students, studentQuestions, loading, error });
+  }, [assessmentId, assessments, fetchAssessmentStudents]);
 
   if (loading) {
     return (
@@ -43,7 +50,7 @@ function AssessmentAnalytics() {
   if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <p className="text-red-500 text-lg">Error loading analytics: {error}</p>
+        <p className="text-red-600 text-xl font-medium">Error: {error}</p>
       </div>
     );
   }
@@ -51,112 +58,101 @@ function AssessmentAnalytics() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <Navbar />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center mb-6">
-          <div className="text-3xl">📚</div>
-          <span className="text-2xl font-bold text-blue-600 ml-2">Gradewise AI</span>
-        </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">My Assessment Analytics</h1>
-        <p className="text-gray-600">Track your assessments and student performance</p>
+      <div className="w-full mx-auto px-4 sm:px-4 lg:px-8 xl:px-10 py-8">
 
-        <div className="mt-6">
-          <Card className="shadow-lg bg-white rounded-xl">
-            <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-t-xl">
-              <h3 className="text-lg font-semibold flex items-center">
-                <FaList className="mr-2" /> My Executed Assessments
-              </h3>
-            </CardHeader>
-            <CardContent>
-              {assessments.length > 0 ? (
-                <div className="space-y-4">
-                  {assessments.map((assessment) => (
-                    <div
-                      key={assessment.id}
-                      className={`p-4 border rounded-lg cursor-pointer hover:bg-gray-50 transition-all ${assessment.id === Number(assessmentId) ? 'bg-blue-50 border-blue-500' : ''}`}
-                      onClick={() => navigate(`/instructor/assessments/${assessment.id}/analytics`)}
-                    >
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-medium text-gray-900 flex items-center">
-                            <FaUser className="mr-2 text-blue-600" /> {assessment.title}
-                          </p>
-                          <p className="text-sm text-gray-600">
-                            <FaCalendarAlt className="mr-1 inline" /> Created: {new Date(assessment.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-blue-600 flex items-center">
-                            <FaCheckCircle className="mr-1" /> {assessment.completed_attempts} Completed
-                          </p>
-                        </div>
+        {/* Header */}
+        <div className="mb-8 text-center sm:text-left">
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900">Assessment Analytics</h1>
+          <p className="text-gray-600 mt-2">Monitor student performance and assessment results</p>
+        </div>
+
+        {/* Executed Assessments List */}
+        <Card className="shadow-xl mb-8">
+          <CardHeader className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-t-xl">
+            <h3 className="text-xl font-bold flex items-center">
+              <FaList className="mr-3" /> My Executed Assessments
+            </h3>
+          </CardHeader>
+          <CardContent className="p-6">
+            {assessments.length > 0 ? (
+              <div className="space-y-4">
+                {assessments.map((assessment) => (
+                  <div
+                    key={assessment.id}
+                    onClick={() => navigate(`/instructor/assessments/${assessment.id}/analytics`)}
+                    className={`p-5 rounded-xl border-2 cursor-pointer transition-all hover:shadow-md ${
+                      assessment.id === Number(assessmentId)
+                        ? "border-blue-500 bg-blue-50 shadow-md"
+                        : "border-gray-200 bg-white hover:border-gray-300"
+                    }`}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                      <div>
+                        <h4 className="text-lg font-semibold text-gray-900 flex items-center">
+                          {assessment.title}
+                        </h4>
+                        <p className="text-sm text-gray-600 mt-1 flex items-center">
+                          <FaCalendarAlt className="mr-2 text-gray-500" />
+                          {new Date(assessment.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <div className="text-center sm:text-right">
+                        <p className="text-2xl font-bold text-indigo-600 flex items-center justify-center sm:justify-end">
+                          <FaCheckCircle className="mr-2" />
+                          {assessment.completed_attempts}
+                        </p>
+                        <p className="text-sm text-gray-600">Completed</p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-500 text-center py-4">No executed assessments found. Create or execute an assessment to see analytics.</p>
-              )}
-            </CardContent>
-          </Card>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-500">
+                <FaTable className="mx-auto text-6xl mb-4 opacity-30" />
+                <p className="text-lg">No executed assessments yet</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-          {assessmentId && !isNaN(assessmentId) && assessmentId !== ':assessmentId' && (
-            <div className="mt-8 space-y-6">
-              <Card className="shadow-lg bg-white rounded-xl">
-                <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-t-xl">
-                  <h3 className="text-lg font-semibold flex items-center">
-                    <FaTable className="mr-2" /> Students' Results for {selectedAssessment?.title || 'Selected Assessment'}
-                  </h3>
+        {/* Student Results - Works on ALL devices */}
+        {assessmentId && !isNaN(assessmentId) && assessmentId !== ":assessmentId" && (
+          <>
+            {/* Desktop Table */}
+            <div className="hidden lg:block mb-10">
+              <Card className="shadow-xl">
+                <CardHeader className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
+                  <h3 className="text-xl font-bold">Student Results — {selectedAssessment?.title}</h3>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-0">
                   {students.length > 0 ? (
                     <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
+                      <table className="min-w-full divide-y divide-gray-300">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              <FaUser className="mr-2 inline" /> Student Name
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              <FaList className="mr-2 inline" /> Total Questions
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              <FaCheckCircle className="mr-2 inline" /> Correct Answers
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              <FaCalendarAlt className="mr-2 inline" /> Attempt Date & Time
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              <FaPercentage className="mr-2 inline" /> Score (%)
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              <FaClock className="mr-2 inline" /> Time Used
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              <FaCheckCircle className="mr-2 inline" /> Status
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Actions
-                            </th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Student</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Questions</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Correct</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Score</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Time Used</th>
+                            <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {students.map((student) => (
-                            <tr key={student.student_id}>
-                              <td className="px-6 py-4 whitespace-nowrap">{student.name || `User ${student.student_id}`}</td>
-                              <td className="px-6 py-4 whitespace-nowrap">{student.total_questions || 0}</td>
-                              <td className="px-6 py-4 whitespace-nowrap">{student.correct_answers || 0}</td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                {new Date(student.completed_at).toLocaleString()}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap">{student.percentage}%</td>
-                              <td className="px-6 py-4 whitespace-nowrap">{student.time_used}</td>
-                              <td className="px-6 py-4 whitespace-nowrap">{student.status || "N/A"}</td>
-                              <td className="px-6 py-4 whitespace-nowrap">
+                          {students.map((s) => (
+                            <tr key={s.student_id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 font-medium">{s.name || `Student ${s.student_id}`}</td>
+                              <td className="px-6 py-4">{s.total_questions || 0}</td>
+                              <td className="px-6 py-4 text-green-600 font-bold">{s.correct_answers || 0}</td>
+                              <td className="px-6 py-4 font-bold text-indigo-600">{s.percentage}%</td>
+                              <td className="px-6 py-4">{s.time_used}</td>
+                              <td className="px-6 py-4">
                                 <button
-                                  onClick={() => fetchStudentQuestions(assessmentId, student.student_id)}
-                                  className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center justify-center"
+                                  onClick={() => fetchStudentQuestions(assessmentId, s.student_id)}
+                                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium flex items-center"
                                 >
-                                  <FaEye className="mr-1" /> View Questions
+                                  <FaEye className="mr-2" /> View Answers
                                 </button>
                               </td>
                             </tr>
@@ -165,47 +161,80 @@ function AssessmentAnalytics() {
                       </table>
                     </div>
                   ) : (
-                    <p className="text-gray-500 text-center py-4">No students have completed this assessment</p>
+                    <p className="text-center py-12 text-gray-500">No students have completed this assessment</p>
                   )}
                 </CardContent>
               </Card>
+            </div>
 
-              {selectedStudentId && studentQuestions.length > 0 && (
-                <Card className="shadow-lg bg-white rounded-xl">
-                  <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-t-xl">
-                    <h3 className="text-lg font-semibold flex items-center">
-                      <FaTable className="mr-2" /> Student Questions and Answers
-                    </h3>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {studentQuestions.map((q, index) => (
-                        <div key={index} className="border p-4 rounded-lg">
-                          <p className="font-medium text-gray-900">Question {q.question_order || (index + 1)} ({q.question_type}):</p>
-                          <p className="text-gray-700">{q.question_text}</p>
-                          <p className="font-medium text-gray-900 mt-2">Options:</p>
-                          <p className="text-gray-700">{q.options ? JSON.stringify(q.options) : 'N/A'}</p>
-                          <p className="font-medium text-gray-900 mt-2">Correct Answer:</p>
-                          <p className="text-gray-700">{q.correct_answer}</p>
-                          <p className="font-medium text-gray-900 mt-2">Student Answer:</p>
-                          <p className="text-gray-700">{q.student_answer || 'N/A'}</p>
-                          <p className="font-medium text-gray-900 mt-2">Score:</p>
-                          <p className="text-gray-700">{q.score}</p>
-                          <p className="font-medium text-gray-900 mt-2">Is Correct:</p>
-                          <p className="text-gray-700">{q.is_correct ? 'Yes' : 'No'}</p>
-                          <p className="font-medium text-gray-900 mt-2">Positive Marks:</p>
-                          <p className="text-gray-700">{q.positive_marks}</p>
-                          <p className="font-medium text-gray-900 mt-2">Negative Marks:</p>
-                          <p className="text-gray-700">{q.negative_marks}</p>
-                        </div>
-                      ))}
+            {/* Mobile Cards */}
+            <div className="lg:hidden space-y-5 mb-10">
+              {students.length > 0 ? students.map(s => (
+                <Card key={s.student_id} className="shadow-lg">
+                  <CardContent className="p-5">
+                    <h4 className="font-bold text-lg">{s.name || `Student ${s.student_id}`}</h4>
+                    <div className="grid grid-cols-2 gap-3 text-sm mt-3">
+                      <div><strong>Questions:</strong> {s.total_questions}</div>
+                      <div><strong>Correct:</strong> <span className="text-green-600 font-bold">{s.correct_answers}</span></div>
+                      <div><strong>Score:</strong> <span className="font-bold text-indigo-600">{s.percentage}%</span></div>
+                      <div><strong>Time:</strong> {s.time_used}</div>
                     </div>
+                    <button
+                      onClick={() => fetchStudentQuestions(assessmentId, s.student_id)}
+                      className="mt-4 w-full py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 flex items-center justify-center"
+                    >
+                      <FaEye className="mr-2" /> View Detailed Answers
+                    </button>
                   </CardContent>
                 </Card>
+              )) : (
+                <Card><CardContent className="text-center py-12 text-gray-500">No results yet</CardContent></Card>
               )}
             </div>
-          )}
-        </div>
+          </>
+        )}
+
+        {/* STUDENT QUESTIONS — NOW ALWAYS VISIBLE AFTER CLICK (Mobile + Desktop) */}
+        {selectedStudentId && studentQuestions.length > 0 && (
+          <Card className="shadow-xl mt-10">
+            <CardHeader className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-t-xl">
+              <h3 className="text-xl font-bold flex items-center">
+                <FaTable className="mr-3" /> Student Answer Details
+              </h3>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="space-y-6">
+                {studentQuestions.map((q, i) => (
+                  <div key={i} className="bg-gray-50 border border-gray-200 rounded-xl p-5">
+                    <h4 className="font-bold text-lg text-gray-900 mb-3">
+                      Question {q.question_order || i + 1} <span className="text-sm font-normal text-gray-600">({q.question_type})</span>
+                    </h4>
+                    <p className="text-gray-800 mb-3"><strong>Question:</strong> {q.question_text}</p>
+
+                    {q.options && (
+                      <div className="mb-3">
+                        <strong>Options:</strong>
+                        <ul className="list-disc ml-6 text-sm text-gray-700 mt-1">
+                          {typeof q.options === "string" ? JSON.parse(q.options) : q.options.map((opt, idx) => (
+                            <li key={idx}>{opt}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mt-4">
+                      <div><strong>Correct Answer:</strong> <span className="text-green-700 font-medium">{q.correct_answer}</span></div>
+                      <div><strong>Student Answer:</strong> <span className={q.is_correct ? "text-green-700" : "text-red-600"}>{q.student_answer || "—"}</span></div>
+                      <div><strong>Score:</strong> {q.score}</div>
+                      <div><strong>Result:</strong> <span className={`font-bold ${q.is_correct ? "text-green-600" : "text-red-600"}`}>{q.is_correct ? "Correct" : "Wrong"}</span></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
       </div>
       <Footer />
     </div>

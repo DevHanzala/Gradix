@@ -52,12 +52,12 @@ function Footer() {
 
   return (
     <footer className="bg-gray-900 text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="w-full px-4 sm:px-4 lg:px-8 xl:px-10 2xl:px-32 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Company Info */}
           <div className="col-span-1 lg:col-span-1">
             <div className="flex items-center space-x-2 mb-4">
-              <div className="text-2xl">Gradewise AI</div>
+              <div className="text-2xl">📚</div>
               <span className="text-xl font-bold text-blue-400">Gradewise AI</span>
             </div>
             <p className="text-gray-400 mb-4 text-sm leading-relaxed">
@@ -131,8 +131,8 @@ function Footer() {
         {user && (
           <div className="border-t border-gray-800 mt-8 pt-8">
             <div className="bg-gray-800 rounded-lg p-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center space-x-3 mb-3 sm:mb-0">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+           <div className="flex items-center justify-between sm:justify-start space-x-3 mb-3 sm:mb-0">
                   <div className="text-2xl">
                     {user.role === "admin" ? "Admin" : user.role === "instructor" ? "Instructor" : "Student"}
                   </div>

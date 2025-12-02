@@ -21,7 +21,7 @@ const StudentAnalytics = () => {
     downloadReport,
   } = useStudentAnalyticsStore();
 
-  const [showType, setShowType] = useState(null); // 'results' or 'questions' or null
+  const [showType, setShowType] = useState(null);
   const [questionsData, setQuestionsData] = useState([]);
   const [questionsLoading, setQuestionsLoading] = useState(false);
 
@@ -30,316 +30,212 @@ const StudentAnalytics = () => {
   }, [fetchAssessments]);
 
   useEffect(() => {
-    if (selectedAssessment && showType === 'results') {
-      fetchAssessmentDetails(selectedAssessment).then(() => {
-        console.log("Selected Assessment Details:", selectedAssessmentDetails);
-      }).catch(err => console.error("Error fetching details:", err));
+    if (selectedAssessment && showType === "results") {
+      fetchAssessmentDetails(selectedAssessment);
     }
   }, [selectedAssessment, showType, fetchAssessmentDetails]);
 
   const formatTime = (seconds) => {
-    if (isNaN(seconds) || seconds <= 0) return "0m 0s";
-    seconds = Math.floor(seconds);
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    return `${minutes}m ${remainingSeconds}s`;
+    if (!seconds) return "0m 0s";
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}m ${s}s`;
   };
 
-  const handleSeeResults = (assessmentId) => {
-    setSelectedAssessment(assessmentId);
-    setShowType('results');
-    setQuestionsData([]); // Clear questions if switching
+  const handleSeeResults = (id) => {
+    setSelectedAssessment(id);
+    setShowType("results");
+    setQuestionsData([]);
   };
 
-  const handleSeeQuestions = async (assessmentId) => {
-    setSelectedAssessment(assessmentId);
-    setShowType('questions');
+  const handleSeeQuestions = async (id) => {
+    setSelectedAssessment(id);
+    setShowType("questions");
     setQuestionsLoading(true);
     try {
       const token = localStorage.getItem("token");
       const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-      const response = await axios.get(`${API_URL}/student-analytics/assessment/${assessmentId}/questions`, {
+      const { data } = await axios.get(`${API_URL}/student-analytics/assessment/${id}/questions`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (response.data.success) {
-        setQuestionsData(response.data.data);
-      } else {
-        throw new Error(response.data.message || "Failed to fetch questions");
-      }
-    } catch (error) {
-      toast.error(error.message || "Failed to fetch questions and answers");
+      setQuestionsData(data.success ? data.data : []);
+    } catch (err) {
+      toast.error("Failed to load questions");
     } finally {
       setQuestionsLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <p className="text-red-500 text-lg">Error loading analytics: {error}</p>
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center"><LoadingSpinner size="lg" /></div>;
+  if (error) return <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center text-red-600 text-xl font-medium">Error: {error}</div>;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <Navbar />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center mb-6">
-          <div className="text-3xl">📚</div>
-          <span className="text-2xl font-bold text-blue-600 ml-2">Gradewise AI</span>
-        </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">My Analytics</h1>
-        <p className="text-gray-600">Track your progress and identify areas for improvement</p>
+      <div className="w-full  mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
-        <div className="mt-6">
-          <Card className="shadow-lg bg-white rounded-xl">
-            <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-t-xl">
-              <h3 className="text-lg font-semibold">My Assessments <FaChartLine className="inline ml-2" /></h3>
-            </CardHeader>
-            <CardContent>
-              {assessments.length > 0 ? (
-                <div className="space-y-4">
-                  {assessments.map((assessment) => (
-                    <div
-                      key={assessment.id}
-                      className={`p-4 border rounded-lg transition-all ${selectedAssessment === assessment.id ? 'bg-blue-50 border-blue-500' : ''}`}
-                    >
-                      <div>
-                        <p className="font-medium text-gray-900">{assessment.title}</p>
-                        <p className="text-sm text-gray-600">Date: {new Date(assessment.date).toLocaleDateString()}</p>
-                      </div>
-                      <div className="flex mt-2">
-                        <button
-                          onClick={() => handleSeeResults(assessment.id)}
-                          className="flex-1 px-3 py-1 bg-green-500 text-white rounded-l hover:bg-green-600 flex items-center justify-center"
-                        >
-                          <FaEye className="mr-1" /> See Results
-                        </button>
-                        <button
-                          onClick={() => handleSeeQuestions(assessment.id)}
-                          className="flex-1 px-3 py-1 bg-blue-500 text-white rounded-r hover:bg-blue-600 flex items-center justify-center"
-                        >
-                          <FaEye className="mr-1" /> See Questions
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-500 text-center py-4">No assessments completed yet <FaBook className="inline" /></p>
-              )}
-            </CardContent>
-          </Card>
+        <h1 className="text-4xl font-extrabold text-center text-gray-900 mb-3">My Analytics</h1>
+        <p className="text-center text-lg text-gray-600 mb-12">Review your performance in detail</p>
 
-          {selectedAssessment && selectedAssessmentDetails && showType === 'results' && (
-            <div className="mt-8 space-y-6">
-              <Card className="shadow-lg bg-white rounded-xl">
-                <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-t-xl">
-                  <h3 className="text-lg font-semibold">Assessment Details <FaBook className="inline ml-2" /></h3>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    <div className="flex items-center">
-                      <FaBook className="text-blue-500 mr-2" />
-                      <p className="text-sm font-medium text-gray-600">Title</p>
-                      <p className="text-lg font-medium text-gray-900 ml-2">{selectedAssessmentDetails.assessment_title || 'N/A'}</p>
-                    </div>
-                    <div className="flex items-center">
-                      <FaCheck className="text-green-500 mr-2" />
-                      <p className="text-sm font-medium text-gray-600">Score</p>
-                      <p className="text-3xl font-bold text-gray-900 ml-2">{selectedAssessmentDetails.score || 0}%</p>
-                    </div>
-                    <div className="flex items-center">
-                      <FaClock className="text-yellow-500 mr-2" />
-                      <p className="text-sm font-medium text-gray-600">Time Taken</p>
-                      <p className="text-lg font-medium text-gray-900 ml-2">{formatTime(selectedAssessmentDetails.time_taken || 0)}</p>
-                    </div>
-                    <div className="flex items-center">
-                      <FaChartLine className="text-purple-500 mr-2" />
-                      <p className="text-sm font-medium text-gray-600">Total Questions</p>
-                      <p className="text-lg font-medium text-gray-900 ml-2">
-                        {selectedAssessmentDetails.total_questions || 0}
-                      </p>
-                    </div>
-                    <div className="flex items-center">
-                      <FaCheck className="text-green-500 mr-2" />
-                      <p className="text-sm font-medium text-gray-600">Correct Answers</p>
-                      <p className="text-lg font-medium text-gray-900 ml-2">
-                        {selectedAssessmentDetails.correct_answers || 0}
-                      </p>
-                    </div>
-                    <div className="flex items-center">
-                      <FaTimes className="text-red-500 mr-2" />
-                      <p className="text-sm font-medium text-gray-600">Incorrect Answers</p>
-                      <p className="text-lg font-medium text-gray-900 ml-2">
-                        {selectedAssessmentDetails.incorrect_answers || 0}
-                      </p>
-                    </div>
-                    <div className="flex items-center">
-                      <FaTimes className="text-red-500 mr-2" />
-                      <p className="text-sm font-medium text-gray-600">Negative Marks Applied</p>
-                      <p className="text-lg font-medium text-gray-900 ml-2">
-                        {selectedAssessmentDetails.negative_marks_applied ? `-${selectedAssessmentDetails.negative_marks_applied}` : 0}
-                      </p>
-                    </div>
-                    <div className="flex items-center">
-                      <FaChartLine className="text-purple-500 mr-2" />
-                      <p className="text-sm font-medium text-gray-600">Total Marks</p>
-                      <p className="text-lg font-medium text-gray-900 ml-2">
-                        {selectedAssessmentDetails.total_marks || 0}
-                      </p>
-                    </div>
-                    <div className="flex items-center">
-                      <FaCheck className="text-green-500 mr-2" />
-                      <p className="text-sm font-medium text-gray-600">Obtained Marks</p>
-                      <p className="text-lg font-medium text-gray-900 ml-2">
-                        {selectedAssessmentDetails.student_score || 0}
-                      </p>
-                    </div>
-                    <div className="flex items-center">
-                      <FaClock className="text-yellow-500 mr-2" />
-                      <p className="text-sm font-medium text-gray-600">Created At</p>
-                      <p className="text-lg font-medium text-gray-900 ml-2">
-                        {new Date(selectedAssessmentDetails.assessment_created_at).toLocaleString() || 'N/A'}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-lg bg-white rounded-xl">
-                <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-t-xl">
-                  <h3 className="text-lg font-semibold">Learning Recommendations <FaChartLine className="inline ml-2" /></h3>
-                </CardHeader>
-                <CardContent>
-                  {selectedAssessmentDetails.recommendations ? (
-                    <>
-                      <h4 className="text-md font-semibold text-gray-700">Areas of Improvement</h4>
-                      {selectedAssessmentDetails.recommendations.weak_areas && selectedAssessmentDetails.recommendations.weak_areas.length > 0 ? (
-                        <ul className="list-disc pl-5 space-y-2">
-                          {selectedAssessmentDetails.recommendations.weak_areas.map((area, index) => (
-                            <li key={index} className="text-sm text-gray-700 bg-gray-50 p-2 rounded">
-                              <strong>{area.topic}:</strong> Performance {area.performance}%, Suggestion: {area.suggestion}
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="text-gray-500 text-center py-2">No specific weak areas identified.</p>
-                      )}
-                      <h4 className="text-md font-semibold text-gray-700 mt-4">Study Plan</h4>
-                      {selectedAssessmentDetails.recommendations.study_plan ? (
-                        <div className="mt-2">
-                          <h5 className="text-sm font-medium text-gray-600">Daily Practice <FaClock className="inline ml-1" /></h5>
-                          <ul className="list-disc pl-5 space-y-2">
-                            {selectedAssessmentDetails.recommendations.study_plan.daily_practice.map((item, index) => (
-                              <li key={index} className="text-sm text-gray-700 bg-gray-50 p-2 rounded">
-                                {item.topic}: {item.focus} ({item.time_allocation || 'N/A'})
-                              </li>
-                            ))}
-                          </ul>
-                          <h5 className="text-sm font-medium text-gray-600 mt-2">Weekly Review <FaChartLine className="inline ml-1" /></h5>
-                          <ul className="list-disc pl-5 space-y-2">
-                            {selectedAssessmentDetails.recommendations.study_plan.weekly_review.map((item, index) => (
-                              <li key={index} className="text-sm text-gray-700 bg-gray-50 p-2 rounded">
-                                {item.topic}: {item.activity} - {item.goal || 'N/A'}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : (
-                        <p className="text-gray-500 text-center py-2">No study plan available.</p>
-                      )}
-                    </>
-                  ) : (
-                    <p className="text-gray-500 text-center py-4">Loading recommendations...</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              <div className="text-center">
-                <button
-                  onClick={() => downloadReport(selectedAssessment)}
-                  className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:from-blue-600 hover:to-purple-600 transition-all flex items-center justify-center"
-                >
-                  <FaBook className="mr-2" /> Download Assessment Report
-                </button>
+        {/* ASSESSMENT LIST — FULL WIDTH ON DESKTOP */}
+        <div className="space-y-8">
+          {assessments.length > 0 ? assessments.map((a) => (
+            <Card
+              key={a.id}
+              className={`w-full shadow-2xl hover:shadow-3xl transition-all duration-300 overflow-hidden rounded-2xl border-2 ${
+                selectedAssessment === a.id ? "border-indigo-500 ring-4 ring-indigo-200 ring-opacity-50" : "border-transparent"
+              }`}
+            >
+              <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 p-6 text-white">
+                <h3 className="text-2xl font-bold">{a.title}</h3>
+                <p className="text-sm opacity-90 mt-1">
+                  {new Date(a.date).toLocaleDateString("en-US", {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </p>
               </div>
+
+              <CardContent className="p-6 bg-white">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+                  <div className="flex-1">
+                    <p className="text-gray-600">Click below to review your answers and performance</p>
+                  </div>
+
+                  {/* Buttons — Always perfect, never cut off */}
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => handleSeeResults(a.id)}
+                      className="flex-1 sm:flex-initial px-8 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-emerald-700 transition shadow-lg flex items-center justify-center text-lg"
+                    >
+                      <FaEye className="mr-2" /> Results
+                    </button>
+                    <button
+                      onClick={() => handleSeeQuestions(a.id)}
+                      className="flex-1 sm:flex-initial px-8 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white font-bold rounded-xl hover:from-blue-600 hover:to-indigo-700 transition shadow-lg flex items-center justify-center text-lg"
+                    >
+                      <FaEye className="mr-2" /> Questions
+                    </button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )) : (
+            <div className="text-center py-20">
+              <FaBook className="mx-auto text-8xl text-gray-300 mb-6" />
+              <p className="text-2xl text-gray-500">No assessments completed yet</p>
             </div>
           )}
+        </div>
 
-          {selectedAssessment && showType === 'questions' && (
-            <div className="mt-8 space-y-6">
-              <Card className="shadow-lg bg-white rounded-xl">
-                <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-t-xl">
-                  <h3 className="text-lg font-semibold">Questions and Answers</h3>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    {questionsLoading ? (
-                      <p className="text-gray-500 text-center py-4">Loading questions...</p>
-                    ) : questionsData.length > 0 ? (
-                      questionsData.map((q, index) => (
-                        <div key={index} className="border border-gray-200 p-6 rounded-xl bg-gradient-to-br from-white to-gray-50 shadow-md hover:shadow-lg transition-all duration-300">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="p-4 bg-white rounded-lg">
-                              <p className="text-xl font-semibold text-gray-800 mb-2">Question {q.question_order || (index + 1)} ({q.type})</p>
-                              <p className="text-gray-700 leading-relaxed">{q.question}</p>
-                            </div>
-                            <div className="p-4 bg-white rounded-lg">
-                              <p className="text-lg font-medium text-gray-800 mb-2">Options</p>
-                              <p className="text-gray-600 leading-relaxed">
-                                {q.options ? (
-                                  <ul className="list-disc list-inside space-y-1">
-                                    {Object.entries(q.options).map(([key, value]) => (
-                                      <li key={key} className="text-gray-700">{`${key}: ${value}`}</li>
-                                    ))}
-                                  </ul>
-                                ) : <span className="text-gray-500 italic">N/A</span>}
-                              </p>
-                            </div>
-                            <div className="p-4 bg-white rounded-lg">
-                              <p className="text-lg font-medium text-gray-800 mb-2">Correct Answer</p>
-                              <p className="text-green-600 font-medium leading-relaxed">{q.correct_answer || 'N/A'}</p>
-                            </div>
-                            <div className="p-4 bg-white rounded-lg">
-                              <p className="text-lg font-medium text-gray-800 mb-2">Your Answer</p>
-                              <p className="text-blue-600 font-medium leading-relaxed">{q.student_answer || 'N/A'}</p>
-                            </div>
-                            <div className="p-4 bg-white rounded-lg">
-                              <p className="text-lg font-medium text-gray-800 mb-2">Score</p>
-                              <p className="text-purple-600 font-medium leading-relaxed">
-                                {q.score < 0 ? `-${Math.abs(q.score)}` : q.score}/{q.max_marks}
-                              </p>
-                            </div>
-                            <div className="p-4 bg-white rounded-lg">
-                              <p className="text-lg font-medium text-gray-800 mb-2">Correct?</p>
-                              <p className="text-gray-700 leading-relaxed">{q.is_correct ? 'Yes' : 'No'}</p>
-                            </div>
-                            <div className="p-4 bg-white rounded-lg">
-                              <p className="text-lg font-medium text-gray-800 mb-2">Negative Marks</p>
-                              <p className="text-red-600 font-medium leading-relaxed">{q.negative_marks ? `-${q.negative_marks}` : 0}</p>
-                            </div>
+        {/* RESULTS VIEW */}
+        {showType === "results" && selectedAssessmentDetails && (
+          <div className="mt-12 space-y-8">
+            <Card className="shadow-2xl">
+              <CardHeader className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-center py-10">
+                <h2 className="text-4xl font-extrabold">{selectedAssessmentDetails.assessment_title}</h2>
+              </CardHeader>
+              <CardContent className="p-10">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
+                  <div className="p-8 bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-3xl shadow-xl">
+                    <p className="text-6xl font-bold">{selectedAssessmentDetails.score}%</p>
+                    <p className="text-xl mt-3">Your Score</p>
+                  </div>
+                  <div className="p-8 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-3xl shadow-xl">
+                    <p className="text-5xl font-bold">{formatTime(selectedAssessmentDetails.time_taken)}</p>
+                    <p className="text-xl mt-3">Time Taken</p>
+                  </div>
+                  <div className="p-8 bg-gradient-to-br from-purple-500 to-pink-600 text-white rounded-3xl shadow-xl">
+                    <p className="text-5xl font-bold">
+                      {selectedAssessmentDetails.correct_answers} / {selectedAssessmentDetails.total_questions}
+                    </p>
+                    <p className="text-xl mt-3">Correct Answers</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="text-center">
+              <button
+                onClick={() => downloadReport(selectedAssessment)}
+                className="px-12 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xl font-bold rounded-2xl hover:shadow-2xl transition transform hover:scale-105"
+              >
+                Download Full Report (PDF)
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* QUESTIONS VIEW — MOBILE SAFE */}
+        {showType === "questions" && (
+          <div className="mt-12 space-y-10">
+            {questionsLoading ? (
+              <Card><CardContent className="py-20 text-center"><LoadingSpinner size="lg" /></CardContent></Card>
+            ) : questionsData.length > 0 ? (
+              questionsData.map((q, i) => (
+                <Card key={i} className="shadow-2xl overflow-hidden">
+                  <div className="bg-gradient-to-r from-gray-800 to-gray-900 text-white p-6">
+                    <h3 className="text-2xl font-bold">
+                      Question {q.question_order || i + 1} ({q.type || "MCQ"})
+                    </h3>
+                  </div>
+                  <CardContent className="p-8 space-y-8">
+                    <div className="bg-gray-50 p-6 rounded-2xl">
+                      <p className="text-xl font-bold text-gray-800 mb-3">Question:</p>
+                      <p className="text-lg text-gray-700 leading-relaxed">{q.question}</p>
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-8">
+                      <div className="space-y-5">
+                        <div className="bg-blue-50 p-6 rounded-2xl">
+                          <p className="font-bold text-blue-800 mb-3">Options</p>
+                          <div className="space-y-3">
+                            {q.options && Object.entries(q.options).map(([k, v]) => (
+                              <div key={k} className="bg-white p-4 rounded-xl text-gray-700">
+                                <strong>{k}:</strong> {v}
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      ))
-                    ) : (
-                      <p className="text-gray-500 text-center py-4">No questions available.</p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </div>
+                      </div>
+
+                      <div className="space-y-6">
+                        <div className="bg-green-50 p-6 rounded-2xl text-center">
+                          <p className="font-bold text-green-800">Correct Answer</p>
+                          <p className="text-3xl font-bold text-green-600 mt-2">{q.correct_answer}</p>
+                        </div>
+                        <div className={`p-6 rounded-2xl text-center ${q.is_correct ? "bg-green-100" : "bg-red-100"}`}>
+                          <p className="font-bold">Your Answer</p>
+                          <p className={`text-3xl font-bold mt-2 ${q.is_correct ? "text-green-600" : "text-red-600"}`}>
+                            {q.student_answer || "Not Answered"}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap justify-center gap-4">
+                          <div className="bg-purple-100 text-purple-800 px-8 py-4 rounded-full font-bold text-xl">
+                            Score: {q.score}/{q.max_marks}
+                          </div>
+                          {q.negative_marks > 0 && (
+                            <div className="bg-red-100 text-red-800 px-8 py-4 rounded-full font-bold text-xl">
+                              Penalty: -{q.negative_marks}
+                            </div>
+                          )}
+                          <div className={`px-8 py-4 rounded-full font-bold text-xl ${q.is_correct ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+                            {q.is_correct ? "Correct" : "Incorrect"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <Card><CardContent className="text-center py-20 text-gray-500 text-xl">No questions available</CardContent></Card>
+            )}
+          </div>
+        )}
       </div>
       <Footer />
     </div>
