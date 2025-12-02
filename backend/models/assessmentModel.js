@@ -793,7 +793,7 @@ const getEnrolledStudents = async (assessmentId) => {
   try {
     const { rows } = await db.query(
       `
-      SELECT u.id, u.email
+      SELECT u.id, u.email, u.name
       FROM enrollments e
       JOIN users u ON e.student_id = u.id
       WHERE e.assessment_id = $1
