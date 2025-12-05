@@ -67,63 +67,82 @@ function Login() {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setErrors({});
+  e.preventDefault();
+  setLoading(true);
+  setErrors({});
 
-    try {
-      loginSchema.parse(formData);
+  try {
+    loginSchema.parse(formData);
 
-      // Get invisible CAPTCHA token
-      const captchaToken = await getCaptchaToken(siteKey, "login");
+    const captchaToken = await getCaptchaToken(siteKey, "login").catch(() => {
+      throw new Error("Captcha verification failed. Please reload and try again.");
+    });
 
-      const response = await login({ ...formData, captchaToken });
-      const token = useAuthStore.getState().token;
-      localStorage.setItem("token", token);
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-      console.log("Login successful, token set:", token.slice(0, 10) + "...");
-      showModal("success", "Login Successful!", `Welcome back, ${response.name}!`);
+    const response = await login({ ...formData, captchaToken });
 
-      setTimeout(() => {
-        redirectUser(response);
-      }, 1500);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const fieldErrors = {};
-        error.errors.forEach((err) => {
-          fieldErrors[err.path[0]] = err.message;
-        });
-        setErrors(fieldErrors);
-      } else {
-        const errorMessage = error.response?.data?.message || "Login failed. Please try again.";
-        showModal("error", "Login Failed", errorMessage);
-      }
-    } finally {
-      setLoading(false);
+    const token = useAuthStore.getState().token;
+    if (!token) throw new Error("Authentication token missing. Please try again.");
+
+    localStorage.setItem("token", token);
+    axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
+    showModal("success", "Login Successful!", `Welcome back, ${response?.name || "User"}!`);
+
+    setTimeout(() => {
+      redirectUser(response || { role: "student" });
+    }, 1500);
+
+  } catch (error) {
+    console.error("Login error:", error);
+
+    if (error instanceof z.ZodError) {
+      const fieldErrors = {};
+      error.errors.forEach((err) => {
+        fieldErrors[err.path[0]] = err.message;
+      });
+      setErrors(fieldErrors);
+    } else {
+      showModal("error", "Login Failed", error.message || "Login failed. Please try again.");
     }
-  };
+  } finally {
+    setLoading(false);
+  }
+};
 
-  const handleGoogleLogin = async () => {
-    setGoogleLoading(true);
-    try {
-      const response = await googleAuth();
-      const token = useAuthStore.getState().token;
-      localStorage.setItem("token", token);
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-      console.log("Google login successful, token set:", token.slice(0, 10) + "...");
-      showModal("success", "Welcome!", `Successfully signed in with Google! Welcome back, ${response.name}!`);
 
-      setTimeout(() => {
-        redirectUser(response);
-      }, 1500);
-    } catch (error) {
-      console.error("Google login error:", error);
-      const errorMessage = error.response?.data?.message || error.message || "Google login failed. Please try again.";
-      showModal("error", "Google Login Failed", errorMessage);
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
+
+const handleGoogleLogin = async () => {
+  setGoogleLoading(true);
+  try {
+    const user = await googleAuth();
+
+    const token = useAuthStore.getState().token;
+    if (!token) throw new Error("Authentication token missing after Google login.");
+
+    localStorage.setItem("token", token);
+    axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
+    showModal("success", "Welcome!", `Signed in with Google as ${user?.name || "user"}.`);
+
+    setTimeout(() => {
+      redirectUser(user || { role: "student" });
+    }, 1500);
+
+  } catch (error) {
+    console.error("Google login error:", error);
+
+    const readable =
+      error.code === "auth/popup-closed-by-user" ? "Popup closed before sign-in was completed."
+      : error.code === "auth/popup-blocked" ? "Browser blocked the popup. Try again."
+      : error.code === "auth/cancelled-popup-request" ? "Another sign-in attempt was already in progress."
+      : error.message || "Google login failed. Please try again.";
+
+    showModal("error", "Google Login Failed", readable);
+
+  } finally {
+    setGoogleLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-gray-50">

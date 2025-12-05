@@ -1,80 +1,118 @@
-import { useEffect } from "react"
+import { useEffect } from "react";
 
 function Modal({ isOpen, onClose, title, children, type = "info" }) {
+  // Auto close after 6 seconds (perfect toast timing)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const timer = setTimeout(() => {
+      onClose();
+    }, 6000); // ← 6 seconds
+
+    return () => clearTimeout(timer);
+  }, [isOpen, onClose]);
+
+  // Prevent background scroll when toast is open (optional but clean)
   useEffect(() => {
     if (isOpen) {
-      document.body.style.overflow = "hidden"
-    } else {
-      document.body.style.overflow = "unset"
+      document.body.style.overflow = "hidden";
     }
-
     return () => {
-      document.body.style.overflow = "unset"
-    }
-  }, [isOpen])
+      document.body.style.overflow = "unset";
+    };
+  }, [isOpen]);
 
-  if (!isOpen) return null
+  if (!isOpen) return null;
 
   const getTypeStyles = () => {
     switch (type) {
       case "success":
-        return "border-green-200 bg-green-50"
+        return {
+          bg: "bg-green-50",
+          border: "border-l-green-500",
+          iconBg: "bg-green-100",
+          text: "text-green-800",
+          icon: "text-green-600",
+        };
       case "error":
-        return "border-red-200 bg-red-50"
+        return {
+          bg: "bg-red-50",
+          border: "border-l-red-500",
+          iconBg: "bg-red-100",
+          text: "text-red-800",
+          icon: "text-red-600",
+        };
       case "warning":
-        return "border-yellow-200 bg-yellow-50"
+        return {
+          bg: "bg-yellow-50",
+          border: "border-l-yellow-500",
+          iconBg: "bg-yellow-100",
+          text: "text-yellow-800",
+          icon: "text-yellow-600",
+        };
       default:
-        return "border-blue-200 bg-blue-50"
+        return {
+          bg: "bg-blue-50",
+          border: "border-l-blue-500",
+          iconBg: "bg-blue-100",
+          text: "text-blue-800",
+          icon: "text-blue-600",
+        };
     }
-  }
+  };
 
-  const getIconColor = () => {
-    switch (type) {
-      case "success":
-        return "text-green-600"
-      case "error":
-        return "text-red-600"
-      case "warning":
-        return "text-yellow-600"
-      default:
-        return "text-blue-600"
-    }
-  }
+  const styles = getTypeStyles();
 
   const getIcon = () => {
     switch (type) {
       case "success":
-        return "✓"
+        return "✓";
       case "error":
-        return "✗"
+        return "✗";
       case "warning":
-        return "⚠"
+        return "⚠";
       default:
-        return "ℹ"
+        return "ℹ";
     }
-  }
+  };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className={`p-6 border-l-4 ${getTypeStyles()}`}>
-          <div className="flex items-center mb-4">
-            <div className={`text-2xl mr-3 ${getIconColor()}`}>{getIcon()}</div>
-            <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
-          </div>
-          <div className="text-gray-700 mb-6">{children}</div>
-          <div className="flex justify-end">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition duration-200"
-            >
-              Close
-            </button>
+    <div className="fixed inset-0 pointer-events-none z-50">
+      {/* Top-Right Position */}
+      <div className="absolute top-4 right-4 max-w-sm w-full pointer-events-auto">
+        <div
+          className={`
+            bg-white rounded-2xl shadow-2xl border-l-4 ${styles.border} ${styles.bg}
+            transform transition-all duration-500 ease-out
+            animate-in slide-in-from-top-4 fade-in
+          `}
+        >
+          <div className="p-5">
+            <div className="flex items-start space-x-4">
+              {/* Icon Circle */}
+              <div className={`flex-shrink-0 w-12 h-12 ${styles.iconBg} rounded-full flex items-center justify-center`}>
+                <span className={`text-2xl font-bold ${styles.icon}`}>{getIcon()}</span>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <h3 className={`text-lg font-bold ${styles.text} mb-1`}>{title}</h3>
+                <div className="text-gray-700 text-sm leading-relaxed">{children}</div>
+              </div>
+            </div>
+
+            {/* Progress Bar (6 seconds) */}
+            <div className="mt-4 h-1 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className={`h-full ${styles.icon.replace("600", "500")} transition-all duration-6000 ease-linear`}
+                style={{ width: "100%" }}
+              />
+            </div>
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default Modal
+export default Modal;

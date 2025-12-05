@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { useEffect } from "react";
 import { Toaster } from "react-hot-toast";
 import "./App.css";
 
@@ -37,8 +38,14 @@ import TakeAssessment from "./Pages/Student/AssesmentManagement/TakeAssessment";
 import StudentAnalytics from "./Pages/Student/StudentAnalytics";
 
 import ProtectedRoute from "./components/ProtectedRoutes";
+import { handleGoogleRedirect } from "./config/handleRedirect";
 
 function App() {
+  // MUST run before Router loads to ensure Google Redirect authentication works reliably
+  useEffect(() => {
+    handleGoogleRedirect();
+  }, []);
+
   return (
     <Router>
       <div className="App">
@@ -51,7 +58,7 @@ function App() {
           <Route path="/reset-password/:resetId" element={<SetNewPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
 
-          {/* Protected Routes */}
+          {/* Profile (authenticated only, no role restriction) */}
           <Route
             path="/profile"
             element={
@@ -65,7 +72,7 @@ function App() {
           <Route
             path="/super-admin/dashboard"
             element={
-              <ProtectedRoute requiredRole="super_admin">
+              <ProtectedRoute allowedRoles={["super_admin"]}>
                 <SuperAdminDashboard />
               </ProtectedRoute>
             }
@@ -75,7 +82,7 @@ function App() {
           <Route
             path="/admin/dashboard"
             element={
-              <ProtectedRoute requiredRole="admin">
+              <ProtectedRoute allowedRoles={["admin"]}>
                 <AdminDashboard />
               </ProtectedRoute>
             }
@@ -85,80 +92,88 @@ function App() {
           <Route
             path="/instructor/dashboard"
             element={
-              <ProtectedRoute requiredRole="instructor">
+              <ProtectedRoute allowedRoles={["instructor"]}>
                 <InstructorDashboard />
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/instructor/resources"
             element={
-              <ProtectedRoute requiredRole="instructor">
+              <ProtectedRoute allowedRoles={["instructor"]}>
                 <ResourceManagement />
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/instructor/assessments"
             element={
-              <ProtectedRoute requiredRole="instructor">
+              <ProtectedRoute allowedRoles={["instructor"]}>
                 <AssessmentList />
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/instructor/assessments/create"
             element={
-              <ProtectedRoute requiredRole="instructor">
+              <ProtectedRoute allowedRoles={["instructor"]}>
                 <CreateAssessment />
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/instructor/assessments/:id"
             element={
-              <ProtectedRoute requiredRole="instructor">
+              <ProtectedRoute allowedRoles={["instructor"]}>
                 <AssessmentDetail />
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/instructor/assessments/:id/edit"
             element={
-              <ProtectedRoute requiredRole="instructor">
+              <ProtectedRoute allowedRoles={["instructor"]}>
                 <EditAssessment />
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/instructor/assessments/:assessmentId/enroll"
             element={
-              <ProtectedRoute requiredRole="instructor">
+              <ProtectedRoute allowedRoles={["instructor"]}>
                 <EnrollStudents />
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/instructor/assessments/:assessmentId/resources"
             element={
-              <ProtectedRoute requiredRole="instructor">
+              <ProtectedRoute allowedRoles={["instructor"]}>
                 <ResourceManagement />
               </ProtectedRoute>
             }
           />
-          
+
           <Route
             path="/instructor/assessments/:assessmentId/analytics"
             element={
-              <ProtectedRoute requiredRole="instructor">
+              <ProtectedRoute allowedRoles={["instructor"]}>
                 <AssessmentAnalytics />
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/instructor/students"
             element={
-              <ProtectedRoute requiredRole="instructor">
+              <ProtectedRoute allowedRoles={["instructor"]}>
                 <AddStudent />
               </ProtectedRoute>
             }
@@ -168,23 +183,25 @@ function App() {
           <Route
             path="/student/dashboard"
             element={
-              <ProtectedRoute requiredRole="student">
+              <ProtectedRoute allowedRoles={["student"]}>
                 <StudentDashboard />
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/student/analytics"
             element={
-              <ProtectedRoute requiredRole="student">
+              <ProtectedRoute allowedRoles={["student"]}>
                 <StudentAnalytics />
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/student/assessments/:assessmentId/take"
             element={
-              <ProtectedRoute requiredRole="student">
+              <ProtectedRoute allowedRoles={["student"]}>
                 <TakeAssessment />
               </ProtectedRoute>
             }

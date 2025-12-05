@@ -59,73 +59,75 @@ function Signup() {
     toast[type === "success" ? "success" : "error"](message);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setErrors({});
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setErrors({});
 
-    try {
-      signupSchema.parse(formData);
+  try {
+    signupSchema.parse(formData);
 
-      const captchaToken = await getCaptchaToken(siteKey, "signup");
+    const captchaToken = await getCaptchaToken(siteKey, "signup").catch(() => {
+      throw new Error("Captcha verification failed. Please try again.");
+    });
 
-      const response = await signup({ ...formData, captchaToken });
-      showModal("success", "Registration Successful!", response.message);
+    const response = await signup({ ...formData, captchaToken });
 
-      setFormData({ name: "", email: "", password: "" });
+    showModal("success", "Registration Successful!", response?.message || "Account created successfully.");
 
-      setTimeout(() => {
-        navigate("/login");
-      }, 2000);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const fieldErrors = {};
-        error.issues.forEach((err) => {
-          fieldErrors[err.path[0]] = err.message;
-        });
-        setErrors(fieldErrors);
-      } else {
-        const errorMessage = error.response?.data?.message || error.message || "Registration failed. Please try again.";
-        showModal("error", "Registration Failed", errorMessage);
-      }
-    } finally {
-      setLoading(false);
+    setFormData({ name: "", email: "", password: "" });
+
+    setTimeout(() => navigate("/login"), 2000);
+
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const fieldErrors = {};
+      error.issues.forEach((err) => {
+        fieldErrors[err.path[0]] = err.message;
+      });
+      setErrors(fieldErrors);
+    } else {
+      showModal(
+        "error",
+        "Registration Failed",
+        error.message || "Registration failed. Please try again."
+      );
     }
-  };
+  } finally {
+    setLoading(false);
+  }
+};
 
-  const handleGoogleSignup = async () => {
-    setGoogleLoading(true);
-    try {
-      const captchaToken = await getCaptchaToken(siteKey, "google_signup");
 
-      const user = await googleAuth({ captchaToken });
-      showModal("success", "Welcome!", `Successfully signed up with Google! Welcome, ${user.name}!`);
+ const handleGoogleSignup = async () => {
+  setGoogleLoading(true);
 
-      setTimeout(() => {
-        switch (user.role) {
-          case "super_admin":
-            navigate("/super-admin/dashboard");
-            break;
-          case "admin":
-            navigate("/admin/dashboard");
-            break;
-          case "instructor":
-            navigate("/instructor/dashboard");
-            break;
-          case "student":
-            navigate("/student/dashboard");
-            break;
-          default:
-            navigate("/profile");
-        }
-      }, 2000);
-    } catch (error) {
-      const errorMessage = error.response?.data?.message || error.message || "Google signup failed. Please try again.";
-      showModal("error", "Google Signup Failed", errorMessage);
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
+  try {
+    const captchaToken = await getCaptchaToken(siteKey, "google_signup").catch(() => {
+      throw new Error("Captcha verification failed.");
+    });
+
+    const user = await googleAuth({ captchaToken });
+
+    showModal("success", "Welcome!", `Google signup successful. Hello ${user?.name || "user"}!`);
+
+    setTimeout(() => {
+      redirectUser(user || { role: "student" });
+    }, 2000);
+
+  } catch (error) {
+    const readable =
+      error.code === "auth/popup-closed-by-user" ? "Popup closed before sign-up completed."
+      : error.code === "auth/popup-blocked" ? "Browser blocked the popup. Retry."
+      : error.message || "Google signup failed.";
+
+    showModal("error", "Google Signup Failed", readable);
+
+  } finally {
+    setGoogleLoading(false);
+  }
+};
+
 
   return (
     <div className="min-h-screen bg-gray-50">
