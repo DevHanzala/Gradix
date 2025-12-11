@@ -31,7 +31,7 @@ router.post("/change-password", changePassword);
 // Protected routes
 router.use(protect);
 
-router.post("/register-student", verifyCaptcha, authorizeRoles("admin", "instructor", "super_admin"), registerStudent);
+router.post("/register-student", authorizeRoles("admin", "instructor", "super_admin"), registerStudent);
 router.get("/users", authorizeRoles("admin", "super_admin"), getUsers);
 router.put("/change-role", authorizeRoles("admin", "super_admin"), changeUserRole);
 router.delete("/users/:userId", authorizeRoles("super_admin"), removeUser);

@@ -9,11 +9,18 @@ import {
   unenrollStudent,
   getEnrolledStudents,
   generateAssessmentQuestions,
+  storeResourceChunk,
 } from '../models/assessmentModel.js';
+
 import { findUserByEmail } from '../models/userModel.js';
-import { linkResourceToAssessment } from '../models/resourceModel.js';
+import { createResource, linkResourceToAssessment } from '../models/resourceModel.js';
 import { uploadResource } from './resourceController.js';
 import { sendAssessmentEnrollmentEmail } from '../services/emailService.js';
+
+// THESE ARE THE NEW ONES YOU NEED:
+import { extractTextFromFile, chunkText } from '../services/textProcessor.js';
+import { generateEmbedding } from '../services/embeddingGenerator.js';
+
 import pool from '../DB/db.js';
 
 export const createNewAssessment = async (req, res) => {
@@ -25,84 +32,88 @@ export const createNewAssessment = async (req, res) => {
       question_blocks,
       selected_resources = [],
     } = req.body;
+
     const instructor_id = req.user.id;
     const new_files = req.files?.new_files || [];
 
-    if (!prompt || !prompt.trim()) {
+    // === TITLE IS ALWAYS REQUIRED ===
+    if (!title || !title.trim()) {
       return res.status(400).json({
         success: false,
-        message: 'Prompt is required and must be a non-empty string',
+        message: "Assessment Title is required",
       });
     }
 
-    if (title && (!title || typeof title !== 'string' || !title.trim())) {
+    // === CHECK IF USER PROVIDED ANY SOURCE (files, links, or selected resources) ===
+    const hasFiles = new_files.length > 0;
+    const hasLinks = Array.isArray(externalLinks) && externalLinks.some(l => l && l.trim());
+    const hasSelectedResources = selected_resources.length > 0;
+    const hasAnySource = hasFiles || hasLinks || hasSelectedResources;
+
+    // === PROMPT LOGIC: REQUIRED ONLY IF NO SOURCE IS PROVIDED ===
+    if (!hasAnySource && (!prompt || !prompt.trim())) {
       return res.status(400).json({
         success: false,
-        message: 'Title must be a non-empty string if provided',
+        message: "Prompt is required when no resources or links are provided",
       });
     }
 
-    // Validate question_blocks if provided
+    // === IF SOURCE EXISTS → PROMPT IS OPTIONAL (even if empty) ===
+    // So we allow prompt = null or empty string if files/links exist
+
+    // Validate question blocks (same as before)
     if (question_blocks && Array.isArray(question_blocks) && question_blocks.length > 0) {
       for (const block of question_blocks) {
         if (!block.question_count || block.question_count < 1) {
-          return res.status(400).json({
-            success: false,
-            message: 'Question count must be at least 1 for each block',
-          });
+          return res.status(400).json({ success: false, message: "Question count must be at least 1" });
         }
         if (!block.duration_per_question || block.duration_per_question < 30) {
-          return res.status(400).json({
-            success: false,
-            message: 'Duration per question must be at least 30 seconds',
-          });
+          return res.status(400).json({ success: false, message: "Duration per question must be at least 30 seconds" });
         }
-        if (block.question_type === 'multiple_choice' && (!block.num_options || block.num_options < 2)) {
-          return res.status(400).json({
-            success: false,
-            message: 'Multiple choice questions must have at least 2 options',
-          });
+        if (block.question_type === "multiple_choice" && (!block.num_options || block.num_options < 2)) {
+          return res.status(400).json({ success: false, message: "Multiple choice needs at least 2 options" });
         }
       }
     }
 
+    // === FINAL DATA ===
     const assessmentData = {
-      title: title || null,
-      prompt: prompt.trim(),
-      external_links: externalLinks && Array.isArray(externalLinks) ? externalLinks.filter(link => link && link.trim()) : null,
+      title: title.trim(),
+      prompt: hasAnySource ? (prompt?.trim() || null) : prompt.trim(), // allow null if source exists
+      external_links: hasLinks ? externalLinks.filter(link => link && link.trim()) : null,
       instructor_id,
       is_executed: false,
     };
 
-    console.log('📝 Creating assessment with data:', assessmentData);
+    console.log("Creating assessment:", assessmentData);
 
     const newAssessment = await createAssessment(assessmentData);
 
-    if (question_blocks && Array.isArray(question_blocks) && question_blocks.length > 0) {
+    if (question_blocks?.length > 0) {
       await storeQuestionBlocks(newAssessment.id, question_blocks, instructor_id);
     }
 
     let newResourceIds = [];
-    if (new_files.length > 0) {
-      const uploadedResources = await uploadResource({ files: new_files });
-      newResourceIds = uploadedResources.map(r => r.id);
+    if (hasFiles) {
+      const uploaded = await uploadResource({ files: new_files });
+      newResourceIds = uploaded.map(r => r.id);
     }
 
-    const allResources = [...selected_resources, ...newResourceIds];
-    for (const resourceId of allResources) {
-      await linkResourceToAssessment(newAssessment.id, resourceId);
+    const allResourceIds = [...selected_resources.map(id => parseInt(id)), ...newResourceIds];
+    for (const id of allResourceIds) {
+      if (!isNaN(id)) await linkResourceToAssessment(newAssessment.id, id);
     }
 
     res.status(201).json({
       success: true,
-      message: 'Assessment created successfully',
+      message: "Assessment created successfully",
       data: newAssessment,
     });
   } catch (error) {
-    console.error('❌ Create assessment error:', error);
+    console.error("Create assessment error:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to create assessment',
+      message: "Failed to create assessment",
       error: error.message,
     });
   }
@@ -161,83 +172,71 @@ export const getAssessment = async (req, res) => {
   }
 };
 
+
 export const updateAssessmentData = async (req, res) => {
   try {
     const assessment_id = req.params.id;
     const user_id = req.user.id;
-    const user_role = req.user.role;
-    const { title, prompt, externalLinks, question_blocks, selected_resources = [] } = req.body;
-    const new_files = req.files?.new_files || [];
 
-    if (!assessment_id || isNaN(parseInt(assessment_id))) {
-      return res.status(400).json({ success: false, message: 'Invalid assessment ID' });
-    }
+    const title = req.body.title;
+    const prompt = req.body.prompt;
+    const externalLinks = req.body.externalLinks ? JSON.parse(req.body.externalLinks) : [];
+    const question_blocks = req.body.question_blocks ? JSON.parse(req.body.question_blocks) : [];
+    const selected_resources = req.body.selected_resources ? JSON.parse(req.body.selected_resources) : [];
+    const new_files = req.files || [];
 
-    console.log(`🔄 Updating assessment ${assessment_id} for user ${user_id} (${user_role})`);
+    if (!title?.trim()) return res.status(400).json({ success: false, message: 'Assessment Title is required' });
 
-    const assessment = await getAssessmentById(parseInt(assessment_id), user_id, user_role);
+    const hasPrompt = prompt?.trim();
+    const hasLinks = Array.isArray(externalLinks) && externalLinks.some(l => l?.trim());
+    const hasResources = selected_resources.length > 0 || new_files.length > 0;
 
-    if (!assessment) {
-      return res.status(404).json({ success: false, message: 'Assessment not found or access denied' });
-    }
-
-    if (!prompt || !prompt.trim()) {
-      return res.status(400).json({ success: false, message: 'Prompt is required and must be a non-empty string' });
-    }
-
-    if (title && (!title || typeof title !== 'string' || !title.trim())) {
-      return res.status(400).json({
-        success: false,
-        message: 'Title must be a non-empty string if provided',
-      });
-    }
-
-    // Validate question_blocks if provided
-    if (question_blocks && Array.isArray(question_blocks) && question_blocks.length > 0) {
-      for (const block of question_blocks) {
-        if (!block.question_count || block.question_count < 1) {
-          return res.status(400).json({
-            success: false,
-            message: 'Question count must be at least 1 for each block',
-          });
-        }
-        if (!block.duration_per_question || block.duration_per_question < 30) {
-          return res.status(400).json({
-            success: false,
-            message: 'Duration per question must be at least 30 seconds',
-          });
-        }
-        if (block.question_type === 'multiple_choice' && (!block.num_options || block.num_options < 2)) {
-          return res.status(400).json({
-            success: false,
-            message: 'Multiple choice questions must have at least 2 options',
-          });
-        }
-      }
+    if (!hasPrompt && !hasLinks && !hasResources) {
+      return res.status(400).json({ success: false, message: 'You must provide either a Prompt, Resources, or External Links' });
     }
 
     const updateData = {
-      title: title || null,
-      prompt: prompt.trim(),
-      external_links: externalLinks && Array.isArray(externalLinks) ? externalLinks.filter(link => link && link.trim()) : null,
+      title: title.trim(),
+      prompt: hasPrompt ? prompt.trim() : null,
+      external_links: hasLinks ? externalLinks.filter(l => l?.trim()) : null,
     };
 
     const updatedAssessment = await updateAssessment(parseInt(assessment_id), updateData);
 
-    if (question_blocks && Array.isArray(question_blocks) && question_blocks.length > 0) {
+    if (question_blocks.length > 0) {
       await storeQuestionBlocks(parseInt(assessment_id), question_blocks, user_id);
     }
 
-    let newResourceIds = [];
-    if (new_files.length > 0) {
-      const uploadedResources = await uploadResource({ files: new_files });
-      newResourceIds = uploadedResources.map(r => r.id);
+    // CLEAR ALL OLD RESOURCE LINKS
+    await pool.query(`DELETE FROM assessment_resources WHERE assessment_id = $1`, [assessment_id]);
+
+    // LINK SELECTED EXISTING RESOURCES
+    for (const resourceId of selected_resources) {
+      if (!isNaN(parseInt(resourceId))) {
+        await linkResourceToAssessment(assessment_id, parseInt(resourceId));
+      }
     }
 
-    const allResources = [...selected_resources, ...newResourceIds];
-    await pool.query('DELETE FROM assessment_resources WHERE assessment_id = $1', [parseInt(assessment_id)]);
-    for (const resourceId of allResources) {
-      await linkResourceToAssessment(parseInt(assessment_id), resourceId);
+    // PROCESS NEW UPLOADED FILES
+    for (const file of new_files) {
+      const text = await extractTextFromFile(file.buffer, file.mimetype);
+      const chunks = chunkText(text, 500);
+
+      const resource = await createResource({
+        name: file.originalname,
+        file_type: file.mimetype,
+        file_size: file.size,
+        content_type: 'file',
+        visibility: 'private',
+        uploaded_by: user_id,
+      });
+
+      for (let i = 0; i < chunks.length; i++) {
+        const embedding = await generateEmbedding(chunks[i]);
+        await storeResourceChunk(resource.id, chunks[i], embedding, { chunk_index: i });
+      }
+
+      await linkResourceToAssessment(assessment_id, resource.id);
     }
 
     res.status(200).json({
@@ -246,12 +245,8 @@ export const updateAssessmentData = async (req, res) => {
       data: updatedAssessment,
     });
   } catch (error) {
-    console.error('❌ Update assessment error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update assessment',
-      error: error.message,
-    });
+    console.error('Update assessment error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 };
 

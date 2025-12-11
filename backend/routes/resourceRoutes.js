@@ -21,14 +21,34 @@ const upload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
     const allowed = [
-      "application/pdf",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "text/plain",
+      // PDFs
+      'application/pdf',
+
+      // Word Documents
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+
+      // PowerPoint
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+
+      // Text
+      'text/plain',
+
+      // Images (for OCR)
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/webp',
     ];
-    allowed.includes(file.mimetype) ? cb(null, true) : cb(new Error("Invalid file type"), false);
+
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Unsupported file type: ${file.mimetype}`), false);
+    }
   },
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 20 * 1024 * 1024 }, // Increased to 20MB
 });
 
 /**

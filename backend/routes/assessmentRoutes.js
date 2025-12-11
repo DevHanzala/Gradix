@@ -5,7 +5,7 @@ import {
   storeQuestionBlocks,
   getAssessmentsByInstructor,
   getAssessmentById,
-  updateAssessment,
+  // updateAssessment,
   deleteAssessment,
   clearLinksForAssessment,
   storeResourceChunk,
@@ -18,23 +18,40 @@ import {
   enrollStudentController,
   unenrollStudentController,
   getEnrolledStudentsController,
+  updateAssessmentData
 } from '../controllers/assessmentController.js';
 
 const router = express.Router();
 
 // MULTER: IN-MEMORY ONLY → NO DISK, NO FOLDER
 const upload = multer({
-  storage: multer.memoryStorage(), // ← NO FILES SAVED TO DISK
+  storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
     const allowed = [
+      // Documents
       'application/pdf',
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/plain',
+
+      // PowerPoint
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+
+      // Images
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/webp',
     ];
-    allowed.includes(file.mimetype) ? cb(null, true) : cb(new Error('Invalid file type'), false);
+
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Unsupported file type: ${file.mimetype}`), false);
+    }
   },
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
 });
 
 // Get socket from request
@@ -179,10 +196,7 @@ router.get('/:id', protect, async (req, res) => {
   assessment ? res.json({ success: true, data: assessment }) : res.status(404).json({ success: false, message: 'Not found' });
 });
 
-router.put('/:id', protect, authorizeRoles('instructor', 'admin', 'super_admin'), async (req, res) => {
-  const assessment = await updateAssessment(req.params.id, req.body);
-  res.json({ success: true, data: assessment });
-});
+router.put('/:id', protect, authorizeRoles('instructor', 'admin', 'super_admin'), upload.array('new_files'), updateAssessmentData);
 
 router.delete('/:id', protect, authorizeRoles('instructor', 'admin', 'super_admin'), async (req, res) => {
   await deleteAssessment(req.params.id);

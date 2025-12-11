@@ -15,8 +15,6 @@ export const ensureResourcesTable = async () => {
         CREATE TABLE resources (
           id SERIAL PRIMARY KEY,
           name VARCHAR(255) NOT NULL,
-          -- file_path REMOVED — we don't store files on disk
-          file_type VARCHAR(100),
           file_size INTEGER,
           content_type VARCHAR(50) NOT NULL,
           visibility VARCHAR(50) NOT NULL DEFAULT 'private',
@@ -81,14 +79,14 @@ export const init = async () => {
 
 export const createResource = async (resourceData) => {
   // REMOVED file_path from destructuring
-  const { name, file_type, file_size, content_type, visibility, uploaded_by } = resourceData;
+  const { name, file_size, content_type, visibility, uploaded_by } = resourceData;
   const query = `
-    INSERT INTO resources (name, file_type, file_size, content_type, visibility, uploaded_by)
-    VALUES ($1, $2, $3, $4, $5, $6)
+    INSERT INTO resources (name, file_size, content_type, visibility, uploaded_by)
+    VALUES ($1, $2, $3, $4, $5)
     RETURNING *
   `;
   try {
-    const { rows } = await pool.query(query, [name, file_type, file_size, content_type, visibility, uploaded_by]);
+    const { rows } = await pool.query(query, [name, file_size, content_type, visibility, uploaded_by]);
     console.log(`Created resource: ID=${rows[0].id}`);
     return rows[0];
   } catch (error) {

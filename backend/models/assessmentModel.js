@@ -11,13 +11,14 @@ const ensureAssessmentsTable = async () => {
         AND table_name = 'assessments'
       )
     `);
+
     if (!tableCheck.rows[0].exists) {
       console.log("Creating assessments table...");
       await db.query(`
         CREATE TABLE assessments (
           id SERIAL PRIMARY KEY,
           title VARCHAR(255),
-          prompt TEXT NOT NULL,
+          prompt TEXT,  -- ← NOW NULLABLE FROM THE START
           external_links JSONB DEFAULT '[]',
           instructor_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
           is_published BOOLEAN DEFAULT FALSE,
@@ -26,20 +27,27 @@ const ensureAssessmentsTable = async () => {
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
         )
       `);
-      await db.query(`
-        CREATE INDEX idx_assessments_instructor_id ON assessments(instructor_id);
-      `);
-      console.log("✅ assessments table created");
+      await db.query(`CREATE INDEX idx_assessments_instructor_id ON assessments(instructor_id);`);
+      console.log("assessments table created");
     } else {
-      await db.query(`
-        ALTER TABLE assessments
-        ALTER COLUMN prompt SET NOT NULL,
-        ALTER COLUMN title DROP NOT NULL;
+      // Only make changes if needed — NEVER force NOT NULL again
+      const columnInfo = await db.query(`
+        SELECT is_nullable 
+        FROM information_schema.columns 
+        WHERE table_name = 'assessments' AND column_name = 'prompt'
       `);
-      console.log("✅ assessments table updated (prompt made required, title made optional)");
+
+      if (columnInfo.rows[0]?.is_nullable === 'NO') {
+        console.log("Making prompt column nullable...");
+        await db.query(`ALTER TABLE assessments ALTER COLUMN prompt DROP NOT NULL;`);
+      }
+
+      // Title should be nullable
+      await db.query(`ALTER TABLE assessments ALTER COLUMN title DROP NOT NULL;`);
+      console.log("assessments table schema is up to date");
     }
   } catch (error) {
-    console.error("❌ Error creating/updating assessments table:", error);
+    console.error("Error ensuring assessments table:", error);
     throw error;
   }
 };
@@ -434,9 +442,7 @@ const getAssessmentsByInstructor = async (instructorId) => {
                 json_build_object(
                   'id', r.id,
                   'name', r.name,
-                  'type', r.file_type,
-                  'content_type', r.content_type,
-                  'url', r.url
+                  'content_type', r.content_type
                 )
              ) FROM assessment_resources ar JOIN resources r ON ar.resource_id = r.id WHERE ar.assessment_id = a.id),
              '[]'
@@ -487,9 +493,7 @@ const getAssessmentById = async (assessment_id, user_id, user_role) => {
                  ARRAY_AGG(
                    json_build_object(
                      'id', r.id,
-                     'name', r.name,
-                     'file_path', r.file_path,
-                     'file_type', r.file_type
+                     'name', r.name
                    )
                  ) FILTER (WHERE r.id IS NOT NULL),
                  '{}'
@@ -523,8 +527,7 @@ const getAssessmentById = async (assessment_id, user_id, user_role) => {
                    json_build_object(
                      'id', r.id,
                      'name', r.name,
-                     'file_path', r.file_path,
-                     'file_type', r.file_type
+                      'content_type', r.content_type
                    )
                  ) FILTER (WHERE r.id IS NOT NULL),
                  '{}'
@@ -563,14 +566,26 @@ const updateAssessment = async (assessmentId, updateData) => {
     WHERE id = $4
     RETURNING *
   `;
-  const validExternalLinks = Array.isArray(external_links) ? external_links.filter(link => link && typeof link === "string" && link.trim() !== "") : [];
+  const validExternalLinks = Array.isArray(external_links) 
+    ? external_links.filter(link => link && typeof link === "string" && link.trim() !== "") 
+    : [];
+
+   console.log("MODEL RECEIVED updateData:", updateData); 
+  console.log("DEBUG: Model updateAssessment - Input updateData:", updateData);
+  console.log("DEBUG: Model updateAssessment - Title:", title, "Prompt:", prompt);
+
   try {
-    const { rows } = await db.query(query, [title || null, prompt, JSON.stringify(validExternalLinks), assessmentId]);
+    const { rows } = await db.query(query, [
+      title || null,           // ← Perfect: empty string → null (DB-safe)
+      prompt,                  // ← Can be null or string
+      JSON.stringify(validExternalLinks),
+      assessmentId
+    ]);
     if (rows.length === 0) throw new Error("Assessment not found");
-    console.log(`✅ Assessment updated: ID=${assessmentId}`);
+    console.log(`DEBUG: Model updateAssessment - Updated row:`, rows[0]);
     return rows[0];
   } catch (error) {
-    console.error("❌ Error updating assessment:", error);
+    console.error("DEBUG: Model updateAssessment - Error:", error);
     throw error;
   }
 };

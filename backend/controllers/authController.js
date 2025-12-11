@@ -495,13 +495,13 @@ export const removeUser = async (req, res) => {
  * Registers a student (Admin/Instructor only).
  */
 export const registerStudent = async (req, res) => {
-  const { name, email, password, roles, captchaToken } = req.body;
+  const { name, email, password, roles } = req.body;
 
   try {
     console.log(`Registering student by ${req.user.email} (${req.user.role}):`, {
       name,
       email,
-      captcha: captchaToken ? "PASSED" : "MISSING",
+      captcha: "SKIPPED (admin/instructor internal action)"
     });
 
     if (roles !== undefined) {
@@ -544,16 +544,27 @@ export const registerStudent = async (req, res) => {
     console.log(`Generated verification token for ${email}`);
 
     const role = "student";
-    const newUser = await createUser(name, email, hashedPassword, role, verificationToken, "manual", null);
+    const newUser = await createUser(
+      name,
+      email,
+      hashedPassword,
+      role,
+      verificationToken,
+      "manual",
+      null
+    );
+
     console.log(`Student created:`, {
       id: newUser.id,
       email: newUser.email,
       role: newUser.role,
     });
 
-    const token = jwt.sign({ id: newUser.id, email: newUser.email, role: newUser.role }, JWT_SECRET, {
-      expiresIn: "24h",
-    });
+    const token = jwt.sign(
+      { id: newUser.id, email: newUser.email, role: newUser.role },
+      JWT_SECRET,
+      { expiresIn: "24h" }
+    );
     console.log(`Generated token for student: ${email}`);
 
     try {
@@ -591,6 +602,9 @@ export const registerStudent = async (req, res) => {
     });
   } catch (error) {
     console.error("Register student error:", error.message, error.stack);
-    res.status(500).json({ success: false, message: error.message || "Server error during student registration." });
+    res.status(500).json({
+      success: false,
+      message: error.message || "Server error during student registration.",
+    });
   }
 };

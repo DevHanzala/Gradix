@@ -1,9 +1,6 @@
 import db from "../DB/db.js";
 import { getCreationModel, getCheckingModel, mapLanguageCode, generateContent } from "../services/geminiService.js";
 import { generateAssessmentQuestions } from "../models/assessmentModel.js";
-import { PDFDocument, rgb } from "pdf-lib";
-import fs from "fs";
-import path from "path";
 
 const checkAnswer = (questionType, studentAnswer, correctAnswer) => {
   if (studentAnswer === undefined || studentAnswer === null) return false;
@@ -45,7 +42,7 @@ export const startAssessmentForStudent = async (req, res) => {
 
     // Fetch question blocks to determine types, counts, durations, and marks
     const { rows: blockRows } = await db.query(
-      `SELECT question_type, question_count, duration_per_question, num_options, num_first_side, num_second_side, positive_marks, negative_marks
+      `SELECT question_type, question_count, duration_per_question, num_options, positive_marks, negative_marks
        FROM question_blocks WHERE assessment_id = $1`,
       [assessmentId]
     );
@@ -132,7 +129,7 @@ export const submitAssessmentForStudent = async (req, res) => {
     const { assessmentId } = req.params;
     const { attemptId, answers, language } = req.body;
 
-    console.log(`📝 Submitting assessment ${assessmentId} for student ${studentId}, attempt ${attemptId}`);
+    console.log(`Submitting assessment ${assessmentId} for student ${studentId}, attempt ${attemptId}`);
 
     // Validate attempt
     const { rows: attemptRows } = await db.query(
@@ -141,11 +138,10 @@ export const submitAssessmentForStudent = async (req, res) => {
       [attemptId, studentId, assessmentId]
     );
     if (attemptRows.length === 0) {
-      console.warn(`⚠️ Attempt ${attemptId} not found or not in progress for student ${studentId}, assessment ${assessmentId}`);
       return res.status(400).json({ success: false, message: "Invalid attempt or assessment not in progress" });
     }
 
-    // Fetch all questions for the attempt to ensure all are evaluated
+    // Fetch all questions for the attempt
     const { rows: questionRows } = await db.query(
       `SELECT id, question_type, correct_answer, positive_marks, negative_marks
        FROM generated_questions WHERE attempt_id = $1 ORDER BY question_order`,
@@ -155,23 +151,35 @@ export const submitAssessmentForStudent = async (req, res) => {
     let totalScore = 0;
     const evaluatedAnswers = [];
 
-    // Process all questions, including unanswered ones
     for (const q of questionRows) {
       const submittedAnswer = answers.find((a) => a.questionId === q.id);
       const studentAnswer = submittedAnswer ? submittedAnswer.answer : null;
-      let isCorrect;
 
+      let isCorrect = false;
+
+      // SMART COMPARISON FOR ALL TYPES
       if (q.question_type === "short_answer") {
         const checkingModel = await getCheckingModel();
         const langName = mapLanguageCode(language);
-        const prompt = `In ${langName}, evaluate if the student's answer "${studentAnswer || ''}" matches the correct answer "${q.correct_answer}" for a short-answer question. Return "true" if they are equivalent (ignoring case and minor phrasing differences), "false" otherwise.`;
+        const prompt = `In ${langName}, evaluate if the student's answer "${studentAnswer || ''}" matches the correct answer "${q.correct_answer}". Return "true" if equivalent (ignore case/spaces), "false" otherwise.`;
         const response = await generateContent(checkingModel, prompt);
         isCorrect = response.trim().toLowerCase() === "true";
       } else {
-        isCorrect = checkAnswer(q.question_type, studentAnswer, q.correct_answer);
+        // TRUE/FALSE & MCQ: Smart string comparison
+        const clean = (val) => {
+          if (val === null || val === undefined) return "";
+          return String(val).trim().toLowerCase().replace(/\\"/g, '"');
+        };
+        isCorrect = clean(q.correct_answer) === clean(studentAnswer);
       }
 
-      const score = isCorrect ? parseFloat(q.positive_marks) : (studentAnswer !== null ? -parseFloat(q.negative_marks) : 0);
+      // FIXED SCORING LOGIC — THIS WAS THE BUG
+      const score = isCorrect
+        ? parseFloat(q.positive_marks || 1)                                    // Correct → +marks
+        : (studentAnswer !== null && studentAnswer !== undefined               // Wrong & answered → -marks
+            ? -Math.abs(parseFloat(q.negative_marks || 0))
+            : 0);                                                              // Unanswered → 0
+
       totalScore += score;
 
       evaluatedAnswers.push({
@@ -182,27 +190,28 @@ export const submitAssessmentForStudent = async (req, res) => {
         correct: isCorrect,
       });
 
-      // Store answer in student_answers
+      // Save to DB
       await db.query(
         `INSERT INTO student_answers (attempt_id, question_id, student_answer, score)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (attempt_id, question_id) DO UPDATE
-         SET student_answer = EXCLUDED.student_answer, score = EXCLUDED.score`,
-        [attemptId, q.id, JSON.stringify(studentAnswer), score]
+         SET student_answer = $3, score = $4`,
+        [attemptId, q.id, studentAnswer !== null ? JSON.stringify(studentAnswer) : null, score]
       );
     }
 
-    // Clamp score to 0 if negative (optional based on your preference)
+    // Prevent negative total score
     totalScore = Math.max(0, totalScore);
 
-    // Update attempt status and score
+    // Update attempt
     await db.query(
-      `UPDATE assessment_attempts SET status = 'completed', completed_at = NOW(), score = $1
+      `UPDATE assessment_attempts 
+       SET status = 'completed', completed_at = NOW(), score = $1
        WHERE id = $2`,
       [totalScore, attemptId]
     );
 
-    console.log(`✅ Assessment ${assessmentId} submitted, attempt ${attemptId}, score: ${totalScore}`);
+    console.log(`Assessment submitted successfully. Final score: ${totalScore}`);
 
     res.status(200).json({
       success: true,
@@ -210,10 +219,11 @@ export const submitAssessmentForStudent = async (req, res) => {
       data: { attemptId, score: totalScore, answers: evaluatedAnswers },
     });
   } catch (error) {
-    console.error("❌ submitAssessmentForStudent error:", error.message, error.stack);
+    console.error("submitAssessmentForStudent error:", error);
     res.status(500).json({ success: false, message: "Failed to submit assessment" });
   }
 };
+
 
 export const getSubmissionDetailsForStudent = async (req, res) => {
   try {
