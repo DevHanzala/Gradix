@@ -172,11 +172,7 @@ const useStudentAssessmentStore = create((set, get) => ({
     }
   },
 
-  decrementTime: () => {
-    set((state) => ({
-      timeRemaining: state.timeRemaining > 0 ? state.timeRemaining - 1 : 0,
-    }));
-  },
+  
 
   getSubmissionDetails: async (submissionId) => {
     set({ loading: true, error: null, submission: null });

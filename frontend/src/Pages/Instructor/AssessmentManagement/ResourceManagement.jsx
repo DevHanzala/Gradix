@@ -73,12 +73,12 @@ function ResourceManagement() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className=" mx-auto px-4 sm:px-4 lg:px-8 py-8">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Manage Resources</h1>
+          <h1 className="md:text-3xl text-xl font-bold text-gray-900">Manage Resources</h1>
           <button
             onClick={() => navigate("/instructor/assessments")}
-            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+            className="px-6 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50"
           >
             Back to Assessments
           </button>
@@ -92,7 +92,7 @@ function ResourceManagement() {
               <input
                 type="file"
                 multiple
-                accept=".pdf,.ppt,.pptx,.txt,.doc,.docx"
+                accept=".pdf,.doc,.docx,.txt,.ppt,.pptx,.jpg,.jpeg,.png,.webp"
                 onChange={handleResourceUpload}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
               />

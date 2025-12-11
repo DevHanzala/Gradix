@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import axios from "axios";
-import { signInWithPopup, signInWithRedirect } from "firebase/auth";
-import { auth, googleProvider } from "../config/firebase.js";
+import { signInWithPopup } from "firebase/auth";
+import { auth, googleProvider } from "../config/firebase";
 
 // Get the API base URL from environment variables
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
@@ -15,19 +15,28 @@ axios.defaults.headers.post["Content-Type"] = "application/json";
 axios.interceptors.request.use(
   (config) => {
     const token = useAuthStore.getState().token;
+
+    // These endpoints do NOT require a token — suppress the warning
+    const noTokenRequired =
+      config.url.includes("/auth/login") ||
+      config.url.includes("/auth/signup") ||
+      config.url.includes("/auth/google-auth") ||
+      config.url.includes("/auth/forgot-password") ||
+      config.url.includes("/auth/verify") ||
+      config.url.includes("/auth/change-password");
+
     if (token) {
-      console.log(`🔍 Adding Authorization header for ${config.url}: Bearer ${token.slice(0, 10)}...`);
       config.headers.Authorization = `Bearer ${token}`;
-    } else {
+    } else if (!noTokenRequired) {
+      // Only warn for protected routes
       console.warn(`⚠️ No token available for ${config.url}`);
     }
+
     return config;
   },
-  (error) => {
-    console.error("❌ Request interceptor error:", error);
-    return Promise.reject(error);
-  },
+  (error) => Promise.reject(error)
 );
+
 
 // Add a response interceptor to handle token expiration or invalid tokens
 axios.interceptors.response.use(
@@ -82,53 +91,32 @@ const useAuthStore = create(
        * @throws {Error} If authentication fails.
        */
       googleAuth: async () => {
-  try {
-    console.log("🔄 Starting Google auth (smart mode)...");
+        try {
+          console.log("🔄 Starting Google authentication...");
+          const result = await signInWithPopup(auth, googleProvider);
+          const firebaseUser = result.user;
 
-    // Detect in-app browsers (popup AND redirect fail inside these)
-    const ua = navigator.userAgent || navigator.vendor || window.opera;
-    const isInAppBrowser =
-      /(FBAN|FBAV|Instagram|Twitter|WhatsApp|Line|MicroMessenger|MiuiBrowser)/i.test(ua);
+          console.log("✅ Firebase Google auth successful:", {
+            uid: firebaseUser.uid,
+            email: firebaseUser.email,
+            name: firebaseUser.displayName,
+          });
 
-    if (isInAppBrowser) {
-      alert(
-        "Google login is blocked inside this app's browser. Please open this page in Safari or Chrome to continue."
-      );
-      throw new Error("In-app browser detected");
-    }
+          const response = await axios.post("/auth/google-auth", {
+            name: firebaseUser.displayName,
+            email: firebaseUser.email,
+            uid: firebaseUser.uid,
+          });
 
-    // Detect mobile (iPhone / Android)
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(ua);
-
-    // Desktop → Popup
-    if (!isMobile) {
-      console.log("🖥️ Desktop detected → using Popup login");
-      const result = await signInWithPopup(auth, googleProvider);
-      const firebaseUser = result.user;
-
-      console.log("✅ Firebase popup success:", firebaseUser.email);
-
-      const response = await axios.post("/auth/google-auth", {
-        name: firebaseUser.displayName,
-        email: firebaseUser.email,
-        uid: firebaseUser.uid,
-      });
-
-      const { token, user } = response.data;
-      set({ token, user });
-      return user;
-    }
-
-    // Mobile → Redirect
-    console.log("📱 Mobile detected → using Redirect login");
-    await signInWithRedirect(auth, googleProvider);
-
-  } catch (error) {
-    console.error("❌ Smart Google auth error:", error);
-    throw error;
-  }
-},
-
+          const { token, user } = response.data;
+          console.log("✅ Backend Google auth successful:", user);
+          set({ token, user });
+          return user;
+        } catch (error) {
+          console.error("❌ Google auth error:", error.response?.data || error);
+          throw error.response?.data || error;
+        }
+      },
 
       /**
        * Handles user signup by making an API call.
@@ -201,17 +189,29 @@ const useAuthStore = create(
        * @returns {Promise<Object>} The response data.
        * @throws {Error} If request fails.
        */
-      forgotPassword: async (data) => {
-        try {
-          console.log(`🔍 Sending forgot password request for: ${data.email}`);
-          const response = await axios.post("/auth/forgot-password", data);
-          console.log("✅ Forgot password request sent");
-          return response.data;
-        } catch (error) {
-          console.error("❌ Forgot password error:", error.response?.data || error);
-          throw error.response?.data || error;
-        }
-      },
+ forgotPassword: async (data) => {
+  try {
+    console.log(`🔍 Sending forgot password request for: ${data.email}`);
+
+    const response = await axios.post("/auth/forgot-password", data);
+
+    console.log("✅ Forgot password request sent");
+
+    return response.data;
+  } catch (error) {
+    console.error("❌ Forgot password error:", error.response?.data || error);
+
+    // Normalize the error structure so UI can always read: error.message
+    throw {
+      status: error.response?.status || 500,
+      message:
+        error.response?.data?.message ||
+        "Failed to send reset link. Please try again.",
+    };
+  }
+},
+
+
 
       /**
        * Handles password change for logged-in users or reset after forgot password.

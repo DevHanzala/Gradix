@@ -1,5 +1,5 @@
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route, useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import "./App.css";
 
@@ -38,17 +38,23 @@ import TakeAssessment from "./Pages/Student/AssesmentManagement/TakeAssessment";
 import StudentAnalytics from "./Pages/Student/StudentAnalytics";
 
 import ProtectedRoute from "./components/ProtectedRoutes";
-import { handleGoogleRedirect } from "./config/handleRedirect";
+
+// SCROLL TO TOP ON EVERY ROUTE CHANGE
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+}
 
 function App() {
-  // MUST run before Router loads to ensure Google Redirect authentication works reliably
-  useEffect(() => {
-    handleGoogleRedirect();
-  }, []);
-
   return (
     <Router>
-      <div className="App">
+      <ScrollToTop /> {/* This fixes "start from top" on every navigation */}
+      <div className="App min-h-screen bg-gray-50">
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
@@ -58,7 +64,7 @@ function App() {
           <Route path="/reset-password/:resetId" element={<SetNewPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
 
-          {/* Profile (authenticated only, no role restriction) */}
+          {/* Protected Routes */}
           <Route
             path="/profile"
             element={
@@ -68,164 +74,148 @@ function App() {
             }
           />
 
-          {/* Super Admin Routes */}
+          {/* Super Admin */}
           <Route
             path="/super-admin/dashboard"
             element={
-              <ProtectedRoute allowedRoles={["super_admin"]}>
+              <ProtectedRoute requiredRole="super_admin">
                 <SuperAdminDashboard />
               </ProtectedRoute>
             }
           />
 
-          {/* Admin Routes */}
+          {/* Admin */}
           <Route
             path="/admin/dashboard"
             element={
-              <ProtectedRoute allowedRoles={["admin"]}>
+              <ProtectedRoute requiredRole="admin">
                 <AdminDashboard />
               </ProtectedRoute>
             }
           />
 
-          {/* Instructor Routes */}
+          {/* Instructor */}
           <Route
             path="/instructor/dashboard"
             element={
-              <ProtectedRoute allowedRoles={["instructor"]}>
+              <ProtectedRoute requiredRole="instructor">
                 <InstructorDashboard />
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/instructor/resources"
             element={
-              <ProtectedRoute allowedRoles={["instructor"]}>
+              <ProtectedRoute requiredRole="instructor">
                 <ResourceManagement />
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/instructor/assessments"
             element={
-              <ProtectedRoute allowedRoles={["instructor"]}>
+              <ProtectedRoute requiredRole="instructor">
                 <AssessmentList />
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/instructor/assessments/create"
             element={
-              <ProtectedRoute allowedRoles={["instructor"]}>
+              <ProtectedRoute requiredRole="instructor">
                 <CreateAssessment />
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/instructor/assessments/:id"
             element={
-              <ProtectedRoute allowedRoles={["instructor"]}>
+              <ProtectedRoute requiredRole="instructor">
                 <AssessmentDetail />
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/instructor/assessments/:id/edit"
             element={
-              <ProtectedRoute allowedRoles={["instructor"]}>
+              <ProtectedRoute requiredRole="instructor">
                 <EditAssessment />
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/instructor/assessments/:assessmentId/enroll"
             element={
-              <ProtectedRoute allowedRoles={["instructor"]}>
+              <ProtectedRoute requiredRole="instructor">
                 <EnrollStudents />
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/instructor/assessments/:assessmentId/resources"
             element={
-              <ProtectedRoute allowedRoles={["instructor"]}>
+              <ProtectedRoute requiredRole="instructor">
                 <ResourceManagement />
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/instructor/assessments/:assessmentId/analytics"
             element={
-              <ProtectedRoute allowedRoles={["instructor"]}>
+              <ProtectedRoute requiredRole="instructor">
                 <AssessmentAnalytics />
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/instructor/students"
             element={
-              <ProtectedRoute allowedRoles={["instructor"]}>
+              <ProtectedRoute requiredRole="instructor">
                 <AddStudent />
               </ProtectedRoute>
             }
           />
 
-          {/* Student Routes */}
+          {/* Student */}
           <Route
             path="/student/dashboard"
             element={
-              <ProtectedRoute allowedRoles={["student"]}>
+              <ProtectedRoute requiredRole="student">
                 <StudentDashboard />
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/student/analytics"
             element={
-              <ProtectedRoute allowedRoles={["student"]}>
+              <ProtectedRoute requiredRole="student">
                 <StudentAnalytics />
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/student/assessments/:assessmentId/take"
             element={
-              <ProtectedRoute allowedRoles={["student"]}>
+              <ProtectedRoute requiredRole="student">
                 <TakeAssessment />
               </ProtectedRoute>
             }
           />
 
-          {/* Catch-all Route */}
+          {/* 404 - Must be last */}
           <Route path="*" element={<NotFound />} />
         </Routes>
 
-        {/* Toast Notifications */}
+        {/* Toast */}
         <Toaster
           position="top-right"
           toastOptions={{
             duration: 4000,
             style: {
-              background: "#363636",
+              background: "#1f2937",
               color: "#fff",
-            },
-            success: {
-              duration: 3000,
-              theme: {
-                primary: "green",
-                secondary: "black",
-              },
+              borderRadius: "12px",
+              padding: "16px",
             },
           }}
         />

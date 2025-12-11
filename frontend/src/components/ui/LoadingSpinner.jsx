@@ -1,26 +1,30 @@
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faSpinner } from "@fortawesome/free-solid-svg-icons";
+
 function LoadingSpinner({ size = "md", color = "blue" }) {
   const sizeClasses = {
-    sm: "h-4 w-4",
-    md: "h-8 w-8",
-    lg: "h-12 w-12",
-    xl: "h-16 w-16",
-  }
+    sm: "text-sm",
+    md: "text-xl",
+    lg: "text-3xl",
+    xl: "text-5xl",
+  };
 
   const colorClasses = {
-    blue: "border-blue-600",
-    green: "border-green-600",
-    red: "border-red-600",
-    gray: "border-gray-600",
-  }
+    blue: "text-blue-600",
+    green: "text-green-600",
+    red: "text-red-600",
+    gray: "text-gray-600",
+    white: "text-white",
+  };
 
   return (
     <div className="flex justify-center items-center">
-      <div
-        className={`animate-spin rounded-full border-2 border-gray-300 ${colorClasses[color]} ${sizeClasses[size]}`}
-        style={{ borderTopColor: "transparent" }}
-      ></div>
+      <FontAwesomeIcon
+        icon={faSpinner}
+        className={`animate-spin ${sizeClasses[size]} ${colorClasses[color]}`}
+      />
     </div>
-  )
+  );
 }
 
-export default LoadingSpinner
+export default LoadingSpinner;

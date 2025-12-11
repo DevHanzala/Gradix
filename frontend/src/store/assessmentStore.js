@@ -82,144 +82,174 @@ const useAssessmentStore = create((set) => ({
     }
   },
 
-  createAssessment: async (assessmentData) => {
-    set({ loading: true, error: null });
-    try {
-      const token = localStorage.getItem("token");
-      if (!token) throw new Error("No authentication token found");
+ createAssessment: async (assessmentData) => {
+  set({ loading: true, error: null });
+  try {
+    const token = localStorage.getItem("token");
+    if (!token) throw new Error("No authentication token found");
 
-      // Validate assessmentData before sending
-      const title = assessmentData.get("title");
-      const prompt = assessmentData.get("prompt");
-      const externalLinks = JSON.parse(assessmentData.get("externalLinks") || "[]");
-      const questionBlocks = JSON.parse(assessmentData.get("question_blocks") || "[]");
-      const selectedResources = JSON.parse(assessmentData.get("selected_resources") || "[]");
-      const newFiles = assessmentData.getAll("new_files");
+    // === NEW VALIDATION ===
+    const title = assessmentData.get("title");
+    const prompt = assessmentData.get("prompt");
+    const externalLinks = JSON.parse(assessmentData.get("externalLinks") || "[]");
+    const questionBlocks = JSON.parse(assessmentData.get("question_blocks") || "[]");
+    const selectedResources = JSON.parse(assessmentData.get("selected_resources") || "[]");
+    const newFiles = assessmentData.getAll("new_files");
 
-      if (!prompt || !prompt.trim()) {
-        throw new Error("Prompt is required and must be a non-empty string");
-      }
+    if (!title?.trim()) {
+      throw new Error("Assessment Title is required");
+    }
 
-      if (title && (!title.trim() || typeof title !== 'string')) {
-        throw new Error("Title must be a non-empty string if provided");
-      }
+    const hasResources = selectedResources.length > 0 || newFiles.length > 0;
+    const hasLinks = externalLinks.some(link => link && link.trim());
 
-      // Validate question_blocks if provided
-      if (questionBlocks && Array.isArray(questionBlocks) && questionBlocks.length > 0) {
-        for (const block of questionBlocks) {
-          if (!block.question_count || block.question_count < 1) {
-            throw new Error("Question count must be at least 1 for each block");
-          }
-          if (!block.duration_per_question || block.duration_per_question < 30) {
-            throw new Error("Duration per question must be at least 30 seconds");
-          }
-          if (block.question_type === "multiple_choice" && (!block.num_options || block.num_options < 2)) {
-            throw new Error("Multiple choice questions must have at least 2 options");
-          }
+    if (!prompt?.trim() && !hasResources && !hasLinks) {
+      throw new Error("You must provide either a Prompt, Resources, or External Links");
+    }
+
+    // Question blocks validation (same)
+    if (questionBlocks.length > 0) {
+      for (const block of questionBlocks) {
+        if (!block.question_count || block.question_count < 1) {
+          throw new Error("Question count must be at least 1");
+        }
+        if (!block.duration_per_question || block.duration_per_question < 30) {
+          throw new Error("Duration per question must be at least 30 seconds");
+        }
+        if (block.question_type === "multiple_choice" && (!block.num_options || block.num_options < 2)) {
+          throw new Error("Multiple choice needs at least 2 options");
         }
       }
-
-      const formData = new FormData();
-      formData.append("title", title ? title.trim() : null);
-      formData.append("prompt", prompt.trim());
-      formData.append("externalLinks", JSON.stringify(externalLinks.filter((link) => link && link.trim())));
-      formData.append("question_blocks", JSON.stringify(questionBlocks));
-      formData.append("selected_resources", JSON.stringify(selectedResources));
-      newFiles.forEach((file) => formData.append("new_files", file));
-
-      const response = await axios.post(`${API_URL}/assessments`, formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
-        },
-      });
-
-      if (response.data.success) {
-        set((state) => ({
-          assessments: [...state.assessments, { ...response.data.data, is_executed: false }],
-          loading: false,
-        }));
-        return response.data.data;
-      } else {
-        throw new Error(response.data.message);
-      }
-    } catch (error) {
-      const errorMessage = error.response?.data?.message || error.message || "Failed to create assessment";
-      set({ error: errorMessage, loading: false });
-      toast.error(errorMessage);
-      throw error;
     }
-  },
 
-  updateAssessment: async (assessmentId, assessmentData) => {
-    set({ loading: true, error: null });
-    try {
-      if (!assessmentId || isNaN(parseInt(assessmentId))) {
-        throw new Error("Invalid assessment ID");
-      }
-      const token = localStorage.getItem("token");
-      if (!token) throw new Error("No authentication token found");
+    // Rebuild FormData (same as before)
+    const formData = new FormData();
+    formData.append("title", title.trim());
+    formData.append("prompt", prompt?.trim() || null);
+    formData.append("externalLinks", JSON.stringify(externalLinks.filter(link => link && link.trim())));
+    formData.append("question_blocks", JSON.stringify(questionBlocks));
+    formData.append("selected_resources", JSON.stringify(selectedResources));
+    newFiles.forEach(file => formData.append("new_files", file));
 
-      // Validate assessmentData before sending
-      const { title, prompt, externalLinks, question_blocks, new_files = [], selected_resources = [] } = assessmentData;
+    const response = await axios.post(`${API_URL}/assessments`, formData, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "multipart/form-data",
+      },
+    });
 
-      if (!prompt || !prompt.trim()) {
-        throw new Error("Prompt is required and must be a non-empty string");
-      }
+    if (response.data.success) {
+      set((state) => ({
+        assessments: [...state.assessments, { ...response.data.data, is_executed: false }],
+        loading: false,
+      }));
+      return response.data.data;
+    } else {
+      throw new Error(response.data.message);
+    }
+  } catch (error) {
+    const errorMessage = error.response?.data?.message || error.message || "Failed to create assessment";
+    set({ error: errorMessage, loading: false });
+    toast.error(errorMessage);
+    throw error;
+  }
+},
 
-      if (title && (!title.trim() || typeof title !== 'string')) {
-        throw new Error("Title must be a non-empty string if provided");
-      }
+updateAssessment: async (assessmentId, assessmentData) => {
+  set({ loading: true, error: null });
+  try {
+    if (!assessmentId || isNaN(parseInt(assessmentId))) {
+      throw new Error("Invalid assessment ID");
+    }
+    const token = localStorage.getItem("token");
+    if (!token) throw new Error("No authentication token found");
 
-      // Validate question_blocks if provided
-      if (question_blocks && Array.isArray(question_blocks) && question_blocks.length > 0) {
-        for (const block of question_blocks) {
-          if (!block.question_count || block.question_count < 1) {
-            throw new Error("Question count must be at least 1 for each block");
-          }
-          if (!block.duration_per_question || block.duration_per_question < 30) {
-            throw new Error("Duration per question must be at least 30 seconds");
-          }
-          if (block.question_type === "multiple_choice" && (!block.num_options || block.num_options < 2)) {
-            throw new Error("Multiple choice questions must have at least 2 options");
-          }
+    // === DEBUG: See what we're sending ===
+    console.log("Updating assessment ID:", assessmentId);
+    for (let [key, value] of assessmentData.entries()) {
+      console.log(`FormData → ${key}:`, value);
+    }
+
+    // === EXTRACT VALUES SAFELY ===
+    const title = assessmentData.get("title")?.trim();
+    const prompt = assessmentData.get("prompt")?.trim();
+    const externalLinks = JSON.parse(assessmentData.get("externalLinks") || "[]");
+    const selectedResources = JSON.parse(assessmentData.get("selected_resources") || "[]");
+    const newFiles = assessmentData.getAll("new_files"); // FileList
+
+    // === VALIDATION ===
+    if (!title) {
+      throw new Error("Assessment Title is required");
+    }
+
+    // Allow empty prompt IF there is at least one of:
+    // - existing selected resources
+    // - new uploaded files
+    // - external links
+    const hasLinks = externalLinks.some(l => l && l.trim());
+    const hasOldResources = selectedResources.length > 0;
+    const hasNewFiles = newFiles.length > 0;
+
+    if (!prompt && !hasLinks && !hasOldResources && !hasNewFiles) {
+      throw new Error("You must keep the existing prompt OR provide new Prompt, Resources, or Links");
+    }
+
+    // Optional: Validate question blocks (same as create)
+    const question_blocks = JSON.parse(assessmentData.get("question_blocks") || "[]");
+    if (question_blocks.length > 0) {
+      for (const block of question_blocks) {
+        if (!block.question_count || block.question_count < 1) {
+          throw new Error("Question count must be at least 1");
+        }
+        if (!block.duration_per_question || block.duration_per_question < 30) {
+          throw new Error("Duration per question must be at least 30 seconds");
+        }
+        if (block.question_type === "multiple_choice" && (!block.num_options || block.num_options < 2)) {
+          throw new Error("Multiple choice needs at least 2 options");
         }
       }
+    }
 
-      const formData = new FormData();
-      formData.append("title", title ? title.trim() : null);
-      formData.append("prompt", prompt.trim());
-      formData.append("externalLinks", JSON.stringify(externalLinks ? externalLinks.filter((link) => link && link.trim()) : []));
-      formData.append("question_blocks", JSON.stringify(question_blocks || []));
-      formData.append("selected_resources", JSON.stringify(selected_resources.filter((id) => id && !isNaN(parseInt(id)))));
-      new_files.forEach((file) => formData.append("new_files", file));
-
-      const response = await axios.put(`${API_URL}/assessments/${parseInt(assessmentId)}`, formData, {
+    // === SEND REQUEST ===
+    const response = await axios.put(
+      `${API_URL}/assessments/${parseInt(assessmentId)}`,
+      assessmentData,
+      {
         headers: {
           Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
+          // Let browser set Content-Type with boundary
         },
-      });
-
-      if (response.data.success) {
-        set((state) => ({
-          assessments: state.assessments.map((assessment) =>
-            assessment.id === assessmentId ? { ...response.data.data, is_executed: assessment.is_executed } : assessment
-          ),
-          currentAssessment: response.data.data,
-          loading: false,
-        }));
-        return response.data.data;
-      } else {
-        throw new Error(response.data.message);
       }
-    } catch (error) {
-      const errorMessage = error.response?.data?.message || error.message || "Failed to update assessment";
-      set({ error: errorMessage, loading: false });
-      toast.error(errorMessage);
-      throw error;
+    );
+
+    if (response.data.success) {
+      const updatedAssessment = response.data.data;
+
+      set((state) => ({
+        assessments: state.assessments.map((a) =>
+          a.id === assessmentId ? { ...updatedAssessment, is_executed: a.is_executed } : a
+        ),
+        currentAssessment: updatedAssessment,
+        loading: false,
+      }));
+
+      toast.success("Assessment updated successfully!");
+      return updatedAssessment;
+    } else {
+      throw new Error(response.data.message || "Update failed");
     }
-  },
+  } catch (error) {
+    const errorMessage =
+      error.response?.data?.message ||
+      error.message                          ||
+      "Failed to update assessment";
+
+    console.error("Update Assessment Error:", errorMessage);
+    set({ error: errorMessage, loading: false });
+    toast.error(errorMessage);
+    throw error;
+  }
+},
 
   deleteAssessment: async (assessmentId) => {
     set({ loading: true, error: null });
@@ -317,7 +347,7 @@ const useAssessmentStore = create((set) => ({
       }
       const token = localStorage.getItem("token");
       if (!token) throw new Error("No authentication token found");
-      const response = await axios.delete(`${API_URL}/assessments/${parseInt(assessmentId)}/unenroll/${parseInt(studentId)}`, {
+      const response = await axios.delete(`${API_URL}/assessments/${parseInt(assessmentId)}/enroll/${parseInt(studentId)}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (response.data.success) {

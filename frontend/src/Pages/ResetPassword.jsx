@@ -39,32 +39,36 @@ function ResetPassword() {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleForgotSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateForm()) return;
+const handleForgotSubmit = async (e) => {
+  e.preventDefault();
+  if (!validateForm()) return;
 
-    setLoading(true);
+  setLoading(true);
 
-    try {
-      console.log("Sending forgot password request for:", formData.email);
-      await forgotPassword({ email: formData.email });
-      showModal(
-        "success",
-        "Reset Link Sent",
-        "If an account with that email exists, a password reset link has been sent. Please check your inbox and spam/junk folder. The link will take you to a page to set a new password."
-      );
-      setTimeout(() => navigate("/login"), 5000); // Redirect to login after 5 seconds
-    } catch (error) {
-      console.error("Forgot password error:", error);
-      showModal(
-        "error",
-        "Request Failed",
-        error.response?.data?.message || "Failed to send reset link. Please try again or contact support@gradewise.ai."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  try {
+    console.log("Sending forgot password request for:", formData.email);
+
+    await forgotPassword({ email: formData.email });
+
+    showModal(
+      "success",
+      "Reset Link Sent",
+      "If an account with that email exists, a password reset link has been sent. Please check your inbox and spam/junk folder. The link will take you to a page to set a new password."
+    );
+
+    setTimeout(() => navigate("/login"), 5000);
+  } catch (error) {
+    console.error("Forgot password error:", error);
+
+    showModal(
+      "error",
+      "Request Failed",
+      error.message || "Failed to send reset link."
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center p-4">

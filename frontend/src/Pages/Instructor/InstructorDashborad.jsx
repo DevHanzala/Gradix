@@ -110,7 +110,7 @@ function InstructorDashboard() {
       title: "View Analytics",
       description: "Analyze assessment performance",
       icon: <FaChartLine className="w-8 h-8" />,
-      link: "/instructor/assessments",
+      link: "/instructor/assessments/:assessmentId/analytics",
       color: "bg-indigo-500 hover:bg-indigo-600",
     },
   ];
@@ -241,7 +241,7 @@ function InstructorDashboard() {
                                     Enroll
                                   </Link>
                                   {!assessment.is_executed && (
-                                    <Link to={`/instructor/assessments/edit/${assessment.id}`} className="text-indigo-600 hover:text-indigo-800 font-medium">
+                                    <Link to={`/instructor/assessments/${assessment.id}/edit`} className="text-indigo-600 hover:text-indigo-800 font-medium">
                                       Edit
                                     </Link>
                                   )}
@@ -312,7 +312,7 @@ function InstructorDashboard() {
                             </Link>
                             {!assessment.is_executed && (
                               <Link
-                                to={`/instructor/assessments/edit/${assessment.id}`}
+                                to={`/instructor/assessments/${assessment.id}/edit`}
                                 className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-lg font-medium hover:bg-indigo-200 transition"
                               >
                                 Edit

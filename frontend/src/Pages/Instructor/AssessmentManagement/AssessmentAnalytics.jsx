@@ -5,7 +5,7 @@ import LoadingSpinner from "../../../components/ui/LoadingSpinner";
 import Navbar from "../../../components/Navbar";
 import Footer from "../../../components/Footer";
 import useInstructorAnalyticsStore from "../../../store/useInstructorAssessmentAnalyticsStore";
-import { FaList, FaTable, FaUser, FaCalendarAlt, FaPercentage, FaClock, FaCheckCircle, FaEye } from "react-icons/fa";
+import { FaList, FaTable, FaCalendarAlt, FaCheckCircle, FaEye } from "react-icons/fa";
 
 function AssessmentAnalytics() {
   const { assessmentId } = useParams();
@@ -55,10 +55,24 @@ function AssessmentAnalytics() {
     );
   }
 
+  // SMART COMPARISON — WORKS FOR ALL QUESTION TYPES
+  const isAnswerCorrect = (correct, student, type) => {
+    if (!student) return false;
+
+    let c = String(correct || "").trim();
+    let s = String(student || "").trim();
+
+    // Remove escaped quotes and extra spaces
+    c = c.replace(/\\"/g, '"').replace(/^["'\s]+|["'\s]+$/g, '').trim();
+    s = s.replace(/\\"/g, '"').replace(/^["'\s]+|["'\s]+$/g, '').trim();
+
+    return c.toLowerCase() === s.toLowerCase();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <Navbar />
-      <div className="w-full mx-auto px-4 sm:px-4 lg:px-8 xl:px-10 py-8">
+      <div className="w-full mx-auto px-4 sm:px-3 lg:px-4 xl:px-6 py-8">
 
         {/* Header */}
         <div className="mb-8 text-center sm:text-left">
@@ -88,7 +102,7 @@ function AssessmentAnalytics() {
                   >
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                       <div>
-                        <h4 className="text-lg font-semibold text-gray-900 flex items-center">
+                        <h4 className="text-lg font-semibold text-gray-900">
                           {assessment.title}
                         </h4>
                         <p className="text-sm text-gray-600 mt-1 flex items-center">
@@ -116,7 +130,7 @@ function AssessmentAnalytics() {
           </CardContent>
         </Card>
 
-        {/* Student Results - Works on ALL devices */}
+        {/* Student Results */}
         {assessmentId && !isNaN(assessmentId) && assessmentId !== ":assessmentId" && (
           <>
             {/* Desktop Table */}
@@ -194,7 +208,7 @@ function AssessmentAnalytics() {
           </>
         )}
 
-        {/* STUDENT QUESTIONS — NOW ALWAYS VISIBLE AFTER CLICK (Mobile + Desktop) */}
+        {/* STUDENT QUESTIONS — FINAL 100% ACCURATE */}
         {selectedStudentId && studentQuestions.length > 0 && (
           <Card className="shadow-xl mt-10">
             <CardHeader className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-t-xl">
@@ -204,32 +218,52 @@ function AssessmentAnalytics() {
             </CardHeader>
             <CardContent className="p-6">
               <div className="space-y-6">
-                {studentQuestions.map((q, i) => (
-                  <div key={i} className="bg-gray-50 border border-gray-200 rounded-xl p-5">
-                    <h4 className="font-bold text-lg text-gray-900 mb-3">
-                      Question {q.question_order || i + 1} <span className="text-sm font-normal text-gray-600">({q.question_type})</span>
-                    </h4>
-                    <p className="text-gray-800 mb-3"><strong>Question:</strong> {q.question_text}</p>
+                {studentQuestions.map((q, i) => {
+                  const isCorrect = isAnswerCorrect(q.correct_answer, q.student_answer, q.question_type);
 
-                    {q.options && (
-                      <div className="mb-3">
-                        <strong>Options:</strong>
-                        <ul className="list-disc ml-6 text-sm text-gray-700 mt-1">
-                          {typeof q.options === "string" ? JSON.parse(q.options) : q.options.map((opt, idx) => (
-                            <li key={idx}>{opt}</li>
-                          ))}
-                        </ul>
+                  return (
+                    <div key={i} className="bg-gray-50 border border-gray-200 rounded p-4">
+                      <h4 className="font-bold text-lg text-gray-900 mb-3">
+                        Question {q.question_order || i + 1} 
+                        <span className="text-sm font-normal text-gray-600 ml-2">({q.question_type})</span>
+                      </h4>
+                      <p className="text-gray-800 mb-4"><strong>Question:</strong> {q.question_text}</p>
+
+                      {q.options && (
+                        <div className="mb-4">
+                          <strong>Options:</strong>
+                          <ul className="list-disc ml-6 text-sm text-gray-700 mt-2">
+                            {(typeof q.options === "string" ? JSON.parse(q.options) : q.options).map((opt, idx) => (
+                              <li key={idx}>{opt}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-base mt-4">
+                        <div>
+                          <strong>Correct Answer:</strong> 
+                          <span className="ml-2 text-green-700 font-semibold">
+                            {q.correct_answer}
+                          </span>
+                        </div>
+                        <div>
+                          <strong>Student Answer:</strong> 
+                          <span className={`ml-2 font-semibold ${isCorrect ? "text-green-700" : "text-red-600"}`}>
+                            {q.student_answer || "—"}
+                          </span>
+                        </div>
+                        <div><strong>Score:</strong> <span className="font-medium">{isCorrect ? (q.positive_marks || 1) : (q.score || -Math.abs(q.negative_marks || 0))}</span></div>
+                        <div>
+                          <strong>Result:</strong> 
+                          <span className={`ml-2 font-bold text-lg ${isCorrect ? "text-green-600" : "text-red-600"}`}>
+                            {isCorrect ? "Correct" : "Wrong"}
+                          </span>
+                        </div>
                       </div>
-                    )}
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mt-4">
-                      <div><strong>Correct Answer:</strong> <span className="text-green-700 font-medium">{q.correct_answer}</span></div>
-                      <div><strong>Student Answer:</strong> <span className={q.is_correct ? "text-green-700" : "text-red-600"}>{q.student_answer || "—"}</span></div>
-                      <div><strong>Score:</strong> {q.score}</div>
-                      <div><strong>Result:</strong> <span className={`font-bold ${q.is_correct ? "text-green-600" : "text-red-600"}`}>{q.is_correct ? "Correct" : "Wrong"}</span></div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

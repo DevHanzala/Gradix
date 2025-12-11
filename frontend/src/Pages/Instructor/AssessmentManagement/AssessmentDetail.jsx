@@ -7,8 +7,10 @@ import Modal from "../../../components/ui/Modal";
 import Navbar from "../../../components/Navbar";
 import Footer from "../../../components/Footer";
 import toast from "react-hot-toast";
-import axios from "axios";
 import { FaInfoCircle, FaCalendarAlt, FaLink, FaQuestionCircle, FaFileAlt, FaExclamationCircle, FaEdit, FaUsers, FaPrint } from "react-icons/fa";
+
+// THIS IS THE MISSING IMPORT — NOW ADDED
+import PhysicalPaperModal from "../../../components/PhysicalPaperModal.jsx";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
@@ -18,6 +20,13 @@ function AssessmentDetail() {
   const { currentAssessment, getAssessmentById, loading, error } = useAssessmentStore();
   const [modal, setModal] = useState({ isOpen: false, type: "info", title: "", message: "" });
   const [isLoading, setIsLoading] = useState(true);
+
+  // THIS STATE CONTROLS THE PHYSICAL PAPER MODAL
+  const [paperModal, setPaperModal] = useState({
+    isOpen: false,
+    assessmentId: null,
+    title: "",
+  });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -45,78 +54,13 @@ function AssessmentDetail() {
     toast[type === "success" ? "success" : "error"](message);
   };
 
-  // PDF Generation (unchanged)
-  const generatePDF = async () => {
-    try {
-      const token = localStorage.getItem("token");
-      const res = await axios.get(`${API_URL}/taking/assessments/${id}/print`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.data?.success) throw new Error(res.data?.message || "Failed");
-
-      const questions = res.data.data.questions || [];
-      const container = document.createElement("div");
-      container.style.padding = "40px";
-      container.style.fontFamily = "Arial, sans-serif";
-      container.style.background = "white";
-
-      const title = document.createElement("h2");
-      title.innerText = `${currentAssessment.title} — Answer Key`;
-      title.style.fontSize = "24px";
-      title.style.marginBottom = "30px";
-      title.style.textAlign = "center";
-      container.appendChild(title);
-
-      questions.forEach((q, idx) => {
-        const div = document.createElement("div");
-        div.style.marginBottom = "20px";
-        div.style.pageBreakInside = "avoid";
-
-        const qNum = document.createElement("strong");
-        qNum.innerText = `Q${idx + 1}. `;
-        div.appendChild(qNum);
-
-        const type = document.createElement("em");
-        type.innerText = `(${q.question_type}) `;
-        div.appendChild(type);
-
-        const text = document.createElement("span");
-        text.innerText = q.question_text;
-        div.appendChild(text);
-        div.appendChild(document.createElement("br"));
-
-        if (q.options?.length) {
-          const ul = document.createElement("ul");
-          ul.style.margin = "8px 0";
-          ul.style.paddingLeft = "20px";
-          q.options.forEach(opt => {
-            const li = document.createElement("li");
-            li.innerText = opt;
-            ul.appendChild(li);
-          });
-          div.appendChild(ul);
-        }
-
-        const ans = document.createElement("strong");
-        ans.innerText = `Answer: ${q.correct_answer}`;
-        ans.style.color = "#1f2937";
-        div.appendChild(ans);
-        container.appendChild(div);
-      });
-
-      const [{ jsPDF }, html2canvas] = await Promise.all([import("jspdf"), import("html2canvas")]);
-      const canvas = await html2canvas.default(container, { scale: 2 });
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "pt", "a4");
-      const width = pdf.internal.pageSize.getWidth();
-      const height = pdf.internal.pageSize.getHeight();
-      pdf.addImage(imgData, "PNG", 20, 20, width - 40, 0);
-      pdf.save(`assessment_${id}_answer_key.pdf`);
-      toast.success("PDF generated successfully!");
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to generate PDF");
-    }
+  // THIS OPENS THE PHYSICAL PAPER MODAL
+  const openPaperModal = (assessment) => {
+    setPaperModal({
+      isOpen: true,
+      assessmentId: assessment.id,
+      title: assessment.title,
+    });
   };
 
   if (isLoading || loading) {
@@ -172,7 +116,11 @@ function AssessmentDetail() {
                 <Link to={`/instructor/assessments/${id}/enroll`} className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition">
                   <FaUsers /> Students
                 </Link>
-                <button onClick={generatePDF} className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition">
+                {/* NOW THIS BUTTON OPENS THE FULL PHYSICAL PAPER MODAL */}
+                <button
+                  onClick={() => openPaperModal(currentAssessment)}
+                  className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition"
+                >
                   <FaPrint /> Print PDF
                 </button>
               </div>
@@ -230,8 +178,7 @@ function AssessmentDetail() {
               {currentAssessment.external_links?.length > 0 ? (
                 <div className="space-y-2">
                   {currentAssessment.external_links.map((link, i) => (
-                    <a key={i} href={link} target="_blank" rel="noopener noreferrer"
-                       className="block text-blue-600 hover:underline text-sm break-all">
+                    <a key={i} href={link} target="_blank" rel="noopener noreferrer" className="block text-blue-600 hover:underline text-sm break-all">
                       {link}
                     </a>
                   ))}
@@ -241,7 +188,7 @@ function AssessmentDetail() {
               )}
             </section>
 
-            {/* Question Blocks - Desktop Table */}
+            {/* Question Blocks - Desktop */}
             <section className="hidden lg:block">
               <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
                 <FaQuestionCircle className="text-indigo-600" /> Question Blocks
@@ -281,7 +228,7 @@ function AssessmentDetail() {
               )}
             </section>
 
-            {/* Question Blocks - Mobile Cards */}
+            {/* Question Blocks - Mobile */}
             <section className="lg:hidden space-y-4">
               <h3 className="text-lg font-semibold flex items-center gap-2">
                 <FaQuestionCircle className="text-indigo-600" /> Question Blocks
@@ -317,8 +264,7 @@ function AssessmentDetail() {
                         <p className="font-medium">{r.name}</p>
                         <p className="text-xs text-gray-500">{r.file_type}</p>
                       </div>
-                      <a href={r.file_path} target="_blank" rel="noopener noreferrer"
-                         className="text-blue-600 hover:underline font-medium text-sm">
+                      <a href={r.file_path} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium text-sm">
                         View/Download
                       </a>
                     </div>
@@ -334,6 +280,15 @@ function AssessmentDetail() {
 
       <Footer />
 
+      {/* Physical Paper Modal */}
+      <PhysicalPaperModal
+        isOpen={paperModal.isOpen}
+        onClose={() => setPaperModal({ ...paperModal, isOpen: false })}
+        assessmentId={paperModal.assessmentId}
+        assessmentTitle={paperModal.title}
+      />
+
+      {/* Error/Success Modal */}
       <Modal isOpen={modal.isOpen} onClose={() => setModal({ ...modal, isOpen: false })} type={modal.type} title={modal.title}>
         {modal.message}
       </Modal>

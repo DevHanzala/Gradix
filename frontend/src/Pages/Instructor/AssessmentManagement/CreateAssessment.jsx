@@ -87,16 +87,16 @@ function CreateAssessment() {
       prev.map((block, i) =>
         i === index
           ? {
-              ...block,
-              [field]:
-                field === "question_count" || field === "duration_per_question" || field === "num_options"
-                  ? Math.max(Number.parseInt(value) || 1, 1)
-                  : field === "positive_marks" || field === "negative_marks"
+            ...block,
+            [field]:
+              field === "question_count" || field === "duration_per_question" || field === "num_options"
+                ? Math.max(Number.parseInt(value) || 1, 1)
+                : field === "positive_marks" || field === "negative_marks"
                   ? value === "" || value === null
                     ? null
                     : Math.max(Number.parseFloat(value) || 0, 0)
                   : value,
-            }
+          }
           : block
       )
     );
@@ -153,32 +153,36 @@ function CreateAssessment() {
     );
   };
 
+
   const validateForm = () => {
-    if (!formData.prompt || !formData.prompt.trim()) {
-      return "Prompt is required and must be a non-empty string";
+    // Title is now MANDATORY
+    if (!formData.title || !formData.title.trim()) {
+      return "Assessment Title is required";
     }
 
-    if (formData.title && (!formData.title.trim() || typeof formData.title !== 'string')) {
-      return "Title must be a non-empty string if provided";
+    // Prompt is optional IF resources or links are provided
+    const hasResources = selectedResources.length > 0 || newFiles.length > 0;
+    const hasLinks = formData.externalLinks.some(link => link && link.trim());
+
+    if (!formData.prompt?.trim() && !hasResources && !hasLinks) {
+      return "You must provide either a Prompt, Resources, or External Links";
     }
 
-    if (questionBlocks && Array.isArray(questionBlocks) && questionBlocks.length > 0) {
-      for (const block of questionBlocks) {
-        if (!block.question_count || block.question_count < 1) {
-          return "Question count must be at least 1 for each block";
-        }
-        if (!block.duration_per_question || block.duration_per_question < 30) {
-          return "Duration per question must be at least 30 seconds";
-        }
-        if (block.question_type === "multiple_choice" && (!block.num_options || block.num_options < 2)) {
-          return "Multiple choice questions must have at least 2 options";
-        }
+    // Optional: still validate question blocks if user added any
+    for (const block of questionBlocks) {
+      if (!block.question_count || block.question_count < 1) {
+        return "Question count must be at least 1";
+      }
+      if (!block.duration_per_question || block.duration_per_question < 30) {
+        return "Duration per question must be at least 30 seconds";
+      }
+      if (block.question_type === "multiple_choice" && (!block.num_options || block.num_options < 2)) {
+        return "Multiple choice needs at least 2 options";
       }
     }
 
-    return null;
+    return null; // valid
   };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -286,7 +290,7 @@ function CreateAssessment() {
               <div className="space-y-6">
                 <div>
                   <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
-                    Assessment Title (Optional)
+                    Assessment Title <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -301,7 +305,7 @@ function CreateAssessment() {
 
                 <div>
                   <label htmlFor="prompt" className="block text-sm font-medium text-gray-700 mb-2">
-                    Prompt
+                    Prompt <span className="text-gray-500">(Optional if using resources or links)</span>
                   </label>
                   <textarea
                     name="prompt"
@@ -310,8 +314,8 @@ function CreateAssessment() {
                     onChange={handleInputChange}
                     rows={4}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Provide a detailed prompt for question generation"
-                    required
+                    placeholder="Provide a detailed prompt for question generation (optional if using resources/links)"
+
                   />
                 </div>
 
@@ -326,7 +330,7 @@ function CreateAssessment() {
                         type="file"
                         id="new_files"
                         multiple
-                        accept=".pdf,.doc,.docx,.txt"
+                        accept=".pdf,.doc,.docx,.txt,.ppt,.pptx,.jpg,.jpeg,.png,.webp"
                         onChange={handleFileChange}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                         disabled={isProcessing}
