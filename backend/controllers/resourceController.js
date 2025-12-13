@@ -13,7 +13,7 @@ import {
 import { getAssessmentById, storeResourceChunk } from "../models/assessmentModel.js";
 import { extractTextFromFile, chunkText } from "../services/textProcessor.js";
 import { generateEmbedding } from "../services/embeddingGenerator.js";
-
+import { redis } from "../services/redis.js";
 /**
  * UPLOAD RESOURCE (FILES + URL) — IN-MEMORY ONLY
  */
@@ -75,6 +75,13 @@ export const uploadResource = async (req, res) => {
     }
 
     console.log(`${uploadedResources.length} resource(s) uploaded successfully`);
+
+    // CLEAR ALL RESOURCE CACHES FOR THIS INSTRUCTOR
+const instructorId = req.user.id;
+await redis.del(`resources:instructor:${instructorId}:visibility:all`);
+await redis.del(`resources:instructor:${instructorId}:visibility:private`);
+await redis.del(`resources:instructor:${instructorId}:visibility:public`);
+
     res.status(201).json({
       success: true,
       message: "Resources uploaded successfully",
@@ -95,13 +102,44 @@ export const uploadResource = async (req, res) => {
  */
 export const getInstructorResources = async (req, res) => {
   try {
-    const resources = await findResourcesByUploader(req.user.id, req.query.visibility || null);
-    res.json({ success: true, message: "Resources retrieved", data: resources || [] });
+    const instructorId = req.user.id;
+    const visibility = req.query.visibility || "all"; // "all", "private", "public"
+
+    // REDIS CACHE KEY — UNIQUE FOR EACH VISIBILITY
+    const cacheKey = `resources:instructor:${instructorId}:visibility:${visibility}`;
+
+    // CHECK REDIS FIRST — INSTANT
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      console.log(`Resources from Redis: ${cacheKey}`);
+      return res.json({ 
+        success: true, 
+        message: "Resources retrieved", 
+        data: cached 
+      });
+    }
+
+    // IF NOT CACHED → GET FROM DB
+    console.log(`Fetching resources from DB for instructor ${instructorId} (${visibility})`);
+    const resources = await findResourcesByUploader(instructorId, visibility === "all" ? null : visibility);
+
+    // CACHE FOR 10 MINUTES
+    await redis.set(cacheKey, resources || [], { ex: 600 });
+
+    res.json({ 
+      success: true, 
+      message: "Resources retrieved", 
+      data: resources || [] 
+    });
   } catch (error) {
     console.error("Get instructor resources error:", error);
-    res.status(500).json({ success: false, message: "Failed to retrieve resources" });
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to retrieve resources" 
+    });
   }
 };
+
 
 /**
  * GET ALL SYSTEM RESOURCES (FILE-BASED)
@@ -148,6 +186,10 @@ export const updateResourceController = async (req, res) => {
     }
 
     const updated = await updateResource(req.params.resourceId, req.body);
+    await redis.del(`resources:instructor:${req.user.id}:visibility:all`);
+await redis.del(`resources:instructor:${req.user.id}:visibility:private`);
+await redis.del(`resources:instructor:${req.user.id}:visibility:public`);
+
     res.json({ success: true, message: "Resource updated", data: updated });
   } catch (error) {
     console.error("Update resource error:", error);
@@ -168,6 +210,9 @@ export const deleteResourceController = async (req, res) => {
     }
 
     await deleteResource(req.params.resourceId);
+    await redis.del(`resources:instructor:${req.user.id}:visibility:all`);
+await redis.del(`resources:instructor:${req.user.id}:visibility:private`);
+await redis.del(`resources:instructor:${req.user.id}:visibility:public`);
     res.json({ success: true, message: "Resource deleted successfully" });
   } catch (error) {
     console.error("Delete resource error:", error);

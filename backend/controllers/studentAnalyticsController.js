@@ -6,6 +6,7 @@ import {
   getAssessmentAnalytics,
   getAssessmentQuestions as modelGetAssessmentQuestions
 } from "../models/studentAnalyticsModel.js";
+import { redis } from "../services/redis.js";
 
 export const getStudentOverview = async (req, res) => {
   try {
@@ -112,7 +113,25 @@ export const getStudentAssessments = async (req, res) => {
       });
     }
 
+    // REDIS CACHE KEY
+    const cacheKey = `student:assessments:list:${studentId}`;
+
+    // CHECK REDIS FIRST — INSTANT LOAD
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      console.log(`Student assessments from Redis for student ${studentId}`);
+      return res.status(200).json({
+        success: true,
+        message: "Student assessments retrieved successfully",
+        data: cached
+      });
+    }
+
+    console.log(`Fetching assessments from DB for student ${studentId}`);
     const assessments = await getStudentAssessmentsList(studentId);
+
+    // CACHE FOR 10 MINUTES
+    await redis.set(cacheKey, assessments, { ex: 600 });
 
     res.status(200).json({
       success: true,
@@ -120,11 +139,10 @@ export const getStudentAssessments = async (req, res) => {
       data: assessments
     });
   } catch (error) {
-    console.error("❌ Get student assessments error:", error.stack || error.message);
+    console.error("Get student assessments error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to retrieve assessments",
-      error: error.message
+      message: "Failed to retrieve assessments"
     });
   }
 };

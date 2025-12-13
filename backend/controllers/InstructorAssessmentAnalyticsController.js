@@ -3,6 +3,7 @@ import {
   getAssessmentStudentsModel,
   getStudentAttemptQuestionsModel
 } from "../models/InstructorAssessmentAnalyticsModel.js";
+import { redis } from "../services/redis.js";
 
 /**
  * Instructor Assessment Analytics Controller
@@ -59,44 +60,43 @@ export const getAssessmentStudents = async (req, res) => {
     const assessmentId = parseInt(req.params.id);
     const instructorId = req.user?.id;
 
-    if (!instructorId || req.user.role !== "instructor") {
-      return res.status(403).json({
-        success: false,
-        message: "Only instructors can access student data"
-      });
-    }
-
-    if (isNaN(assessmentId)) {
+    if (!instructorId || req.user.role !== "instructor" || isNaN(assessmentId)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid assessment ID"
+        message: "Invalid request"
       });
     }
 
-    console.log(`📋 Getting students for assessment ${assessmentId}`);
-    const students = await getAssessmentStudentsModel(assessmentId, instructorId);
+    // REDIS CACHE KEY
+    const cacheKey = `analytics:students:${assessmentId}`;
 
-    if (!students || students.length === 0) {
-      console.log(`ℹ️ No students found for assessment ${assessmentId}`);
+    // CHECK REDIS FIRST — INSTANT
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      console.log(`Students list from Redis for assessment ${assessmentId}`);
       return res.status(200).json({
         success: true,
-        message: "No students found for this assessment",
-        data: []
+        message: "Students retrieved successfully",
+        data: cached
       });
     }
 
-    console.log(`✅ Retrieved ${students.length} students for assessment ${assessmentId}`);
+    console.log(`Fetching students from DB for assessment ${assessmentId}`);
+    const students = await getAssessmentStudentsModel(assessmentId, instructorId);
+
+    // CACHE FOR 5 MINUTES
+    await redis.set(cacheKey, students || [], { ex: 300 });
+
     res.status(200).json({
       success: true,
       message: "Students retrieved successfully",
-      data: students
+      data: students || []
     });
   } catch (error) {
-    console.error("❌ Error fetching assessment students:", error);
+    console.error("Error fetching assessment students:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to fetch assessment students",
-      error: error.message
+      message: "Failed to fetch assessment students"
     });
   }
 };

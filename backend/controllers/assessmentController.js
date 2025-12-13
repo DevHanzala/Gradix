@@ -11,6 +11,7 @@ import {
   generateAssessmentQuestions,
   storeResourceChunk,
 } from '../models/assessmentModel.js';
+import { redis } from "../services/redis.js";
 
 import { findUserByEmail } from '../models/userModel.js';
 import { createResource, linkResourceToAssessment } from '../models/resourceModel.js';
@@ -104,6 +105,8 @@ export const createNewAssessment = async (req, res) => {
       if (!isNaN(id)) await linkResourceToAssessment(newAssessment.id, id);
     }
 
+    await redis.del(`instructor:assessments:${req.user.id}`);
+
     res.status(201).json({
       success: true,
       message: "Assessment created successfully",
@@ -122,40 +125,73 @@ export const createNewAssessment = async (req, res) => {
 export const getInstructorAssessments = async (req, res) => {
   try {
     const instructor_id = req.user.id;
-    console.log(`🔄 Fetching assessments for instructor ${instructor_id}`);
+
+    const cacheKey = `instructor:assessments:${instructor_id}`;
+
+    // CHECK REDIS FIRST — INSTANT
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      return res.status(200).json({
+        success: true,
+        message: 'Assessments retrieved successfully',
+        data: cached,
+      });
+    }
+
+    // IF NOT CACHED → GET FROM DB
     const assessments = await getAssessmentsByInstructor(instructor_id);
+
+    // CACHE FOR 10 MINUTES
+    await redis.set(cacheKey, assessments, { ex: 600 });
+
     res.status(200).json({
       success: true,
       message: 'Assessments retrieved successfully',
       data: assessments,
     });
   } catch (error) {
-    console.error('❌ Get assessments error:', error);
+    console.error('Get assessments error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve assessments',
-      error: error.message,
     });
   }
 };
 
+
 export const getAssessment = async (req, res) => {
   try {
-    const assessment_id = req.params.id;
+    const assessment_id = parseInt(req.params.id);
     const user_id = req.user.id;
     const user_role = req.user.role;
 
-    if (!assessment_id || isNaN(parseInt(assessment_id))) {
+    if (isNaN(assessment_id)) {
       return res.status(400).json({ success: false, message: 'Invalid assessment ID' });
     }
 
-    console.log(`🔄 Fetching assessment ${assessment_id} for user ${user_id} (${user_role})`);
+    // REDIS CACHE KEY
+    const cacheKey = `assessment:single:${assessment_id}:${user_id}`;
 
-    const assessment = await getAssessmentById(parseInt(assessment_id), user_id, user_role);
+    // CHECK REDIS FIRST — INSTANT
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      console.log(`Assessment ${assessment_id} from Redis cache`);
+      return res.status(200).json({
+        success: true,
+        message: 'Assessment retrieved successfully',
+        data: cached,
+      });
+    }
+
+    console.log(`Fetching assessment ${assessment_id} from DB`);
+    const assessment = await getAssessmentById(assessment_id, user_id, user_role);
 
     if (!assessment) {
       return res.status(404).json({ success: false, message: 'Assessment not found or access denied' });
     }
+
+    // CACHE FOR 10 MINUTES
+    await redis.set(cacheKey, assessment, { ex: 600 });
 
     res.status(200).json({
       success: true,
@@ -163,11 +199,10 @@ export const getAssessment = async (req, res) => {
       data: assessment,
     });
   } catch (error) {
-    console.error('❌ Get assessment error:', error);
+    console.error('Get assessment error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve assessment',
-      error: error.message,
     });
   }
 };
@@ -239,6 +274,15 @@ export const updateAssessmentData = async (req, res) => {
       await linkResourceToAssessment(assessment_id, resource.id);
     }
 
+    // FINAL CACHE CLEARING — PUT THIS AT THE END OF updateAssessmentData & deleteAssessmentData
+    const instructorId = req.user.id;
+    const assessmentId = parseInt(req.params.id || req.params.assessmentId);
+
+    await redis.del(`instructor:assessments:${instructorId}`);
+    await redis.del(`assessment:single:${assessmentId}:${instructorId}`);
+    await redis.del(`assessment:single:${assessmentId}:*`);
+
+    console.log(`All cache cleared for assessment ${assessmentId}`);
     res.status(200).json({
       success: true,
       message: 'Assessment updated successfully',
@@ -268,7 +312,17 @@ export const deleteAssessmentData = async (req, res) => {
     }
 
     await deleteAssessment(parseInt(assessment_id));
+
     console.log(`✅ Assessment deleted: ID=${assessment_id}`);
+    // FINAL CACHE CLEARING — PUT THIS AT THE END OF updateAssessmentData & deleteAssessmentData
+    const instructorId = req.user.id;
+    const assessmentId = parseInt(req.params.id || req.params.assessmentId);
+
+    await redis.del(`instructor:assessments:${instructorId}`);
+    await redis.del(`assessment:single:${assessmentId}:${instructorId}`);
+    await redis.del(`assessment:single:${assessmentId}:*`);
+
+    console.log(`All cache cleared for assessment ${assessmentId}`);
     res.status(200).json({
       success: true,
       message: 'Assessment deleted successfully',
@@ -328,6 +382,12 @@ export const enrollStudentController = async (req, res) => {
     await sendAssessmentEnrollmentEmail(email, assessment.title, assessmentId);
 
     console.log(`✅ Student enrolled successfully for assessment ${assessmentId}`);
+
+// CLEAR STUDENT'S ASSESSMENT LIST CACHE
+await redis.del(`student:assessments:list:${student.id}`);
+// OR if you use studentId variable:
+await redis.del(`student:assessments:list:${student.id}`);
+
     res.status(200).json({
       success: true,
       message: 'Student enrolled successfully',
@@ -365,7 +425,7 @@ export const unenrollStudentController = async (req, res) => {
     }
 
     const result = await unenrollStudent(parseInt(assessmentId), parseInt(studentId));
-
+await redis.del(`student:assessments:list:${studentId}`);
     res.status(200).json({
       success: true,
       message: 'Student unenrolled successfully',
