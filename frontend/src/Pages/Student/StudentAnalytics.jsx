@@ -208,19 +208,19 @@ const StudentAnalytics = () => {
                       <p className="text-base text-gray-700 leading-relaxed">{q.question}</p>
                     </div>
 
-                    {/* Only show options for MCQ */}
-                    {q.type === "MCQ" && q.options && (
-                      <div className="bg-blue-50 p-4 rounded-xl">
-                        <p className="font-bold text-blue-800 mb-2">Options</p>
-                        <div className="space-y-2">
-                          {Object.entries(q.options).map(([k, v]) => (
-                            <div key={k} className="bg-white p-3 rounded-lg text-gray-700 text-sm">
-                              <strong>{k}:</strong> {v}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+               {/* Only show options for MCQ */}
+{["multiple_choice", "MCQ"].includes(q.type) && q.options && (
+  <div className="bg-blue-50 p-4 rounded-xl">
+    <p className="font-bold text-blue-800 mb-2">Options</p>
+    <div className="space-y-2">
+      {Object.entries(q.options).map(([k, v]) => (
+        <div key={k} className="bg-white p-3 rounded-lg text-gray-700 text-sm">
+          <strong>{k}:</strong> {v}
+        </div>
+      ))}
+    </div>
+  </div>
+)}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="bg-green-50 p-4 rounded-xl text-center">

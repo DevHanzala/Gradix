@@ -8,7 +8,7 @@ import Modal from "../../../components/ui/Modal";
 import Navbar from "../../../components/Navbar";
 import Footer from "../../../components/Footer";
 import toast from "react-hot-toast";
-import { io } from "socket.io-client"; // NEW
+import { io } from "socket.io-client";
 
 function CreateAssessment() {
   const navigate = useNavigate();
@@ -36,18 +36,17 @@ function CreateAssessment() {
   const [selectedResources, setSelectedResources] = useState([]);
   const [newFiles, setNewFiles] = useState([]);
 
-  // NEW: Progress state
+  // Progress state
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // NEW: Socket ref
+  // Socket ref
   const socketRef = useRef(null);
 
   useEffect(() => {
     fetchAllResources();
 
-    // NEW: Connect to Socket.IO
     const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
     const socket = io(API_URL, {
       transports: ["websocket"],
@@ -87,16 +86,16 @@ function CreateAssessment() {
       prev.map((block, i) =>
         i === index
           ? {
-            ...block,
-            [field]:
-              field === "question_count" || field === "duration_per_question" || field === "num_options"
-                ? Math.max(Number.parseInt(value) || 1, 1)
-                : field === "positive_marks" || field === "negative_marks"
-                  ? value === "" || value === null
-                    ? null
-                    : Math.max(Number.parseFloat(value) || 0, 0)
-                  : value,
-          }
+              ...block,
+              [field]:
+                field === "question_count" || field === "duration_per_question" || field === "num_options"
+                  ? Math.max(Number.parseInt(value) || 1, 1)
+                  : field === "positive_marks" || field === "negative_marks"
+                    ? value === "" || value === null
+                      ? null
+                      : Math.max(Number.parseFloat(value) || 0, 0)
+                    : value,
+            }
           : block
       )
     );
@@ -153,14 +152,11 @@ function CreateAssessment() {
     );
   };
 
-
   const validateForm = () => {
-    // Title is now MANDATORY
     if (!formData.title || !formData.title.trim()) {
       return "Assessment Title is required";
     }
 
-    // Prompt is optional IF resources or links are provided
     const hasResources = selectedResources.length > 0 || newFiles.length > 0;
     const hasLinks = formData.externalLinks.some(link => link && link.trim());
 
@@ -168,7 +164,6 @@ function CreateAssessment() {
       return "You must provide either a Prompt, Resources, or External Links";
     }
 
-    // Optional: still validate question blocks if user added any
     for (const block of questionBlocks) {
       if (!block.question_count || block.question_count < 1) {
         return "Question count must be at least 1";
@@ -181,8 +176,9 @@ function CreateAssessment() {
       }
     }
 
-    return null; // valid
+    return null;
   };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -220,7 +216,6 @@ function CreateAssessment() {
     );
     assessmentData.append("selected_resources", JSON.stringify(selectedResources));
 
-    // NEW: Attach socket ID
     if (socketRef.current?.id) {
       assessmentData.append("socketId", socketRef.current.id);
     }
@@ -259,7 +254,7 @@ function CreateAssessment() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-6">Create New Assessment</h1>
 
-        {/* NEW: Progress Bar */}
+        {/* Progress Bar */}
         {isProcessing && (
           <Card className="mb-6 border-blue-200 bg-blue-50">
             <CardContent className="p-4">
@@ -278,10 +273,6 @@ function CreateAssessment() {
         )}
 
         <form onSubmit={handleSubmit}>
-          {/* ... [All your existing form cards] ... */}
-          {/* (Title, Prompt, Resources, Links, Question Blocks) */}
-          {/* Keeping all your existing JSX unchanged below */}
-
           <Card className="mb-6">
             <CardHeader>
               <h2 className="text-xl font-semibold text-gray-900">Assessment Details</h2>
@@ -299,7 +290,8 @@ function CreateAssessment() {
                     value={formData.title}
                     onChange={handleInputChange}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter assessment title (optional)"
+                    placeholder="Enter assessment title"
+                    required
                   />
                 </div>
 
@@ -314,8 +306,7 @@ function CreateAssessment() {
                     onChange={handleInputChange}
                     rows={4}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Provide a detailed prompt for question generation (optional if using resources/links)"
-
+                    placeholder="Provide a detailed prompt for question generation"
                   />
                 </div>
 
@@ -411,6 +402,7 @@ function CreateAssessment() {
             </CardContent>
           </Card>
 
+          {/* Question Blocks - IMPROVED FOR MOBILE & UX */}
           <Card className="mb-6">
             <CardHeader>
               <h2 className="text-xl font-semibold text-gray-900">Question Blocks (Optional)</h2>
@@ -453,7 +445,8 @@ function CreateAssessment() {
                         value={block.question_count}
                         onChange={(e) => handleBlockChange(index, "question_count", e.target.value)}
                         min="1"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g. 5"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
                         required
                         disabled={isProcessing}
                       />
@@ -466,7 +459,8 @@ function CreateAssessment() {
                         value={block.duration_per_question}
                         onChange={(e) => handleBlockChange(index, "duration_per_question", e.target.value)}
                         min="30"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g. 120"
+                        className="w-full px-3 py-2 border  elemental-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
                         required
                         disabled={isProcessing}
                       />
@@ -480,7 +474,9 @@ function CreateAssessment() {
                           value={block.num_options}
                           onChange={(e) => handleBlockChange(index, "num_options", e.target.value)}
                           min="2"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          max="6"
+                          placeholder="2 to 6"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
                           required
                           disabled={isProcessing}
                         />
@@ -495,7 +491,8 @@ function CreateAssessment() {
                         onChange={(e) => handleBlockChange(index, "positive_marks", e.target.value)}
                         min="0"
                         step="0.1"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g. 1"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
                         disabled={isProcessing}
                       />
                     </div>
@@ -508,7 +505,8 @@ function CreateAssessment() {
                         onChange={(e) => handleBlockChange(index, "negative_marks", e.target.value)}
                         min="0"
                         step="0.1"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g. 0.25"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-400"
                         disabled={isProcessing}
                       />
                     </div>
