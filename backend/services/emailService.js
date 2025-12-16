@@ -26,7 +26,6 @@ export const sendEmail = async (to, subject, htmlContent, textContent = null) =>
     };
 
     const result = await transporter.sendMail(mailOptions);
-    console.log(`Email sent successfully to ${to}:`, result.messageId);
     return { success: true, messageId: result.messageId };
   } catch (error) {
     console.error(`Failed to send email to ${to}:`, error);
@@ -38,9 +37,10 @@ export const sendEmail = async (to, subject, htmlContent, textContent = null) =>
  * Send verification email
  */
 export const sendVerificationEmail = async (email, name, verificationToken) => {
-  const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${verificationToken}`;
+  const baseUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+  const verificationUrl = `${baseUrl}/verify-email?token=${verificationToken}`;
 
-  const subject = "Verify Your Email - Gradewise AI";
+  const subject = "Verify Your Email - Gradwise AI";
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -60,11 +60,11 @@ export const sendVerificationEmail = async (email, name, verificationToken) => {
     <body>
       <div class="container">
         <div class="header">
-          <h1>Welcome to Gradewise AI!</h1>
+          <h1>Welcome to Gradwise AI!</h1>
         </div>
         <div class="content">
           <h2>Hi ${name},</h2>
-          <p>Thank you for signing up for Gradewise AI! To complete your registration, please verify your email address by clicking the button below:</p>
+          <p>Thank you for signing up for Gradwise AI! To complete your registration, please verify your email address by clicking the button below:</p>
           
           <div style="text-align: center;">
             <a href="${verificationUrl}" class="button">Verify Email Address</a>
@@ -75,28 +75,34 @@ export const sendVerificationEmail = async (email, name, verificationToken) => {
           
           <p><strong>This verification link will expire in 24 hours.</strong></p>
           
-          <p>If you didn't create an account with Gradewise AI, you can safely ignore this email.</p>
+          <p>If you didn't create an account with Gradwise AI, you can safely ignore this email.</p>
           
-          <p>Best regards,<br>The Gradewise AI Team</p>
+          <p>Best regards,<br>The Gradwise AI Team</p>
         </div>
         <div class="footer">
-          <p>© 2025 Gradewise AI. All rights reserved.</p>
+          <p>© 2025 Gradwise AI. All rights reserved.</p>
         </div>
       </div>
     </body>
     </html>
   `;
 
-  return await sendEmail(email, subject, htmlContent);
+  // Fire and forget — no await to prevent hanging
+  sendEmail(email, subject, htmlContent).catch((error) => {
+    console.error(`Background verification email failed for ${email}:`, error.message);
+  });
+
+  console.log(`Verification email triggered for ${email} (sent in background)`);
 };
 
 /**
  * Send password reset email
  */
 export const sendPasswordResetEmail = async (email, name, resetToken) => {
-  const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+  const baseUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+  const resetUrl = `${baseUrl}/reset-password/${resetToken}`;
 
-  const subject = "Reset Your Password - Gradewise AI";
+  const subject = "Reset Your Password - Gradwise AI";
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -121,7 +127,7 @@ export const sendPasswordResetEmail = async (email, name, resetToken) => {
         </div>
         <div class="content">
           <h2>Hi ${name},</h2>
-          <p>We received a request to reset your password for your Gradewise AI account. Click the button below to set a new password:</p>
+          <p>We received a request to reset your password for your Gradwise AI account. Click the button below to set a new password:</p>
           
           <div style="text-align: center;">
             <a href="${resetUrl}" class="button">Set New Password</a>
@@ -146,26 +152,32 @@ export const sendPasswordResetEmail = async (email, name, resetToken) => {
             <li>Numbers and special characters</li>
           </ul>
           
-          <p>If you need further assistance, contact support@gradewise.ai.</p>
+          <p>If you need further assistance, contact support@gradwise.ai.</p>
           
-          <p>Best regards,<br>The Gradewise AI Team</p>
+          <p>Best regards,<br>The Gradwise AI Team</p>
         </div>
         <div class="footer">
-          <p>© 2025 Gradewise AI. All rights reserved.</p>
+          <p>© 2025 Gradwise AI. All rights reserved.</p>
         </div>
       </div>
     </body>
     </html>
   `;
 
-  return await sendEmail(email, subject, htmlContent);
+  // Fire and forget — no await to prevent hanging
+  sendEmail(email, subject, htmlContent).catch((error) => {
+    console.error(`Background reset email failed for ${email}:`, error.message);
+  });
+
+  console.log(`Reset email triggered for ${email} (sent in background)`);
 };
 
 /**
  * Send welcome email after verification
  */
 export const sendWelcomeEmail = async (email, name, role) => {
-  const dashboardUrl = `${process.env.FRONTEND_URL}/dashboard`;
+  const baseUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+  const dashboardUrl = `${baseUrl}/dashboard`;
 
   const subject = "Welcome to Gradewise AI - Let's Get Started!";
   const htmlContent = `
@@ -265,7 +277,8 @@ export const sendRoleChangeEmail = async (email, name, oldRole, newRole) => {
     super_admin: "/super-admin/dashboard",
   };
   const dashboardPath = roleToDashboardPath[newRole] || "/profile";
-  const dashboardUrl = `${process.env.FRONTEND_URL}${dashboardPath}`;
+  const baseUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+  const dashboardUrl = `${baseUrl}${dashboardPath}`;
 
   const subject = `Your Role Has Been Updated - Gradewise AI`;
   const htmlContent = `
@@ -324,7 +337,8 @@ export const sendRoleChangeEmail = async (email, name, oldRole, newRole) => {
  * Send assessment enrollment email to students
  */
 export const sendAssessmentEnrollmentEmail = async (email, name, assessmentTitle, dueDate) => {
-  const dashboardUrl = `${process.env.FRONTEND_URL}/student/dashboard`;
+  const baseUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+  const dashboardUrl = `${baseUrl}/student/dashboard`;
 
   const subject = `New Assessment Available: ${assessmentTitle}`;
   const htmlContent = `
@@ -398,7 +412,8 @@ export const sendAssessmentEnrollmentEmail = async (email, name, assessmentTitle
  * Send assessment reminder email
  */
 export const sendAssessmentReminderEmail = async (email, name, assessmentTitle, dueDate, hoursRemaining) => {
-  const dashboardUrl = `${process.env.FRONTEND_URL}/dashboard`;
+  const baseUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+  const dashboardUrl = `${baseUrl}/dashboard`;
 
   const subject = `⏰ Reminder: ${assessmentTitle} Due Soon`;
   const htmlContent = `
@@ -475,7 +490,6 @@ export const sendAssessmentReminderEmail = async (email, name, assessmentTitle, 
 export const testEmailConfiguration = async () => {
   try {
     await transporter.verify();
-    console.log("Email configuration is valid");
     return { success: true, message: "Email configuration is valid" };
   } catch (error) {
     console.error("Email configuration error:", error);

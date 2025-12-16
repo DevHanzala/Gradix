@@ -7,6 +7,7 @@ import {
   getAssessmentQuestions as modelGetAssessmentQuestions
 } from "../models/studentAnalyticsModel.js";
 import { redis } from "../services/redis.js";
+import { getCreationModel, generateContent } from "../services/geminiService.js";
 
 export const getStudentOverview = async (req, res) => {
   try {
@@ -205,6 +206,8 @@ export const getAssessmentQuestions = async (req, res) => {
   }
 };
 
+// UPDATE IN studentAnalyticsController.js — ADD AI TO getStudentReport
+
 export const getStudentReport = async (req, res) => {
   try {
     const studentId = req.user.id;
@@ -221,24 +224,68 @@ export const getStudentReport = async (req, res) => {
 
     let report;
     if (assessmentId) {
+      // Fetch basic details
       const details = await getAssessmentAnalytics(studentId, parseInt(assessmentId));
-      report = {
-        student_id: studentId,
-        assessment_id: assessmentId,
-        generated_at: new Date().toISOString(),
-        score: details.score,
-        total_marks: details.total_marks,
-        student_score: details.student_score,
-        weak_areas: details.weak_areas,
-        recommendations: details.recommendations,
-        summary: {
-          score: details.score,
-          total_marks: details.total_marks,
-          student_score: details.student_score,
-          improvement_areas: details.weak_areas.length
-        }
+
+      // GENERATE RECOMMENDATIONS WITH AI — COMPULSORY FOR REPORT
+      const client = await getCreationModel();
+      const weakQuestionsJson = JSON.stringify(details.weak_questions || []);
+      const prompt = `You are an educational AI assistant. Generate learning recommendations for the assessment "${details.assessment_title}" with score ${details.score || 0}%. Weak questions: ${weakQuestionsJson}. If no weak questions, provide general recommendations. Respond ONLY with valid JSON: { "weak_areas": [{ "topic": "string", "performance": number, "suggestion": "string" }], "study_plan": { "daily_practice": [{ "topic": "string", "focus": "string", "time_allocation": "string" }], "weekly_review": [{ "topic": "string", "activity": "string", "goal": "string" }] } }.`;
+
+      let responseText = await generateContent(client, prompt, {
+        generationConfig: { maxOutputTokens: 1000, temperature: 0.7, response_mime_type: 'application/json' },
+      });
+
+      responseText = responseText.replace(/^```json\n/, '').replace(/\n```$/, '').trim();
+
+      let recommendations = {
+        weak_areas: [],
+        study_plan: { daily_practice: [], weekly_review: [] }
       };
+
+      try {
+        recommendations = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error("AI recommendation parse error:", parseError);
+        recommendations = {
+          weak_areas: details.weak_questions?.map(area => ({
+            topic: area.question_type || 'General',
+            performance: Math.round((area.performance || 0) * 100),
+            suggestion: "Practice more in this area."
+          })) || [],
+          study_plan: {
+            daily_practice: [{ topic: "General", focus: "Review basics", time_allocation: "30 minutes" }],
+            weekly_review: [{ topic: "All", activity: "Mock test", goal: "Improve by 10%" }]
+          }
+        };
+      }
+
+      // Build report with recommendations
+      report = {
+  student_id: studentId,
+  assessment_id: assessmentId,
+  generated_at: new Date().toISOString(),
+  score: details.score,
+  total_marks: details.total_marks,
+  student_score: details.student_score,
+  time_taken: details.time_taken,
+  total_questions: details.total_questions,
+  correct_answers: details.correct_answers,
+  incorrect_answers: details.incorrect_answers,
+  negative_marks_applied: details.negative_marks_applied || 0, // make sure this is here
+  student_answers: details.student_answers || [], // ADD THIS LINE
+  recommendations
+};
+
+console.log("=== REPORT DEBUG ===");
+console.log("details from getAssessmentAnalytics:", details);
+console.log("negative_marks_applied from details:", details.negative_marks_applied);
+console.log("Final report sent:", report);
+console.log("negative_marks_applied in report:", report.negative_marks_applied);
+console.log("=== END DEBUG ===");
+
     } else {
+      // General report (no changes)
       const [analytics, performance, recommendations] = await Promise.all([
         getStudentAnalytics(studentId),
         getPerformanceOverTime(studentId, 'month'),
