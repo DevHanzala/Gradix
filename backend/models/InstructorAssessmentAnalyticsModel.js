@@ -1,31 +1,31 @@
-import db from "../DB/db.js";
+  import db from "../DB/db.js";
 
-/**
- * Instructor Assessment Analytics Model
- */
+  /**
+   * Instructor Assessment Analytics Model
+   */
 
-/**
- * Fetch executed assessments for an instructor
- */
-export const getInstructorExecutedAssessmentsModel = async (instructorId) => {
-  const result = await db.query(
-    `SELECT a.id, a.title, a.created_at, COUNT(aa.id) as completed_attempts
-     FROM assessments a
-     LEFT JOIN assessment_attempts aa ON a.id = aa.assessment_id
-     WHERE a.instructor_id = $1
-       AND aa.completed_at IS NOT NULL
-       AND aa.status = 'completed'
-     GROUP BY a.id, a.title, a.created_at
-     HAVING COUNT(aa.id) > 0`,
-    [instructorId]
-  );
-  return result.rows;
-};
+  /**
+   * Fetch executed assessments for an instructor
+   */
+  export const getInstructorExecutedAssessmentsModel = async (instructorId) => {
+    const result = await db.query(
+      `SELECT a.id, a.title, a.created_at, COUNT(aa.id) as completed_attempts
+      FROM assessments a
+      LEFT JOIN assessment_attempts aa ON a.id = aa.assessment_id
+      WHERE a.instructor_id = $1
+        AND aa.completed_at IS NOT NULL
+        AND aa.status = 'completed'
+      GROUP BY a.id, a.title, a.created_at
+      HAVING COUNT(aa.id) > 0`,
+      [instructorId]
+    );
+    return result.rows;
+  };
 
-/**
- * Fetch students who completed a specific assessment
- */
-export const getAssessmentStudentsModel = async (assessmentId, instructorId) => {
+  /**
+   * Fetch students who completed a specific assessment
+   */
+  export const getAssessmentStudentsModel = async (assessmentId, instructorId) => {
   try {
     const result = await db.query(`
       SELECT 
@@ -35,15 +35,7 @@ export const getAssessmentStudentsModel = async (assessmentId, instructorId) => 
         aa.completed_at,
         aa.started_at,
         COUNT(gq.id) as total_questions,
-
-        -- SMART CORRECT COUNT (ignores case, quotes, spaces)
-        COUNT(CASE WHEN 
-          TRIM(LOWER(REPLACE(REPLACE(CAST(gq.correct_answer AS TEXT), '\\"', ''), '"', ''))) = 
-          TRIM(LOWER(REPLACE(REPLACE(CAST(sa.student_answer AS TEXT), '\\"', ''), '"', '')))
-        THEN 1 END) as correct_answers,
-
         COALESCE(SUM(gq.positive_marks), 0) as max_possible_score
-
       FROM assessment_attempts aa
       JOIN assessments a ON a.id = aa.assessment_id
       JOIN users u ON u.id = aa.student_id
@@ -54,6 +46,32 @@ export const getAssessmentStudentsModel = async (assessmentId, instructorId) => 
       GROUP BY aa.id, aa.student_id, u.name, aa.started_at, aa.completed_at, aa.score
       ORDER BY aa.completed_at DESC
     `, [assessmentId, instructorId]);
+
+    // Smart correct count using saved score for short answer, string compare for others
+    const detailedResult = await db.query(`
+      SELECT 
+        aa.student_id,
+        COUNT(CASE 
+          WHEN gq.question_type = 'short_answer' THEN
+            CASE WHEN sa.score > 0 THEN 1 ELSE NULL END
+          ELSE
+            CASE WHEN TRIM(LOWER(REGEXP_REPLACE(sa.student_answer, '[^a-zA-Z0-9]', '', 'g'))) = 
+                     TRIM(LOWER(REGEXP_REPLACE((gq.correct_answer)::text, '[^a-zA-Z0-9]', '', 'g'))) 
+            THEN 1 ELSE NULL END
+        END) as correct_answers
+      FROM assessment_attempts aa
+      JOIN generated_questions gq ON gq.attempt_id = aa.id
+      LEFT JOIN student_answers sa ON sa.question_id = gq.id AND sa.attempt_id = aa.id
+      WHERE aa.assessment_id = $1 AND aa.student_id IN (
+        SELECT student_id FROM assessment_attempts WHERE assessment_id = $1 AND status = 'completed'
+      )
+      GROUP BY aa.student_id
+    `, [assessmentId]);
+
+    const correctMap = {};
+    detailedResult.rows.forEach(row => {
+      correctMap[row.student_id] = Number(row.correct_answers || 0);
+    });
 
     return result.rows.map(row => {
       const timeDiff = row.started_at && row.completed_at 
@@ -70,7 +88,7 @@ export const getAssessmentStudentsModel = async (assessmentId, instructorId) => 
         student_id: row.student_id,
         name: row.name,
         total_questions: Number(row.total_questions),
-        correct_answers: Number(row.correct_answers), // NOW 100% ACCURATE
+        correct_answers: correctMap[row.student_id] || 0,
         percentage,
         time_used: `${minutes}m ${seconds}s`,
         time_taken: timeDiff
@@ -82,10 +100,11 @@ export const getAssessmentStudentsModel = async (assessmentId, instructorId) => 
   }
 };
 
-/**
- * Fetch questions and answers for a specific student's attempt
- */
-export const getStudentAttemptQuestionsModel = async (assessmentId, studentId, instructorId) => {
+
+  /**
+   * Fetch questions and answers for a specific student's attempt
+   */
+  export const getStudentAttemptQuestionsModel = async (assessmentId, studentId, instructorId) => {
   try {
     // Verify instructor owns the assessment
     const check = await db.query(`SELECT 1 FROM assessments WHERE id = $1 AND instructor_id = $2`, [assessmentId, instructorId]);
@@ -113,25 +132,26 @@ export const getStudentAttemptQuestionsModel = async (assessmentId, studentId, i
       ORDER BY gq.question_order
     `, [attemptId]);
 
-    // FIX: Smart comparison for ALL question types
-    return result.rows.map(q => {
-      let correct = false;
-
-      const clean = (str) => String(str || "")
-        .replace(/\\"/g, '"')           // remove \" 
-        .replace(/^["'\s]+|["'\s]+$/g, '') // remove leading/trailing quotes & spaces
+    const clean = (str) => {
+      if (str === null || str === undefined) return "";
+      return String(str)
+        .replace(/\\"/g, '"')
+        .replace(/^["'\s]+|["'\s]+$/g, '')
         .trim()
-        .toLowerCase();
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '');
+    };
 
-      const c = clean(q.correct_answer);
-      const s = clean(q.student_answer);
+    return result.rows.map(q => {
+      const studentClean = clean(q.student_answer);
+      const correctClean = clean(q.correct_answer);
 
-      correct = c === s;
+      const isCorrect = studentClean === correctClean;
 
       return {
         ...q,
-        is_correct: correct,
-        score: correct ? q.positive_marks : (q.score || -Math.abs(q.negative_marks || 0))
+        is_correct: isCorrect,
+        score: isCorrect ? q.positive_marks : (q.score || -Math.abs(q.negative_marks || 0))
       };
     });
 

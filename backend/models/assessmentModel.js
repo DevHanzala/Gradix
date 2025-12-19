@@ -1,6 +1,6 @@
 import db from "../DB/db.js";
 import { findResourceById } from "./resourceModel.js";
-import { getCreationModel, mapLanguageCode, generateContent } from "../services/geminiService.js";
+import { getCreationModel, mapLanguageCode, } from "../services/geminiService.js";
 
 const ensureAssessmentsTable = async () => {
   try {
@@ -622,143 +622,141 @@ const storeResourceChunk = async (resourceId, chunkText, embedding, metadata) =>
   }
 };
 
-const generateAssessmentQuestions = async (assessmentId, attemptId, language, assessment) => {
+
+ const generateAssessmentQuestions = async (assessmentId, attemptId, language, assessment) => {
   const { rows: blockRows } = await db.query(
     `SELECT question_type, question_count, duration_per_question, num_options, positive_marks, negative_marks
      FROM question_blocks WHERE assessment_id = $1`,
     [assessmentId]
   );
+
   if (blockRows.length === 0) {
     throw new Error(`No question blocks defined for assessment ${assessmentId}`);
   }
 
   const questionTypes = [...new Set(blockRows.map(b => b.question_type))];
-  const numQuestions = blockRows.reduce((sum, b) => sum + b.question_count, 0);
   const typeCountsStr = blockRows.map(b => `${b.question_count} ${b.question_type}`).join(", ");
+  const langName = mapLanguageCode(language);
+
+  const client = await getCreationModel();
+
+const questionPrompt = `
+Generate ONLY a valid JSON array of questions. NO text outside.
+
+STRICT RULES — MUST FOLLOW:
+1. Question types EXACTLY: ${questionTypes.join(", ")}
+2. Exact counts: ${typeCountsStr}
+3. EVERY question MUST have:
+   - question_type (exact from list)
+   - question_text
+   - options (array or null)
+   - correct_answer
+   - positive_marks
+   - negative_marks
+   - duration_per_question
+4. short_answer questions MUST have correct_answer as OBJECT:
+   {
+     "grading_type": "keyword_match",
+     "required_keywords": [strings],
+     "optional_keywords": [strings],
+     "min_required_match": number
+   }
+5. Use instructor marks & time exactly.
+6. NO MISSING FIELDS
+
+Title: "${assessment.title}"
+Prompt: "${assessment.prompt || "N/A"}"
+`;
 
   let questions = [];
-  const client = await getCreationModel();
-  const langName = mapLanguageCode(language);
-  let questionPrompt = `Generate a complete and valid JSON array of unique assessment questions in ${langName} based on the assessment title "${assessment.title}"${assessment.prompt ? ` and prompt "${assessment.prompt}"` : ''}. Follow these rules strictly:
-  1. Start with: [
-  2. Each question must have: id, question_type, question_text, options (array of num_options for multiple_choice, null for true_false or short_answer), correct_answer (string for multiple_choice/short_answer, boolean for true_false), positive_marks, negative_marks, duration_per_question.
-  3. Use only the following question types: ${questionTypes.join(", ")}.
-  4. Include exactly these counts: ${typeCountsStr}. Total questions: ${numQuestions}. Ensure no repetition within this set.
-  5. For multiple_choice: ${blockRows.filter(b => b.question_type === "multiple_choice").map(b => `${b.question_count} questions with ${b.num_options || 4} options`).join(", ") || "none"}.
-  6. Marks: Use positive_marks=${blockRows.map(b => b.positive_marks || 1).join(", ")} and negative_marks=${blockRows.map(b => b.negative_marks || 0).join(", ")} for each question type.
-  7. Duration: Use duration_per_question=${blockRows.map(b => b.duration_per_question || 180).join(", ")} seconds for each question type.
-  8. End with: ]
-  9. No extra text, comments, or incomplete objects. Ensure all fields are present and valid.
-  External links for context: ${(assessment.external_links || []).join(", ")}`;
 
   try {
-    const response = await client.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [{ role: "user", parts: [{ text: questionPrompt }] }],
-      generationConfig: { maxOutputTokens: 4000, temperature: 0.7 },
-    });
-    const text = response.text || (response.candidates && response.candidates[0]?.content?.parts?.[0]?.text) || "";
-    console.log(`📝 Raw Gemini response (first 500 chars):`, text.substring(0, 500));
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (jsonMatch) {
-      try {
-        questions = JSON.parse(jsonMatch[0]);
-        if (!Array.isArray(questions)) {
-          throw new Error("Parsed result is not an array");
-        }
-        if (questions.length > numQuestions) {
-          questions = questions.slice(0, numQuestions);
-          console.warn(`⚠️ Truncated ${questions.length - numQuestions} excess questions`);
-        }
-        const invalidTypes = questions.filter(q => !questionTypes.includes(q.question_type));
-        if (invalidTypes.length > 0) {
-          throw new Error(`Invalid question types detected: ${invalidTypes.map(q => q.question_type).join(", ")}`);
-        }
-        const missingFields = questions.filter(q =>
-          q.id === undefined ||
-          q.question_text === undefined ||
-          q.correct_answer === undefined ||
-          q.positive_marks === undefined ||
-          q.negative_marks === undefined ||
-          q.duration_per_question === undefined ||
-          (q.question_type === "multiple_choice" && (!q.options || q.options.length !== (blockRows.find(b => b.question_type === "multiple_choice")?.num_options || 4)))
-        );
-        if (missingFields.length > 0) {
-          throw new Error(`Missing required fields in ${missingFields.length} questions`);
-        }
-        const uniqueQuestions = new Set(questions.map(q => q.question_text));
-        if (uniqueQuestions.size !== questions.length) {
-          throw new Error(`Duplicate questions detected: ${questions.length - uniqueQuestions.size} duplicates`);
-        }
-        const generatedCounts = questions.reduce((acc, q) => {
-          acc[q.question_type] = (acc[q.question_type] || 0) + 1;
-          return acc;
-        }, {});
-        const expectedCounts = blockRows.reduce((acc, b) => {
-          acc[b.question_type] = b.question_count;
-          return acc;
-        }, {});
-        const countsMatch = questionTypes.every(type => generatedCounts[type] === expectedCounts[type]);
-        if (!countsMatch) {
-          throw new Error("Generated question counts per type do not match instructor settings");
-        }
-      } catch (e) {
-        console.error(`❌ Invalid JSON from Gemini:`, e.message, "Raw text sample:", jsonMatch[0].substring(0, 500));
-        questions = [];
-      }
-    } else {
-      console.warn(`⚠️ No valid JSON array found in response, sample:`, text.substring(0, 500));
-      questions = [];
-    }
-  } catch (e) {
-    console.error(`❌ Failed to generate questions from Gemini:`, e.message, "Prompt sample:", questionPrompt.substring(0, 500));
-    questions = [];
+  const response = await client.models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: [{ role: "user", parts: [{ text: questionPrompt }] }],
+    generationConfig: { maxOutputTokens: 3000, temperature: 0.4 }
+  });
+
+  let text = response.text || response.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+  // FIX: CLEAN TEXT BEFORE PARSE
+  text = text.trim().replace(/^```json/, '').replace(/```$/, '').trim(); // remove markdown
+  const jsonMatch = text.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) throw new Error("No JSON array found");
+
+  // SAFE PARSE WITH TRY-CATCH
+  try {
+    questions = JSON.parse(jsonMatch[0]);
+  } catch (parseErr) {
+    console.error("JSON parse error:", parseErr);
+    console.log("Raw text:", text);
+    throw new Error("Invalid JSON from AI");
   }
 
-  if (!Array.isArray(questions) || questions.length === 0) {
-    console.log(`🔄 Falling back to instructor-defined question structure for ${numQuestions} questions`);
-    questions = blockRows.flatMap(block => {
-      const { question_type, question_count, duration_per_question, num_options, positive_marks, negative_marks } = block;
-      return Array.from({ length: question_count }, (_, index) => ({
-        id: `${attemptId}-${question_type}-${index + 1}`,
-        question_type,
-        question_text: `Instructor-defined ${question_type} question ${index + 1} (to be replaced by student input)`,
-        options: question_type === "multiple_choice" ? Array(num_options || 4).fill("Option placeholder") : null,
-        correct_answer: question_type === "true_false" ? true : "Placeholder answer",
-        positive_marks: positive_marks || 1,
-        negative_marks: negative_marks || 0,
-        duration_per_question: duration_per_question || 180,
-      }));
-    });
-  }
+  if (!Array.isArray(questions)) throw new Error("Invalid JSON format");
 
-  const totalDuration = questions.reduce((sum, q) => sum + q.duration_per_question, 0);
-  await db.query("DELETE FROM generated_questions WHERE attempt_id = $1", [attemptId]);
+} catch (error) {
+  console.error("❌ Question generation failed:", error.message);
+  throw error;
+}
+
+  // DELETE OLD QUESTIONS
+  await db.query(`DELETE FROM generated_questions WHERE attempt_id = $1`, [attemptId]);
+
+  let totalDuration = 0;
+
   for (let i = 0; i < questions.length; i++) {
-    const q = questions[i];
-    await db.query(
-      `
-      INSERT INTO generated_questions (
-        attempt_id, question_order, question_type, question_text, options, correct_answer, positive_marks, negative_marks, duration_per_question
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      `,
-      [
-        attemptId,
-        i + 1,
-        q.question_type,
-        q.question_text,
-        q.options ? JSON.stringify(q.options) : null,
-        q.correct_answer,
-        q.positive_marks,
-        q.negative_marks,
-        q.duration_per_question,
-      ]
-    );
+  let q = questions[i];
+
+  // FIND MATCHING BLOCK FOR THIS QUESTION (by order)
+  const blockIndex = Math.floor(i / blockRows[0].question_count); // simple way
+  const block = blockRows.find(b => b.question_type === q.question_type) || blockRows[0];
+
+  // FORCE INSTRUCTOR SETTINGS — NO AI RANDOM
+  q.question_type = block.question_type;
+  q.positive_marks = block.positive_marks;
+  q.negative_marks = block.negative_marks;
+  q.duration_per_question = block.duration_per_question;
+
+  // REQUIRED VALIDATION
+  if (!q.question_text || typeof q.question_text !== "string") {
+    console.warn(`Question ${i + 1} invalid — skipping`);
+    continue;
   }
-  console.log(`✅ Generated and stored ${questions.length} questions for attempt ${attemptId}`);
+
+  totalDuration += q.duration_per_question;
+
+  // SAFE correct_answer FOR JSONB
+  let correctAnswerValue = JSON.stringify(q.correct_answer ?? "");
+  if (correctAnswerValue === "null") correctAnswerValue = "''";
+
+  await db.query(
+    `
+    INSERT INTO generated_questions (
+      attempt_id, question_order, question_type, question_text, options,
+      correct_answer, positive_marks, negative_marks, duration_per_question
+    )
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+    `,
+    [
+      attemptId,
+      i + 1,
+      q.question_type,
+      q.question_text.trim(),
+      q.options ? JSON.stringify(q.options) : null,
+      correctAnswerValue,
+      q.positive_marks,
+      q.negative_marks,
+      q.duration_per_question
+    ]
+  );
+}
+
+
   return { questions, duration: totalDuration };
 };
+
+
 
 const enrollStudent = async (assessmentId, email) => {
   try {

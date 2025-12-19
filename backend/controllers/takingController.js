@@ -1,24 +1,32 @@
 import db from "../DB/db.js";
-import { getCreationModel, getCheckingModel, mapLanguageCode, generateContent } from "../services/geminiService.js";
 import { generateAssessmentQuestions } from "../models/assessmentModel.js";
 
-const checkAnswer = (questionType, studentAnswer, correctAnswer) => {
-  if (studentAnswer === undefined || studentAnswer === null) return false;
-  switch (questionType) {
-    case "multiple_choice":
-      return studentAnswer === correctAnswer;
-    case "true_false":
-      return studentAnswer === correctAnswer;
-    case "matching":
-      if (!Array.isArray(studentAnswer) || !Array.isArray(correctAnswer)) return false;
-      if (studentAnswer.length !== correctAnswer.length) return false;
-      return studentAnswer.every((ans, i) => ans[1] === correctAnswer[i][1]);
-    case "short_answer":
-      return studentAnswer.trim().toLowerCase() === correctAnswer.trim().toLowerCase();
-    default:
-      return false;
+const normalizeText = (text = "") =>
+  text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+export const evaluateShortAnswer = (studentAnswer, rule) => {
+  if (!studentAnswer || !rule) return false;
+
+  const answer = normalizeText(studentAnswer);
+
+  const required = rule.required_keywords || [];
+  const minMatch = rule.min_required_match || required.length;
+
+  let matched = 0;
+
+  for (const keyword of required) {
+    if (answer.includes(normalizeText(keyword))) {
+      matched++;
+    }
   }
+
+  return matched >= minMatch;
 };
+
 
 export const startAssessmentForStudent = async (req, res) => {
   try {
@@ -159,12 +167,13 @@ export const submitAssessmentForStudent = async (req, res) => {
 
       // SMART COMPARISON FOR ALL TYPES
       if (q.question_type === "short_answer") {
-        const checkingModel = await getCheckingModel();
-        const langName = mapLanguageCode(language);
-        const prompt = `In ${langName}, evaluate if the student's answer "${studentAnswer || ''}" matches the correct answer "${q.correct_answer}". Return "true" if equivalent (ignore case/spaces), "false" otherwise.`;
-        const response = await generateContent(checkingModel, prompt);
-        isCorrect = response.trim().toLowerCase() === "true";
-      } else {
+        const rule = typeof q.correct_answer === "string"
+          ? JSON.parse(q.correct_answer)
+          : q.correct_answer;
+
+        isCorrect = evaluateShortAnswer(studentAnswer, rule);
+      }
+      else {
         // TRUE/FALSE & MCQ: Smart string comparison
         const clean = (val) => {
           if (val === null || val === undefined) return "";
@@ -177,8 +186,8 @@ export const submitAssessmentForStudent = async (req, res) => {
       const score = isCorrect
         ? parseFloat(q.positive_marks || 1)                                    // Correct → +marks
         : (studentAnswer !== null && studentAnswer !== undefined               // Wrong & answered → -marks
-            ? -Math.abs(parseFloat(q.negative_marks || 0))
-            : 0);                                                              // Unanswered → 0
+          ? -Math.abs(parseFloat(q.negative_marks || 0))
+          : 0);                                                              // Unanswered → 0
 
       totalScore += score;
 
@@ -204,13 +213,12 @@ export const submitAssessmentForStudent = async (req, res) => {
     totalScore = Math.max(0, totalScore);
 
     // Update attempt
-    await db.query(
-      `UPDATE assessment_attempts 
-       SET status = 'completed', completed_at = NOW(), score = $1
-       WHERE id = $2`,
-      [totalScore, attemptId]
-    );
-
+await db.query(
+  `UPDATE assessment_attempts 
+   SET status = 'completed', completed_at = NOW(), score = $1
+   WHERE id = $2`,
+  [totalScore, attemptId]
+);
     console.log(`Assessment submitted successfully. Final score: ${totalScore}`);
 
     res.status(200).json({
@@ -274,9 +282,9 @@ export const getAssessmentForInstructorPrint = async (req, res) => {
 
     console.log(`Generating data for physical paper: assessment ${assessmentId}, instructor ${userId}`);
 
-    // Fetch assessment
+    // Fetch assessment + question blocks
     const { rows: assessmentRows } = await db.query(
-      `SELECT a.id, a.title, a.instructor_id 
+      `SELECT a.id, a.title, a.instructor_id, a.prompt, a.external_links
        FROM assessments a
        WHERE a.id = $1 AND a.instructor_id = $2`,
       [assessmentId, userId]
@@ -284,6 +292,19 @@ export const getAssessmentForInstructorPrint = async (req, res) => {
 
     if (assessmentRows.length === 0) {
       return res.status(404).json({ success: false, message: "Assessment not found or access denied" });
+    }
+
+    const assessment = assessmentRows[0];
+
+    // FETCH QUESTION BLOCKS — THIS WAS MISSING
+    const { rows: blockRows } = await db.query(
+      `SELECT question_type, question_count, duration_per_question, num_options, positive_marks, negative_marks
+       FROM question_blocks WHERE assessment_id = $1`,
+      [assessmentId]
+    );
+
+    if (blockRows.length === 0) {
+      return res.status(400).json({ success: false, message: "No question blocks defined for this assessment" });
     }
 
     // Create temp attempt
@@ -297,8 +318,13 @@ export const getAssessmentForInstructorPrint = async (req, res) => {
     attemptId = attemptRows[0].id;
     console.log(`Temp attempt created: ${attemptId}`);
 
-    // Generate questions
-    const { questions, duration } = await generateAssessmentQuestions(assessmentId, attemptId, "en", assessmentRows[0]);
+    // Pass question_blocks properly
+    const { questions, duration } = await generateAssessmentQuestions(
+      assessmentId,
+      attemptId,
+      "en",
+      assessment,
+    );
 
     const totalMarks = questions.reduce((sum, q) => sum + (q.positive_marks || 0), 0);
 
@@ -308,13 +334,12 @@ export const getAssessmentForInstructorPrint = async (req, res) => {
       [attemptId]
     );
 
-    // RETURN ONLY DATA — NO PDF
     res.json({
       success: true,
       questions,
       duration,
       totalMarks,
-      assessmentTitle: assessmentRows[0].title
+      assessmentTitle: assessment.title
     });
 
   } catch (error) {

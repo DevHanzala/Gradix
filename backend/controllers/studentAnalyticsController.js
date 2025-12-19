@@ -76,32 +76,31 @@ export const getStudentPerformance = async (req, res) => {
 export const getStudentRecommendations = async (req, res) => {
   try {
     const studentId = req.user.id;
-
     if (req.user.role !== "student") {
       return res.status(403).json({
         success: false,
         message: "Only students can access their recommendations"
       });
     }
-
-    console.log(`🎯 Getting learning recommendations for student ${studentId}`);
-
-    const recommendations = await getLearningRecommendations(studentId);
-
     res.status(200).json({
       success: true,
-      message: "Learning recommendations retrieved successfully",
-      data: recommendations
+      message: "Recommendations available only in report",
+      data: {
+        weak_areas: [],
+        study_plan: { daily_practice: [], weekly_review: [] },
+        next_assessments: []
+      }
     });
   } catch (error) {
-    console.error("❌ Get student recommendations error:", error.stack || error.message);
+    console.error("Get student recommendations error:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to retrieve learning recommendations",
-      error: error.message
+      message: "Failed to retrieve recommendations"
     });
   }
 };
+
+
 
 export const getStudentAssessments = async (req, res) => {
   try {
@@ -152,16 +151,13 @@ export const getAssessmentDetails = async (req, res) => {
   try {
     const studentId = req.user.id;
     const assessmentId = parseInt(req.params.id);
-
     if (req.user.role !== "student") {
       return res.status(403).json({
         success: false,
         message: "Only students can access their assessment details"
       });
     }
-
     const details = await getAssessmentAnalytics(studentId, assessmentId);
-
     res.status(200).json({
       success: true,
       message: "Assessment details retrieved successfully",
@@ -169,13 +165,21 @@ export const getAssessmentDetails = async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Get assessment details error:", error.stack || error.message);
-    res.status(500).json({
-      success: false,
-      message: "Failed to retrieve assessment details",
-      error: error.message
-    });
+    if (error.message === 'No completed attempt found for this assessment') {
+      res.status(404).json({
+        success: false,
+        message: "No completed attempt found for this assessment"
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: "Failed to retrieve assessment details",
+        error: error.message
+      });
+    }
   }
 };
+  
 
 export const getAssessmentQuestions = async (req, res) => {
   try {
@@ -274,7 +278,8 @@ export const getStudentReport = async (req, res) => {
   incorrect_answers: details.incorrect_answers,
   negative_marks_applied: details.negative_marks_applied || 0, // make sure this is here
   student_answers: details.student_answers || [], // ADD THIS LINE
-  recommendations
+  recommendations,
+  title: details.assessment_title
 };
 
 console.log("=== REPORT DEBUG ===");
