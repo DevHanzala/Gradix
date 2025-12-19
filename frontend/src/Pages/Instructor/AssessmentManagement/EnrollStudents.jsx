@@ -74,7 +74,7 @@ function EnrollStudents() {
             <CardContent className="pt-2">
               {isLoading || loading ? (
                 <div className="flex flex-col items-center py-12">
-                  <LoadingSpinner size="lg" />
+                  <LoadingSpinner size="lg" color="white" type="spinner" />
                   <p className="mt-3 text-gray-600">Loading...</p>
                 </div>
               ) : enrolledStudents?.length === 0 ? (

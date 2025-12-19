@@ -65,11 +65,11 @@ function AssessmentDetail() {
 
   if (isLoading || loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
         <Navbar />
-        <div className="flex justify-center items-center py-32">
-          <LoadingSpinner size="lg" />
-          <span className="ml-3 text-gray-600">Loading assessment...</span>
+        <div className="flex flex-col justify-center items-center py-32">
+          <LoadingSpinner size="lg" type="spinner" color="blue" />
+          <span className="mt-4 text-gray-600 font-medium">Loading assessment...</span>
         </div>
         <Footer />
       </div>
@@ -78,15 +78,24 @@ function AssessmentDetail() {
 
   if (error || !currentAssessment) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
         <Navbar />
-        <div className="text-center py-16">
-          <FaExclamationCircle className="mx-auto text-6xl text-red-500 mb-4" />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">Assessment Not Found</h3>
-          <p className="text-gray-600 mb-6">The requested assessment could not be loaded.</p>
-          <Link to="/instructor/assessments" className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-            Back to Assessments
-          </Link>
+        <div className="max-w-2xl mx-auto px-4 py-16">
+          <Card className="shadow-lg border-0">
+            <CardContent className="text-center py-16">
+              <FaExclamationCircle className="mx-auto text-7xl text-red-500 mb-6" />
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">Assessment Not Found</h3>
+              <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                The requested assessment could not be loaded. It may have been deleted or you don't have access to it.
+              </p>
+              <Link 
+                to="/instructor/assessments" 
+                className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-semibold shadow-md hover:shadow-lg"
+              >
+                ← Back to Assessments
+              </Link>
+            </CardContent>
+          </Card>
         </div>
         <Footer />
       </div>
@@ -94,32 +103,55 @@ function AssessmentDetail() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
       <Navbar />
-      <div className="w-full mx-auto px-4 sm:px-4 lg:px-8 xl:px-10 py-8">
+      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-8 sm:py-12 max-w-7xl">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Assessment Details</h1>
-          <p className="text-gray-600 mt-1">View and manage this assessment</p>
+          <div className="flex items-center gap-2 mb-4">
+            <Link 
+              to="/instructor/assessments"
+              className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 transition-colors duration-200"
+            >
+              ← Back
+            </Link>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">Assessment Details</h1>
+          <p className="text-gray-600">View and manage this assessment</p>
         </div>
 
-        <Card className="shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-t-xl">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-              <h2 className="text-2xl font-bold">{currentAssessment.title}</h2>
-              <div className="flex flex-wrap gap-3 text-sm">
+        <Card className="shadow-lg border-0 overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+            <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-2xl sm:text-3xl font-bold mb-2 break-words">{currentAssessment.title}</h2>
+                <div className="flex flex-wrap gap-3 text-sm">
+                  <span className={`px-3 py-1 rounded-full font-semibold ${currentAssessment.is_executed ? 'bg-green-500 bg-opacity-30' : 'bg-yellow-500 bg-opacity-30'}`}>
+                    {currentAssessment.is_executed ? '✓ Executed' : '📝 Draft'}
+                  </span>
+                  <span className={`px-3 py-1 rounded-full font-semibold ${currentAssessment.is_published ? 'bg-blue-500 bg-opacity-30' : 'bg-gray-500 bg-opacity-30'}`}>
+                    {currentAssessment.is_published ? '🌐 Published' : '🔒 Unpublished'}
+                  </span>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2 text-sm">
                 {!currentAssessment.is_executed && (
-                  <Link to={`/instructor/assessments/${id}/edit`} className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition">
+                  <Link 
+                    to={`/instructor/assessments/${id}/edit`} 
+                    className="flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all duration-200 font-semibold backdrop-blur-sm"
+                  >
                     <FaEdit /> Edit
                   </Link>
                 )}
-                <Link to={`/instructor/assessments/${id}/enroll`} className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition">
+                <Link 
+                  to={`/instructor/assessments/${id}/enroll`} 
+                  className="flex items-center gap-2  px-4 py-2.5 rounded-lg transition-all duration-200 font-semibold backdrop-blur-sm"
+                >
                   <FaUsers /> Students
                 </Link>
-                {/* NOW THIS BUTTON OPENS THE FULL PHYSICAL PAPER MODAL */}
                 <button
                   onClick={() => openPaperModal(currentAssessment)}
-                  className="flex items-center gap-2 bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg transition"
+                  className="flex items-center gap-2  px-4 py-2.5 rounded-lg transition-all duration-200 font-semibold backdrop-blur-sm"
                 >
                   <FaPrint /> Print PDF
                 </button>
@@ -127,151 +159,235 @@ function AssessmentDetail() {
             </div>
           </CardHeader>
 
-          <CardContent className="p-6 space-y-8">
+          <CardContent className="p-6 sm:p-8 space-y-8">
             {/* Basic Info */}
             <section>
-              <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-                <FaInfoCircle className="text-blue-600" /> Basic Information
+              <h3 className="text-xl font-bold flex items-center gap-2 mb-5 text-gray-900">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg flex items-center justify-center">
+                  <FaInfoCircle className="text-blue-600 text-lg" />
+                </div>
+                Basic Information
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <span className="font-medium text-gray-600">Title:</span>
-                  <p className="mt-1 font-semibold">{currentAssessment.title}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="bg-gradient-to-br from-gray-50 to-blue-50 p-5 rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-colors duration-200">
+                  <span className="font-semibold text-gray-600 uppercase text-xs tracking-wide">Title</span>
+                  <p className="mt-2 font-semibold text-gray-900 text-base">{currentAssessment.title}</p>
                 </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <span className="font-medium text-gray-600">Prompt:</span>
-                  <p className="mt-1">{currentAssessment.prompt || "—"}</p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <span className="font-medium text-gray-600">Status:</span>
-                  <p className="mt-1 font-semibold">{currentAssessment.is_executed ? "Executed" : "Draft"}</p>
-                </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <span className="font-medium text-gray-600">Published:</span>
-                  <p className="mt-1 font-semibold">{currentAssessment.is_published ? "Yes" : "No"}</p>
+                <div className="bg-gradient-to-br from-gray-50 to-blue-50 p-5 rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-colors duration-200">
+                  <span className="font-semibold text-gray-600 uppercase text-xs tracking-wide">Prompt</span>
+                  <p className="mt-2 text-gray-900">{currentAssessment.prompt || "—"}</p>
                 </div>
               </div>
             </section>
 
             {/* Dates */}
             <section>
-              <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-                <FaCalendarAlt className="text-green-600" /> Dates
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <span className="font-medium text-gray-600">Created:</span>
-                  <p className="mt-1">{new Date(currentAssessment.created_at).toLocaleString()}</p>
+              <h3 className="text-xl font-bold flex items-center gap-2 mb-5 text-gray-900">
+                <div className="w-10 h-10 bg-gradient-to-br from-green-100 to-green-200 rounded-lg flex items-center justify-center">
+                  <FaCalendarAlt className="text-green-600 text-lg" />
                 </div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <span className="font-medium text-gray-600">Updated:</span>
-                  <p className="mt-1">{currentAssessment.updated_at ? new Date(currentAssessment.updated_at).toLocaleString() : "—"}</p>
+                Dates
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="bg-gradient-to-br from-gray-50 to-green-50 p-5 rounded-xl border-2 border-gray-200 hover:border-green-300 transition-colors duration-200">
+                  <span className="font-semibold text-gray-600 uppercase text-xs tracking-wide">Created</span>
+                  <p className="mt-2 text-gray-900 font-medium">{new Date(currentAssessment.created_at).toLocaleString()}</p>
+                </div>
+                <div className="bg-gradient-to-br from-gray-50 to-green-50 p-5 rounded-xl border-2 border-gray-200 hover:border-green-300 transition-colors duration-200">
+                  <span className="font-semibold text-gray-600 uppercase text-xs tracking-wide">Updated</span>
+                  <p className="mt-2 text-gray-900 font-medium">{currentAssessment.updated_at ? new Date(currentAssessment.updated_at).toLocaleString() : "—"}</p>
                 </div>
               </div>
             </section>
 
             {/* External Links */}
             <section>
-              <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-                <FaLink className="text-purple-600" /> External Links
+              <h3 className="text-xl font-bold flex items-center gap-2 mb-5 text-gray-900">
+                <div className="w-10 h-10 bg-gradient-to-br from-purple-100 to-purple-200 rounded-lg flex items-center justify-center">
+                  <FaLink className="text-purple-600 text-lg" />
+                </div>
+                External Links
               </h3>
               {currentAssessment.external_links?.length > 0 ? (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {currentAssessment.external_links.map((link, i) => (
-                    <a key={i} href={link} target="_blank" rel="noopener noreferrer" className="block text-blue-600 hover:underline text-sm break-all">
-                      {link}
+                    <a 
+                      key={i} 
+                      href={link} 
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="flex items-center gap-3 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-200 hover:border-purple-400 rounded-xl transition-all duration-200 group"
+                    >
+                      <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-purple-200 transition-colors duration-200">
+                        <FaLink className="text-purple-600 text-sm" />
+                      </div>
+                      <span className="text-blue-600 hover:text-blue-800 font-medium text-sm break-all flex-1">{link}</span>
+                      <span className="text-gray-400 group-hover:text-gray-600 transition-colors duration-200">→</span>
                     </a>
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-500 italic">No external links</p>
+                <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-8 text-center">
+                  <FaLink className="mx-auto text-4xl text-gray-300 mb-2" />
+                  <p className="text-gray-500 italic">No external links</p>
+                </div>
               )}
             </section>
 
             {/* Question Blocks - Desktop */}
             <section className="hidden lg:block">
-              <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-                <FaQuestionCircle className="text-indigo-600" /> Question Blocks
+              <h3 className="text-xl font-bold flex items-center gap-2 mb-5 text-gray-900">
+                <div className="w-10 h-10 bg-gradient-to-br from-indigo-100 to-indigo-200 rounded-lg flex items-center justify-center">
+                  <FaQuestionCircle className="text-indigo-600 text-lg" />
+                </div>
+                Question Blocks
               </h3>
               {currentAssessment.question_blocks?.length > 0 ? (
-                <div className="overflow-x-auto rounded-lg border">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Count</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time/Q</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Options</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">+Marks</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">-Marks</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {currentAssessment.question_blocks.map((b, i) => (
-                        <tr key={i} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm">{b.question_type}</td>
-                          <td className="px-4 py-3 text-sm">{b.question_count}</td>
-                          <td className="px-4 py-3 text-sm">{b.duration_per_question}s</td>
-                          <td className="px-4 py-3 text-sm">
-                            {b.question_type === "multiple_choice" ? b.num_options :
-                             b.question_type === "matching" ? `${b.num_first_side}/${b.num_second_side}` : "—"}
-                          </td>
-                          <td className="px-4 py-3 text-sm">{b.positive_marks ?? "—"}</td>
-                          <td className="px-4 py-3 text-sm">{b.negative_marks ?? "—"}</td>
+                <div className="overflow-hidden rounded-xl border-2 border-gray-200 shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gradient-to-r from-indigo-50 to-purple-50">
+                        <tr>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Type</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Count</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Time/Q</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Options</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">+Marks</th>
+                          <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">-Marks</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-100">
+                        {currentAssessment.question_blocks.map((b, i) => (
+                          <tr key={i} className="hover:bg-indigo-50 transition-colors duration-150">
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                              <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-semibold">
+                                {b.question_type}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-900 font-medium">{b.question_count}</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">{b.duration_per_question}s</td>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {b.question_type === "multiple_choice" ? b.num_options :
+                               b.question_type === "matching" ? `${b.num_first_side}/${b.num_second_side}` : "—"}
+                            </td>
+                            <td className="px-6 py-4 text-sm">
+                              <span className="bg-green-100 text-green-700 px-2 py-1 rounded font-semibold">
+                                {b.positive_marks ?? "—"}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm">
+                              <span className="bg-red-100 text-red-700 px-2 py-1 rounded font-semibold">
+                                {b.negative_marks ?? "—"}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               ) : (
-                <p className="text-gray-500 italic">No question blocks</p>
+                <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-8 text-center">
+                  <FaQuestionCircle className="mx-auto text-4xl text-gray-300 mb-2" />
+                  <p className="text-gray-500 italic">No question blocks</p>
+                </div>
               )}
             </section>
 
             {/* Question Blocks - Mobile */}
             <section className="lg:hidden space-y-4">
-              <h3 className="text-lg font-semibold flex items-center gap-2">
-                <FaQuestionCircle className="text-indigo-600" /> Question Blocks
+              <h3 className="text-xl font-bold flex items-center gap-2 text-gray-900">
+                <div className="w-10 h-10 bg-gradient-to-br from-indigo-100 to-indigo-200 rounded-lg flex items-center justify-center">
+                  <FaQuestionCircle className="text-indigo-600 text-lg" />
+                </div>
+                Question Blocks
               </h3>
               {currentAssessment.question_blocks?.length > 0 ? (
                 currentAssessment.question_blocks.map((b, i) => (
-                  <div key={i} className="bg-gray-50 rounded-lg p-4 border">
+                  <div key={i} className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl p-5 border-2 border-indigo-200 hover:border-indigo-400 transition-colors duration-200">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="bg-indigo-600 text-white px-3 py-1 rounded-full text-xs font-bold">
+                        Block {i + 1}
+                      </span>
+                      <span className="bg-white px-3 py-1 rounded-full text-xs font-bold text-indigo-600 border border-indigo-200">
+                        {b.question_type}
+                      </span>
+                    </div>
                     <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div><strong>Type:</strong> {b.question_type}</div>
-                      <div><strong>Count:</strong> {b.question_count}</div>
-                      <div><strong>Time/Q:</strong> {b.duration_per_question}s</div>
-                      <div><strong>Options:</strong> {b.question_type === "multiple_choice" ? b.num_options : b.question_type === "matching" ? `${b.num_first_side}/${b.num_second_side}` : "—"}</div>
-                      <div><strong>+Marks:</strong> {b.positive_marks ?? "—"}</div>
-                      <div><strong>-Marks:</strong> {b.negative_marks ?? "—"}</div>
+                      <div>
+                        <strong className="text-gray-600 text-xs uppercase">Count:</strong>
+                        <p className="text-gray-900 font-semibold">{b.question_count}</p>
+                      </div>
+                      <div>
+                        <strong className="text-gray-600 text-xs uppercase">Time/Q:</strong>
+                        <p className="text-gray-900 font-semibold">{b.duration_per_question}s</p>
+                      </div>
+                      <div>
+                        <strong className="text-gray-600 text-xs uppercase">Options:</strong>
+                        <p className="text-gray-900 font-semibold">
+                          {b.question_type === "multiple_choice" ? b.num_options : b.question_type === "matching" ? `${b.num_first_side}/${b.num_second_side}` : "—"}
+                        </p>
+                      </div>
+                      <div>
+                        <strong className="text-gray-600 text-xs uppercase">+/-Marks:</strong>
+                        <p className="text-gray-900 font-semibold">
+                          <span className="text-green-600">+{b.positive_marks ?? "—"}</span> / 
+                          <span className="text-red-600 ml-1">-{b.negative_marks ?? "—"}</span>
+                        </p>
+                      </div>
                     </div>
                   </div>
                 ))
               ) : (
-                <p className="text-gray-500 italic">No question blocks</p>
+                <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-8 text-center">
+                  <FaQuestionCircle className="mx-auto text-4xl text-gray-300 mb-2" />
+                  <p className="text-gray-500 italic">No question blocks</p>
+                </div>
               )}
             </section>
 
             {/* Resources */}
             <section>
-              <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-                <FaFileAlt className="text-orange-600" /> Resources
+              <h3 className="text-xl font-bold flex items-center gap-2 mb-5 text-gray-900">
+                <div className="w-10 h-10 bg-gradient-to-br from-orange-100 to-orange-200 rounded-lg flex items-center justify-center">
+                  <FaFileAlt className="text-orange-600 text-lg" />
+                </div>
+                Resources
               </h3>
               {currentAssessment.resources?.length > 0 ? (
                 <div className="space-y-3">
                   {currentAssessment.resources.map((r, i) => (
-                    <div key={i} className="flex justify-between items-center bg-gray-50 p-4 rounded-lg border">
-                      <div>
-                        <p className="font-medium">{r.name}</p>
-                        <p className="text-xs text-gray-500">{r.file_type}</p>
+                    <div 
+                      key={i} 
+                      className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-gradient-to-r from-orange-50 to-yellow-50 p-5 rounded-xl border-2 border-orange-200 hover:border-orange-400 transition-all duration-200"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <FaFileAlt className="text-orange-600" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-gray-900 truncate">{r.name}</p>
+                          <p className="text-xs text-gray-600 bg-orange-100 inline-block px-2 py-0.5 rounded mt-1 font-medium">
+                            {r.file_type}
+                          </p>
+                        </div>
                       </div>
-                      <a href={r.file_path} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium text-sm">
+                      <a 
+                        href={r.file_path} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="px-4 py-2 bg-orange-600 text-white hover:bg-orange-700 rounded-lg transition-colors duration-200 font-semibold text-sm whitespace-nowrap"
+                      >
                         View/Download
                       </a>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-gray-500 italic">No resources attached</p>
+                <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-8 text-center">
+                  <FaFileAlt className="mx-auto text-4xl text-gray-300 mb-2" />
+                  <p className="text-gray-500 italic">No resources attached</p>
+                </div>
               )}
             </section>
           </CardContent>

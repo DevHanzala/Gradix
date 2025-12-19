@@ -197,7 +197,7 @@ function AdminDashboard() {
           <CardContent className="p-0">
             {loading ? (
               <div className="text-center py-16 sm:py-20">
-                <LoadingSpinner size="lg" />
+                <LoadingSpinner size="lg" type="bars" color="purple" />
                 <p className="text-gray-600 mt-4 text-sm sm:text-base">Loading users...</p>
               </div>
             ) : (

@@ -185,7 +185,7 @@ function InstructorDashboard() {
         {isLoading || loading ? (
           <div className="flex justify-center items-center h-64 sm:h-80">
             <div className="text-center">
-              <LoadingSpinner size="lg" />
+              <LoadingSpinner size="lg" color="purple" type="dots" />
               <span className="ml-3 text-gray-600 text-sm sm:text-base">Loading dashboard data...</span>
             </div>
           </div>

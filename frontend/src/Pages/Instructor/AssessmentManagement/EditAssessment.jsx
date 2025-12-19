@@ -38,13 +38,11 @@ function EditAssessment() {
   const [selectedResources, setSelectedResources] = useState([]);
   const [newFiles, setNewFiles] = useState([]);
 
-  // NEW: Progress state
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
-const [questionBlocksTouched, setQuestionBlocksTouched] = useState(false);
+  const [questionBlocksTouched, setQuestionBlocksTouched] = useState(false);
 
-  // NEW: Socket ref
   const socketRef = useRef(null);
 
   useEffect(() => {
@@ -108,7 +106,6 @@ const [questionBlocksTouched, setQuestionBlocksTouched] = useState(false);
     }
   }, [currentAssessment]);
 
-  // NEW: Socket connection for progress
   useEffect(() => {
     const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
     const socket = io(API_URL, {
@@ -143,47 +140,47 @@ const [questionBlocksTouched, setQuestionBlocksTouched] = useState(false);
   };
 
   const handleBlockChange = (index, field, value) => {
-  setQuestionBlocksTouched(true);  // ADD THIS LINE
-  setQuestionBlocks((prev) =>
-    prev.map((block, i) =>
-      i === index
-        ? {
-            ...block,
-            [field]:
-              field === "question_count" || field === "duration_per_question" || field === "num_options"
-                ? Math.max(Number.parseInt(value) || 1, 1)
-                : field === "positive_marks" || field === "negative_marks"
-                  ? value === "" || value === null
-                    ? null
-                    : Math.max(Number.parseFloat(value) || 0, 0)
-                  : value,
-          }
-        : block
-    )
-  );
-};
+    setQuestionBlocksTouched(true);
+    setQuestionBlocks((prev) =>
+      prev.map((block, i) =>
+        i === index
+          ? {
+              ...block,
+              [field]:
+                field === "question_count" || field === "duration_per_question" || field === "num_options"
+                  ? Math.max(Number.parseInt(value) || 1, 1)
+                  : field === "positive_marks" || field === "negative_marks"
+                    ? value === "" || value === null
+                      ? null
+                      : Math.max(Number.parseFloat(value) || 0, 0)
+                    : value,
+            }
+          : block
+      )
+    );
+  };
 
-const addQuestionBlock = () => {
-  setQuestionBlocksTouched(true);  // ADD THIS LINE
-  setQuestionBlocks((prev) => [
-    ...prev,
-    {
-      question_type: "multiple_choice",
-      question_count: 1,
-      duration_per_question: 120,
-      num_options: 4,
-      positive_marks: 1,
-      negative_marks: 0,
-    },
-  ]);
-};
+  const addQuestionBlock = () => {
+    setQuestionBlocksTouched(true);
+    setQuestionBlocks((prev) => [
+      ...prev,
+      {
+        question_type: "multiple_choice",
+        question_count: 1,
+        duration_per_question: 120,
+        num_options: 4,
+        positive_marks: 1,
+        negative_marks: 0,
+      },
+    ]);
+  };
 
- const removeQuestionBlock = (index) => {
-  setQuestionBlocksTouched(true);  // ADD THIS LINE
-  if (questionBlocks.length > 1) {
-    setQuestionBlocks((prev) => prev.filter((_, i) => i !== index));
-  }
-};
+  const removeQuestionBlock = (index) => {
+    setQuestionBlocksTouched(true);
+    if (questionBlocks.length > 1) {
+      setQuestionBlocks((prev) => prev.filter((_, i) => i !== index));
+    }
+  };
 
   const addExternalLink = () => {
     setFormData((prev) => ({
@@ -258,34 +255,31 @@ const addQuestionBlock = () => {
 
     const assessmentData = new FormData();
 
-    // CONSOLE: Log title before appending
     console.log("DEBUG: Frontend EditAssessment - Title before append:", formData.title, "Trimmed:", formData.title.trim());
 
-    // Always send title
     assessmentData.append("title", formData.title.trim());
 
-    // Prompt optional
     if (formData.prompt?.trim()) {
       assessmentData.append("prompt", formData.prompt.trim());
     }
 
     assessmentData.append("externalLinks", JSON.stringify(formData.externalLinks.filter(l => l.trim())));
-   // Only send question_blocks if user actually changed them
-if (questionBlocksTouched) {
-  assessmentData.append("question_blocks", JSON.stringify(questionBlocks.map(b => ({
-    question_type: b.question_type,
-    question_count: b.question_count,
-    duration_per_question: b.duration_per_question,
-    num_options: b.question_type === "multiple_choice" ? b.num_options : null,
-    positive_marks: b.positive_marks || 1,
-    negative_marks: b.negative_marks || 0,
-  }))));
-}
+    
+    if (questionBlocksTouched) {
+      assessmentData.append("question_blocks", JSON.stringify(questionBlocks.map(b => ({
+        question_type: b.question_type,
+        question_count: b.question_count,
+        duration_per_question: b.duration_per_question,
+        num_options: b.question_type === "multiple_choice" ? b.num_options : null,
+        positive_marks: b.positive_marks || 1,
+        negative_marks: b.negative_marks || 0,
+      }))));
+    }
+    
     assessmentData.append("selected_resources", JSON.stringify(selectedResources));
     newFiles.forEach(f => assessmentData.append("new_files", f));
     if (socketRef.current?.id) assessmentData.append("socketId", socketRef.current.id);
 
-    // CONSOLE: Log all FormData entries
     console.log("DEBUG: Frontend EditAssessment - FormData contents:");
     for (let [key, value] of assessmentData.entries()) {
       console.log(`  ${key}: ${value}`);
@@ -305,26 +299,33 @@ if (questionBlocksTouched) {
 
   if (loading || !currentAssessment) {
     return (
-      <div className="min-h-screen bg-gray-50 flex justify-center items-center">
-        <LoadingSpinner size="lg" />
-        <span className="ml-3 text-gray-600">Loading assessment details...</span>
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 flex flex-col justify-center items-center">
+        <LoadingSpinner size="lg" type="spinner" color="blue" />
+        <span className="mt-4 text-gray-600 font-medium">Loading assessment details...</span>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
         <Navbar />
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Error</h1>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={() => navigate("/instructor/assessments")}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md"
-          >
-            Back to Assessments
-          </button>
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <Card className="shadow-lg border-0">
+            <CardContent className="p-8">
+              <div className="text-center">
+                <div className="text-7xl mb-6">⚠️</div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-4">Error</h1>
+                <p className="text-gray-600 mb-8">{error}</p>
+                <button
+                  onClick={() => navigate("/instructor/assessments")}
+                  className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-semibold shadow-md hover:shadow-lg"
+                >
+                  ← Back to Assessments
+                </button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
         <Footer />
         <Modal
@@ -340,22 +341,46 @@ if (questionBlocksTouched) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
       <Navbar />
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-6">Edit Assessment</h1>
-
-        {/* NEW: Progress Bar */}
-        {isProcessing && (
-          <Card className="mb-6 border-blue-200 bg-blue-50">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-blue-900">{progressMessage}</p>
-                <p className="text-sm font-semibold text-blue-900">{Math.round(progress)}%</p>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <button
+              onClick={() => navigate("/instructor/assessments")}
+              className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 transition-colors duration-200"
+            >
+              ← Back
+            </button>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">Edit Assessment</h1>
+          <p className="text-gray-600">Update your assessment details and configuration</p>
+          {currentAssessment.is_executed && (
+            <div className="mt-4 bg-yellow-50 border-2 border-yellow-300 rounded-lg p-4 flex items-start gap-3">
+              <span className="text-2xl">⚠️</span>
+              <div>
+                <p className="font-semibold text-yellow-900">Assessment Executed</p>
+                <p className="text-sm text-yellow-800">This assessment has been executed and cannot be modified.</p>
               </div>
-              <div className="w-full bg-blue-200 rounded-full h-3">
+            </div>
+          )}
+        </div>
+
+        {/* Progress Bar */}
+        {isProcessing && (
+          <Card className="mb-6 border-blue-300 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                  <p className="text-sm font-medium text-blue-900">{progressMessage}</p>
+                </div>
+                <p className="text-lg font-bold text-blue-900">{Math.round(progress)}%</p>
+              </div>
+              <div className="w-full bg-blue-200 rounded-full h-3 overflow-hidden shadow-inner">
                 <div
-                  className="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
+                  className="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full transition-all duration-500 ease-out shadow-sm"
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -363,15 +388,17 @@ if (questionBlocksTouched) {
           </Card>
         )}
 
-        <form onSubmit={handleSubmit}>
-          <Card className="mb-6">
-            <CardHeader>
-              <h2 className="text-xl font-semibold text-gray-900">Assessment Details</h2>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Assessment Details Card */}
+          <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 border-0">
+            <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-t-lg">
+              <h2 className="text-xl font-semibold">📝 Assessment Details</h2>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-6 sm:p-8">
               <div className="space-y-6">
+                {/* Title Input */}
                 <div>
-                  <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="title" className="block text-sm font-semibold text-gray-700 mb-2">
                     Assessment Title <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -380,112 +407,131 @@ if (questionBlocksTouched) {
                     id="title"
                     value={formData.title}
                     onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter assessment title"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    placeholder="e.g., Data Structures Final Exam"
                     disabled={currentAssessment.is_executed}
                   />
                 </div>
 
+                {/* Prompt Textarea */}
                 <div>
-                  <label htmlFor="prompt" className="block text-sm font-medium text-gray-700 mb-2">
-                    AI Prompt <span className="text-gray-500">(Optional if using resources or links)</span>
+                  <label htmlFor="prompt" className="block text-sm font-semibold text-gray-700 mb-2">
+                    AI Prompt <span className="text-gray-500 font-normal">(Optional if using resources or links)</span>
                   </label>
                   <textarea
                     name="prompt"
                     id="prompt"
                     value={formData.prompt}
                     onChange={handleInputChange}
-                    rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Provide a detailed prompt for question generation"
+                    rows={5}
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-300 resize-none disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    placeholder="Provide a detailed prompt for question generation..."
                     disabled={currentAssessment.is_executed}
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">External Links (Optional)</label>
-                  {formData.externalLinks.map((link, index) => (
-                    <div key={index} className="flex items-center space-x-2 mb-2">
-                      <input
-                        type="url"
-                        value={link}
-                        onChange={(e) => handleLinkChange(index, e.target.value)}
-                        placeholder="https://example.com"
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        disabled={currentAssessment.is_executed}
-                      />
-                      {formData.externalLinks.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeExternalLink(index)}
-                          className="px-3 py-1 bg-red-100 text-red-600 rounded-md hover:bg-red-200"
+                {/* External Links */}
+                <div className="bg-gray-50 rounded-lg p-6 border-2 border-gray-100">
+                  <label className="block text-sm font-semibold text-gray-700 mb-4">🔗 External Links</label>
+                  <div className="space-y-3">
+                    {formData.externalLinks.map((link, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <input
+                          type="url"
+                          value={link}
+                          onChange={(e) => handleLinkChange(index, e.target.value)}
+                          placeholder="https://example.com/resource"
+                          className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed"
                           disabled={currentAssessment.is_executed}
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                        />
+                        {formData.externalLinks.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeExternalLink(index)}
+                            className="px-4 py-3 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                            disabled={currentAssessment.is_executed}
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                   <button
                     type="button"
                     onClick={addExternalLink}
-                    className="mt-2 px-4 py-2 bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200"
+                    className="mt-4 px-5 py-2.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={currentAssessment.is_executed}
                   >
-                    Add Link
+                    + Add Link
                   </button>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Resources</label>
-                  <div className="flex flex-col space-y-4">
+                {/* Resources Section */}
+                <div className="bg-gray-50 rounded-lg p-6 border-2 border-gray-100">
+                  <label className="block text-sm font-semibold text-gray-700 mb-4">📚 Resources</label>
+                  <div className="space-y-6">
+                    {/* Upload Files */}
                     <div>
                       <label htmlFor="new_files" className="block text-sm font-medium text-gray-700 mb-2">
-                        Upload New Files (Optional)
+                        Upload New Files
                       </label>
-                      <input
-                        type="file"
-                        id="new_files"
-                        multiple
-                        accept=".pdf,.doc,.docx,.txt,.ppt,.pptx,.jpg,.jpeg,.png,.webp"
-                        onChange={handleFileChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        disabled={currentAssessment.is_executed}
-                      />
+                      <div className="relative">
+                        <input
+                          type="file"
+                          id="new_files"
+                          multiple
+                          accept=".pdf,.doc,.docx,.txt,.ppt,.pptx,.jpg,.jpeg,.png,.webp"
+                          onChange={handleFileChange}
+                          className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-blue-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={currentAssessment.is_executed}
+                        />
+                      </div>
                       {newFiles.length > 0 && (
-                        <ul className="mt-2 space-y-1">
-                          {newFiles.map((file, index) => (
-                            <li key={index} className="text-sm text-gray-600">
-                              {file.name}
-                            </li>
-                          ))}
-                        </ul>
+                        <div className="mt-3 bg-white rounded-lg p-3 border border-gray-200">
+                          <p className="text-xs font-semibold text-gray-600 mb-2">Selected Files:</p>
+                          <ul className="space-y-1">
+                            {newFiles.map((file, index) => (
+                              <li key={index} className="text-sm text-gray-700 flex items-center gap-2">
+                                <span className="text-blue-600">📄</span>
+                                {file.name}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
                       )}
                     </div>
+
+                    {/* Existing Resources */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Select Existing Resources (Optional)</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Select Existing Resources</label>
                       {resourcesLoading ? (
-                        <LoadingSpinner size="sm" />
+                        <div className="flex justify-center py-8">
+                          <LoadingSpinner size="sm" type="dots" color="blue" />
+                        </div>
                       ) : resources.length > 0 ? (
-                        <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-300 rounded-md p-2">
+                        <div className="space-y-2 max-h-64 overflow-y-auto border-2 border-gray-200 rounded-lg p-4 bg-white">
                           {resources.map((resource) => (
-                            <div key={resource.id} className="flex items-center">
+                            <div key={resource.id} className="flex items-center p-2 hover:bg-gray-50 rounded-md transition-colors duration-150">
                               <input
                                 type="checkbox"
                                 id={`resource-${resource.id}`}
                                 checked={selectedResources.includes(resource.id)}
                                 onChange={() => handleResourceToggle(resource.id)}
-                                className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                                 disabled={currentAssessment.is_executed}
                               />
-                              <label htmlFor={`resource-${resource.id}`} className="ml-2 text-sm text-gray-600">
-                                {resource.name} ({resource.content_type})
+                              <label htmlFor={`resource-${resource.id}`} className="ml-3 text-sm text-gray-700 cursor-pointer flex-1">
+                                <span className="font-medium">{resource.name}</span>
+                                <span className="text-gray-500 ml-2">({resource.content_type})</span>
                               </label>
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <p className="text-gray-500">No resources available</p>
+                        <div className="text-center py-8 bg-white border-2 border-dashed border-gray-200 rounded-lg">
+                          <p className="text-gray-500">No resources available</p>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -494,162 +540,161 @@ if (questionBlocksTouched) {
             </CardContent>
           </Card>
 
-          <Card className="mb-6">
-            <CardHeader>
-              <h2 className="text-xl font-semibold text-gray-900">Question Blocks (Optional)</h2>
+          {/* Question Blocks Card */}
+          <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 border-0">
+            <CardHeader className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-t-lg">
+              <h2 className="text-xl font-semibold">❓ Question Configuration</h2>
             </CardHeader>
-            <CardContent>
-              {questionBlocks.map((block, index) => (
-                <div key={index} className="p-4 border border-gray-300 rounded-md mb-4">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-medium text-gray-900">Question Block {index + 1}</h3>
-                    {questionBlocks.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeQuestionBlock(index)}
-                        className="text-red-600 hover:text-red-800"
-                        disabled={currentAssessment.is_executed}
-                      >
-                        Remove Block
-                      </button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Question Type</label>
-                      <select
-                        value={block.question_type}
-                        onChange={(e) => handleBlockChange(index, "question_type", e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        disabled={currentAssessment.is_executed}
-                      >
-                        <option value="multiple_choice">Multiple Choice</option>
-                        <option value="short_answer">Short Answer</option>
-                        <option value="true_false">True/False</option>
-                      </select>
+            <CardContent className="p-6 sm:p-8">
+              <div className="space-y-6">
+                {questionBlocks.map((block, index) => (
+                  <div key={index} className="p-6 border-2 border-gray-200 rounded-xl bg-gradient-to-br from-white to-gray-50 hover:border-blue-300 transition-all duration-300">
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                        <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm">Block {index + 1}</span>
+                      </h3>
+                      {questionBlocks.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeQuestionBlock(index)}
+                          className="text-red-600 hover:text-red-800 font-medium hover:bg-red-50 px-3 py-1 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={currentAssessment.is_executed}
+                        >
+                          🗑️ Remove
+                        </button>
+                      )}
                     </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Question Count</label>
-                      <input
-                        type="number"
-                        value={block.question_count}
-                        onChange={(e) => handleBlockChange(index, "question_count", e.target.value)}
-                        min="1"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        disabled={currentAssessment.is_executed}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Duration per Question (seconds)</label>
-                      <input
-                        type="number"
-                        value={block.duration_per_question}
-                        onChange={(e) => handleBlockChange(index, "duration_per_question", e.target.value)}
-                        min="30"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        disabled={currentAssessment.is_executed}
-                      />
-                    </div>
-
-                    {block.question_type === "multiple_choice" && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Number of Options</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Question Type</label>
+                        <select
+                          value={block.question_type}
+                          onChange={(e) => handleBlockChange(index, "question_type", e.target.value)}
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-300 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          disabled={currentAssessment.is_executed}
+                        >
+                          <option value="multiple_choice">Multiple Choice</option>
+                          <option value="short_answer">Short Answer</option>
+                          <option value="true_false">True/False</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Question Count</label>
                         <input
                           type="number"
-                          value={block.num_options}
-                          onChange={(e) => handleBlockChange(index, "num_options", e.target.value)}
-                          min="2"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          value={block.question_count}
+                          onChange={(e) => handleBlockChange(index, "question_count", e.target.value)}
+                          min="1"
+                          placeholder="e.g. 5"
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed"
                           disabled={currentAssessment.is_executed}
                         />
                       </div>
-                    )}
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Duration (seconds)</label>
+                        <input
+                          type="number"
+                          value={block.duration_per_question}
+                          onChange={(e) => handleBlockChange(index, "duration_per_question", e.target.value)}
+                          min="30"
+                          placeholder="e.g. 120"
+                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                          disabled={currentAssessment.is_executed}
+                        />
+                      </div>
+
+                      {block.question_type === "multiple_choice" && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Number of Options</label>
+                          <input
+                            type="number"
+                            value={block.num_options}
+                            onChange={(e) => handleBlockChange(index, "num_options", e.target.value)}
+                            min="2"
+                            max="6"
+                            placeholder="2 to 6"
+                            className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                            disabled={currentAssessment.is_executed}
+                          />
+                        </div>
+                      )}
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Positive Marks</label>
-                      <input
-                        type="number"
-                        value={block.positive_marks || ""}
-                        onChange={(e) => handleBlockChange(index, "positive_marks", e.target.value)}
-                        min="0"
-                        step="0.1"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        disabled={currentAssessment.is_executed}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Negative Marks</label>
-                      <input
-                        type="number"
-                        value={block.negative_marks || ""}
-                        onChange={(e) => handleBlockChange(index, "negative_marks", e.target.value)}
-                        min="0"
-                        step="0.1"
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        disabled={currentAssessment.is_executed}
-                      />
-                    </div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Negative Marks</label>
+                    <input
+                      type="number"
+                      value={block.negative_marks || ""}
+                      onChange={(e) => handleBlockChange(index, "negative_marks", e.target.value)}
+                      min="0"
+                      step="0.1"
+                      placeholder="e.g. 0.25"
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      disabled={currentAssessment.is_executed}
+                    />
                   </div>
                 </div>
-              ))}
-              <button
-                type="button"
-                onClick={addQuestionBlock}
-                className="mt-4 px-4 py-2 bg-blue-100 text-blue-600 rounded-md hover:bg-blue-200"
-                disabled={currentAssessment.is_executed}
-              >
-                Add Question Block
-              </button>
-            </CardContent>
-          </Card>
-
-          <div className="flex justify-end space-x-4">
+              </div>
+            ))}
             <button
               type="button"
-              onClick={() => navigate("/instructor/assessments")}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition duration-200"
-              disabled={isProcessing}
+              onClick={addQuestionBlock}
+              className="w-full py-3 bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-600 rounded-lg hover:from-blue-100 hover:to-indigo-100 transition-all duration-200 font-semibold border-2 border-dashed border-blue-300 hover:border-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={currentAssessment.is_executed}
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-              disabled={loading || isProcessing || currentAssessment.is_executed}
-            >
-              {isProcessing ? (
-                <>
-                  <LoadingSpinner size="sm" color="white" />
-                  <span className="ml-2">Processing...</span>
-                </>
-              ) : loading ? (
-                <>
-                  <LoadingSpinner size="sm" color="white" />
-                  <span className="ml-2">Updating...</span>
-                </>
-              ) : (
-                "Update Assessment"
-              )}
+              + Add Question Block
             </button>
           </div>
-        </form>
+        </CardContent>
+      </Card>
+
+      {/* Action Buttons */}
+      <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
+        <button
+          type="button"
+          onClick={() => navigate("/instructor/assessments")}
+          className="px-8 py-3 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-all duration-200 font-medium order-2 sm:order-1 disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={isProcessing}
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center font-semibold shadow-md hover:shadow-lg order-1 sm:order-2"
+          disabled={loading || isProcessing || currentAssessment.is_executed}
+        >
+          {isProcessing ? (
+            <>
+              <LoadingSpinner size="sm" color="white" type="gradient" />
+              <span className="ml-2">Processing...</span>
+            </>
+          ) : loading ? (
+            <>
+              <LoadingSpinner size="sm" color="white" type="gradient" />
+              <span className="ml-2">Updating...</span>
+            </>
+          ) : (
+            <>
+              <span>✨ Update Assessment</span>
+            </>
+          )}
+        </button>
       </div>
+    </form>
+  </div>
 
-      <Footer />
+  <Footer />
 
-      <Modal
-        isOpen={modal.isOpen}
-        onClose={() => setModal({ ...modal, isOpen: false })}
-        type={modal.type}
-        title={modal.title}
-      >
-        {modal.message}
-      </Modal>
-    </div>
-  );
+  <Modal
+    isOpen={modal.isOpen}
+    onClose={() => setModal({ ...modal, isOpen: false })}
+    type={modal.type}
+    title={modal.title}
+  >
+    {modal.message}
+  </Modal>
+</div>
+);
 }
-
 export default EditAssessment;
