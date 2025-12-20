@@ -5,12 +5,12 @@ import Navbar from "../../components/Navbar";
 import Footer from "../../components/Footer";
 import toast from "react-hot-toast";
 import useStudentAnalyticsStore from "../../store/useStudentAnalyticsStore.js";
-import { 
-  FaEye, 
-  FaBook, 
-  FaTrophy, 
-  FaClock, 
-  FaCheckCircle, 
+import {
+  FaEye,
+  FaBook,
+  FaTrophy,
+  FaClock,
+  FaCheckCircle,
   FaDownload,
   FaChartLine,
   FaTimesCircle
@@ -123,9 +123,8 @@ const StudentAnalytics = () => {
             assessments.map((a) => (
               <Card
                 key={a.id}
-                className={`w-full shadow-xl hover:shadow-2xl transition-all duration-300 border-2 ${
-                  selectedAssessment === a.id ? "border-indigo-500" : "border-gray-200"
-                }`}
+                className={`w-full shadow-xl hover:shadow-2xl transition-all duration-300 border-2 ${selectedAssessment === a.id ? "border-indigo-500" : "border-gray-200"
+                  }`}
               >
                 <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 sm:p-5 text-white rounded-t-xl">
                   <h3 className="text-lg sm:text-xl font-bold mb-1">{a.title}</h3>
@@ -265,22 +264,29 @@ const StudentAnalytics = () => {
                       <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 p-5 sm:p-6 rounded-xl text-center">
                         <FaCheckCircle className="text-3xl sm:text-4xl text-green-600 mx-auto mb-2" />
                         <p className="font-bold text-green-900 text-sm sm:text-base">Correct Answer</p>
-                        <p className="text-xl sm:text-2xl font-extrabold text-green-600 mt-2">{q.correct_answer}</p>
+                        <p className="font-bold text-lg mt-2 text-green-700">
+                          {q.type === 'true_false'
+                            ? (q.correct_answer === true || q.correct_answer === 'true' ? 'True' : 'False')
+                            : q.correct_answer || "N/A"
+                          }
+                        </p>
                       </div>
 
-                      <div className={`border-2 p-5 sm:p-6 rounded-xl text-center ${
-                        q.is_correct 
-                          ? "bg-gradient-to-br from-green-50 to-emerald-50 border-green-200" 
-                          : "bg-gradient-to-br from-red-50 to-pink-50 border-red-200"
-                      }`}>
+                      <div className={`border-2 p-5 sm:p-6 rounded-xl text-center ${q.is_correct
+                        ? "bg-gradient-to-br from-green-50 to-emerald-50 border-green-200"
+                        : "bg-gradient-to-br from-red-50 to-pink-50 border-red-200"
+                        }`}>
                         {q.is_correct ? (
                           <FaCheckCircle className="text-3xl sm:text-4xl text-green-600 mx-auto mb-2" />
                         ) : (
                           <FaTimesCircle className="text-3xl sm:text-4xl text-red-600 mx-auto mb-2" />
                         )}
                         <p className="font-bold text-gray-900 text-sm sm:text-base">Your Answer</p>
-                        <p className={`text-xl sm:text-2xl font-extrabold mt-2 ${q.is_correct ? "text-green-600" : "text-red-600"}`}>
-                          {q.student_answer || "Not Answered"}
+                        <p className={`text-lg font-bold mt-2 ${q.is_correct ? "text-green-600" : "text-red-600"}`}>
+                          {q.type === 'true_false'
+                            ? (q.student_answer === true || q.student_answer === 'true' ? 'True' : 'False')
+                            : q.student_answer || "Not Answered"
+                          }
                         </p>
                       </div>
                     </div>

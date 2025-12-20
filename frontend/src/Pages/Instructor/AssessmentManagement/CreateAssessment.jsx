@@ -463,7 +463,7 @@ function CreateAssessment() {
                           disabled={isProcessing}
                         >
                           <option value="multiple_choice">Multiple Choice</option>
-                          <option value="short_answer">Short Answer</option>
+                          {/* <option value="short_answer">Short Answer</option> */}
                           <option value="true_false">True/False</option>
                         </select>
                       </div>

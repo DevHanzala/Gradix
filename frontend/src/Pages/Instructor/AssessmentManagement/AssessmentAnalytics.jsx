@@ -106,11 +106,10 @@ function AssessmentAnalytics() {
                   <div
                     key={assessment.id}
                     onClick={() => navigate(`/instructor/assessments/${assessment.id}/analytics`)}
-                    className={`p-5 sm:p-6 rounded-xl border-2 cursor-pointer transition-all duration-200 ${
-                      assessment.id === Number(assessmentId)
+                    className={`p-5 sm:p-6 rounded-xl border-2 cursor-pointer transition-all duration-200 ${assessment.id === Number(assessmentId)
                         ? "border-indigo-500 bg-gradient-to-r from-indigo-50 to-purple-50 shadow-md scale-[1.02]"
                         : "border-gray-200 bg-white hover:border-indigo-300 hover:shadow-md"
-                    }`}
+                      }`}
                   >
                     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
                       <div className="flex-1">
@@ -273,9 +272,9 @@ function AssessmentAnalytics() {
                           </span>
                           <span className="text-sm font-normal text-gray-600">({q.question_type})</span>
                         </h4>
-                        <div className={`px-4 py-1.5 rounded-full font-bold text-sm ${isCorrect ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                        {/* <div className={`px-4 py-1.5 rounded-full font-bold text-sm ${isCorrect ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
                           {isCorrect ? "✓ Correct" : "✗ Wrong"}
-                        </div>
+                        </div> */}
                       </div>
 
                       <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
@@ -299,12 +298,20 @@ function AssessmentAnalytics() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4">
                           <strong className="text-xs font-semibold text-gray-700 uppercase block mb-2">Correct Answer</strong>
-                          <p className="text-green-700 font-bold text-lg">{q.correct_answer}</p>
+                          <p className="font-bold text-lg text-green-700">
+                            {q.question_type === 'true_false'
+                              ? (q.correct_answer === true || q.correct_answer === 'true' ? 'True' : 'False')
+                              : q.correct_answer || "N/A"
+                            }
+                          </p>
                         </div>
                         <div className={`border-2 rounded-lg p-4 ${isCorrect ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
                           <strong className="text-xs font-semibold text-gray-700 uppercase block mb-2">Student Answer</strong>
                           <p className={`font-bold text-lg ${isCorrect ? "text-green-700" : "text-red-700"}`}>
-                            {q.student_answer || "—"}
+                            {q.question_type === 'true_false'
+                              ? (q.student_answer === true || q.student_answer === 'true' ? 'True' : 'False')
+                              : q.student_answer || "—"
+                            }
                           </p>
                         </div>
                         <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
@@ -313,12 +320,12 @@ function AssessmentAnalytics() {
                             {isCorrect ? (q.positive_marks || 1) : (q.score || -Math.abs(q.negative_marks || 0))}
                           </p>
                         </div>
-                        <div className={`border-2 rounded-lg p-4 ${isCorrect ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
+                        {/* <div className={`border-2 rounded-lg p-4 ${isCorrect ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
                           <strong className="text-xs font-semibold text-gray-700 uppercase block mb-2">Result</strong>
                           <p className={`font-bold text-xl ${isCorrect ? "text-green-600" : "text-red-600"}`}>
                             {isCorrect ? "✓ Correct" : "✗ Wrong"}
                           </p>
-                        </div>
+                        </div> */}
                       </div>
                     </div>
                   );
