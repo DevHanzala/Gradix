@@ -635,34 +635,34 @@ export const getAssessmentQuestions = async (studentId, assessmentId) => {
     `;
     const questionsRes = await db.query(questionsQuery, [attemptId]);
 
-    return questionsRes.rows.map(q => {
-      // FIX: Handle correct_answer as JSONB for short_answer
-      let correctAnswerStr = '';
-      if (q.question_type === 'short_answer' && typeof q.correct_answer === 'object' && q.correct_answer !== null) {
-        // Extract keywords or main answer from JSONB
-        correctAnswerStr = Object.values(q.correct_answer).flat().join(' ').trim().replace(/"/g, '').toLowerCase();
-      } else {
-        correctAnswerStr = (q.correct_answer || '').toString().trim().replace(/"/g, '').toLowerCase();
-      }
+   return questionsRes.rows.map(q => {
+  let expected = "";
+  if (q.question_type === 'short_answer' && typeof q.correct_answer === 'object') {
+    expected = q.correct_answer.required_keywords?.[0] || "";
+  } else {
+    expected = String(q.correct_answer).trim().toLowerCase();
+  }
 
-      const normalizedStudentAnswer = (q.student_answer || '').trim().replace(/"/g, '').toLowerCase();
-      const computedIsCorrect = normalizedStudentAnswer === correctAnswerStr;
-      const computedScore = computedIsCorrect ? q.positive_marks : (q.negative_marks || 0);
+  const student = String(q.student_answer || "").trim().toLowerCase();
 
-      return {
-        question_id: q.id,
-        question_order: q.question_order,
-        question: q.question_text,
-        type: q.question_type,
-        options: q.options,
-        max_marks: q.positive_marks,
-        correct_answer: q.correct_answer, // Keep original (object or string)
-        student_answer: q.student_answer,
-        score: computedScore,
-        is_correct: computedIsCorrect,
-        negative_marks: q.negative_marks
-      };
-    });
+  const isCorrect = student === expected;
+
+  const score = isCorrect ? q.positive_marks : (q.student_answer ? -q.negative_marks : 0);
+
+  return {
+    question_id: q.id,
+    question_order: q.question_order,
+    question: q.question_text,
+    type: q.question_type,
+    options: q.options,
+    max_marks: q.positive_marks,
+    correct_answer: q.correct_answer, // keep original for display
+    student_answer: q.student_answer,
+    score: score,
+    is_correct: isCorrect,
+    negative_marks: q.negative_marks
+  };
+});
   } catch (error) {
     console.error("❌ Error getting assessment questions:", error);
     throw error;

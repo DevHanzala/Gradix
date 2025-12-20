@@ -200,12 +200,19 @@ export const submitAssessmentForStudent = async (req, res) => {
       });
 
       // Save to DB
-      await db.query(
+           await db.query(
         `INSERT INTO student_answers (attempt_id, question_id, student_answer, score)
          VALUES ($1, $2, $3, $4)
          ON CONFLICT (attempt_id, question_id) DO UPDATE
          SET student_answer = $3, score = $4`,
-        [attemptId, q.id, studentAnswer !== null ? JSON.stringify(studentAnswer) : null, score]
+        [
+          attemptId, 
+          q.id, 
+          studentAnswer !== null 
+            ? (q.question_type === "short_answer" ? JSON.stringify(studentAnswer) : studentAnswer) 
+            : null, 
+          score
+        ]
       );
     }
 

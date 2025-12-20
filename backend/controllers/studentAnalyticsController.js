@@ -279,7 +279,7 @@ export const getStudentReport = async (req, res) => {
   negative_marks_applied: details.negative_marks_applied || 0, // make sure this is here
   student_answers: details.student_answers || [], // ADD THIS LINE
   recommendations,
-  title: details.assessment_title
+assessment_title: details.assessment_title
 };
 
 console.log("=== REPORT DEBUG ===");

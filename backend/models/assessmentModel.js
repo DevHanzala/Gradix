@@ -622,11 +622,18 @@ const storeResourceChunk = async (resourceId, chunkText, embedding, metadata) =>
   }
 };
 
-
- const generateAssessmentQuestions = async (assessmentId, attemptId, language, assessment) => {
+const generateAssessmentQuestions = async (
+  assessmentId,
+  attemptId,
+  language,
+  assessment
+) => {
+  // STEP 1: Fetch instructor blocks
   const { rows: blockRows } = await db.query(
     `SELECT question_type, question_count, duration_per_question, num_options, positive_marks, negative_marks
-     FROM question_blocks WHERE assessment_id = $1`,
+     FROM question_blocks
+     WHERE assessment_id = $1
+     ORDER BY id`,
     [assessmentId]
   );
 
@@ -638,125 +645,157 @@ const storeResourceChunk = async (resourceId, chunkText, embedding, metadata) =>
   const typeCountsStr = blockRows.map(b => `${b.question_count} ${b.question_type}`).join(", ");
   const langName = mapLanguageCode(language);
 
+  // STEP 2: Fetch resource content from chunks
+  const { rows: chunkRows } = await db.query(`
+    SELECT r.name, rc.chunk_text
+    FROM assessment_resources ar
+    JOIN resources r ON ar.resource_id = r.id
+    LEFT JOIN resource_chunks rc ON rc.resource_id = r.id
+    WHERE ar.assessment_id = $1
+    ORDER BY r.id, rc.chunk_index
+  `, [assessmentId]);
+
+  const resourcesContent = chunkRows
+    .filter(row => row.chunk_text)
+    .map(row => `Resource "${row.name}":\n${row.chunk_text}`)
+    .join("\n\n---\n\n")
+    .substring(0, 5000) || "No resource content available";
+
+  // STEP 3: Gemini client
   const client = await getCreationModel();
 
-const questionPrompt = `
-Generate ONLY a valid JSON array of questions. NO text outside.
+  // STEP 4: Final Prompt
+  const questionPrompt = `
+Generate questions in ${langName} language only. All text MUST be in ${langName}.
 
-STRICT RULES — MUST FOLLOW:
-1. Question types EXACTLY: ${questionTypes.join(", ")}
+CONTENT TO BASE QUESTIONS ON:
+Title: "${assessment.title}"
+Instructor Prompt: "${assessment.prompt || "No prompt provided"}"
+External Links: ${(assessment.external_links || []).join(", ") || "None"}
+
+Uploaded Resource Content:
+${resourcesContent}
+
+Generate questions STRICTLY based on the above content.
+
+Generate ONLY a valid JSON array of questions. NO extra text.
+
+STRICT RULES:
+1. Question types exactly: ${questionTypes.join(", ")}
 2. Exact counts: ${typeCountsStr}
 3. EVERY question MUST have:
-   - question_type (exact from list)
+   - question_type
    - question_text
-   - options (array or null)
+   - options (array for MCQ, ["true","false"] for true_false, null for short_answer)
    - correct_answer
    - positive_marks
    - negative_marks
    - duration_per_question
-4. short_answer questions MUST have correct_answer as OBJECT:
+4. short_answer correct_answer MUST be object:
    {
      "grading_type": "keyword_match",
-     "required_keywords": [strings],
-     "optional_keywords": [strings],
+     "required_keywords": [lowercase strings],
+     "optional_keywords": [],
      "min_required_match": number
    }
-5. Use instructor marks & time exactly.
-6. NO MISSING FIELDS
-
-Title: "${assessment.title}"
-Prompt: "${assessment.prompt || "N/A"}"
+5. MCQ correct_answer MUST be the FULL OPTION TEXT like "B. Oxygen"
+6. true_false correct_answer MUST be boolean true/false
+7. Use instructor marks & time exactly
+8. No missing fields
+9. Output ONLY JSON array [ ... ]
 `;
 
   let questions = [];
 
+  // STEP 5: Call Gemini
   try {
-  const response = await client.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: [{ role: "user", parts: [{ text: questionPrompt }] }],
-    generationConfig: { maxOutputTokens: 3000, temperature: 0.4 }
-  });
+    const response = await client.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: "user", parts: [{ text: questionPrompt }] }],
+      generationConfig: {
+        maxOutputTokens: 3000,
+        temperature: 0.0,
+        responseMimeType: "application/json"
+      }
+    });
 
-  let text = response.text || response.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    let text = response.text || response.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-  // FIX: CLEAN TEXT BEFORE PARSE
-  text = text.trim().replace(/^```json/, '').replace(/```$/, '').trim(); // remove markdown
-  const jsonMatch = text.match(/\[[\s\S]*\]/);
-  if (!jsonMatch) throw new Error("No JSON array found");
+    text = text.trim().replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
 
-  // SAFE PARSE WITH TRY-CATCH
-  try {
-    questions = JSON.parse(jsonMatch[0]);
-  } catch (parseErr) {
-    console.error("JSON parse error:", parseErr);
-    console.log("Raw text:", text);
-    throw new Error("Invalid JSON from AI");
+    const start = text.indexOf('[');
+    const end = text.lastIndexOf(']') + 1;
+    if (start === -1 || end === 0) throw new Error("No JSON array found");
+
+    const jsonText = text.substring(start, end);
+    questions = JSON.parse(jsonText);
+
+    if (!Array.isArray(questions) || questions.length === 0) {
+      throw new Error("Empty questions array");
+    }
+
+  } catch (error) {
+    console.error("❌ Question generation failed:", error.message);
+    throw error;
   }
 
-  if (!Array.isArray(questions)) throw new Error("Invalid JSON format");
-
-} catch (error) {
-  console.error("❌ Question generation failed:", error.message);
-  throw error;
-}
-
-  // DELETE OLD QUESTIONS
+  // STEP 6: Save to DB
   await db.query(`DELETE FROM generated_questions WHERE attempt_id = $1`, [attemptId]);
 
   let totalDuration = 0;
+  let questionIndex = 0;
 
-  for (let i = 0; i < questions.length; i++) {
-  let q = questions[i];
+  for (const block of blockRows) {
+    for (let i = 0; i < block.question_count && questionIndex < questions.length; i++) {
+      let q = questions[questionIndex];
 
-  // FIND MATCHING BLOCK FOR THIS QUESTION (by order)
-  const blockIndex = Math.floor(i / blockRows[0].question_count); // simple way
-  const block = blockRows.find(b => b.question_type === q.question_type) || blockRows[0];
+      // FORCE INSTRUCTOR VALUES
+      q.question_type = block.question_type;
+      q.positive_marks = block.positive_marks;
+      q.negative_marks = block.negative_marks;
+      q.duration_per_question = block.duration_per_question;
 
-  // FORCE INSTRUCTOR SETTINGS — NO AI RANDOM
-  q.question_type = block.question_type;
-  q.positive_marks = block.positive_marks;
-  q.negative_marks = block.negative_marks;
-  q.duration_per_question = block.duration_per_question;
+      if (!q.question_text) {
+        questionIndex++;
+        continue;
+      }
 
-  // REQUIRED VALIDATION
-  if (!q.question_text || typeof q.question_text !== "string") {
-    console.warn(`Question ${i + 1} invalid — skipping`);
-    continue;
+      // MCQ: STORE FULL TEXT
+      if (q.question_type === "multiple_choice" && q.options && q.correct_answer) {
+        const letter = String(q.correct_answer).trim().toUpperCase();
+        const key = Object.keys(q.options).find(k => k.trim().toUpperCase().startsWith(letter));
+        if (key) {
+          q.correct_answer = `${key}. ${q.options[key]}`;
+        }
+      }
+
+      totalDuration += q.duration_per_question;
+
+      await db.query(
+        `INSERT INTO generated_questions (
+          attempt_id, question_order, question_type, question_text, options,
+          correct_answer, positive_marks, negative_marks, duration_per_question
+        )
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [
+          attemptId,
+          questionIndex + 1,
+          q.question_type,
+          q.question_text.trim(),
+          q.options ? JSON.stringify(q.options) : null,
+          JSON.stringify(q.correct_answer),
+          q.positive_marks,
+          q.negative_marks,
+          q.duration_per_question
+        ]
+      );
+
+      questionIndex++;
+    }
   }
-
-  totalDuration += q.duration_per_question;
-
-  // SAFE correct_answer FOR JSONB
-  let correctAnswerValue = JSON.stringify(q.correct_answer ?? "");
-  if (correctAnswerValue === "null") correctAnswerValue = "''";
-
-  await db.query(
-    `
-    INSERT INTO generated_questions (
-      attempt_id, question_order, question_type, question_text, options,
-      correct_answer, positive_marks, negative_marks, duration_per_question
-    )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-    `,
-    [
-      attemptId,
-      i + 1,
-      q.question_type,
-      q.question_text.trim(),
-      q.options ? JSON.stringify(q.options) : null,
-      correctAnswerValue,
-      q.positive_marks,
-      q.negative_marks,
-      q.duration_per_question
-    ]
-  );
-}
-
 
   return { questions, duration: totalDuration };
 };
-
-
 
 const enrollStudent = async (assessmentId, email) => {
   try {
