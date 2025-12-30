@@ -1,6 +1,8 @@
 import db from "../DB/db.js";
 import { findResourceById } from "./resourceModel.js";
-import { getCreationModel, mapLanguageCode, } from "../services/geminiService.js";
+// import { getCreationModel, mapLanguageCode, } from "../services/geminiService.js";
+import { mapLanguageCode } from "../services/ai/aiService.js";
+import { generateContent } from "../services/ai/generateContent.js";
 
 const ensureAssessmentsTable = async () => {
   try {
@@ -628,7 +630,10 @@ const generateAssessmentQuestions = async (
   language,
   assessment
 ) => {
-  // STEP 1: Fetch instructor blocks
+  /* =========================
+     STEP 1: FETCH INSTRUCTOR BLOCKS
+  ========================= */
+
   const { rows: blockRows } = await db.query(
     `SELECT question_type, question_count, duration_per_question, num_options, positive_marks, negative_marks
      FROM question_blocks
@@ -642,10 +647,21 @@ const generateAssessmentQuestions = async (
   }
 
   const questionTypes = [...new Set(blockRows.map(b => b.question_type))];
-  const typeCountsStr = blockRows.map(b => `${b.question_count} ${b.question_type}`).join(", ");
+ const typeCountsStr = blockRows
+  .map(b => {
+    if (b.question_type === "multiple_choice") {
+      return `${b.question_count} multiple_choice (${b.num_options} options per question)`;
+    }
+    return `${b.question_count} ${b.question_type}`;
+  })
+  .join(", ");
+
   const langName = mapLanguageCode(language);
 
-  // STEP 2: Fetch resource content from chunks
+  /* =========================
+     STEP 2: FETCH RESOURCE CONTENT
+  ========================= */
+
   const { rows: chunkRows } = await db.query(`
     SELECT r.name, rc.chunk_text
     FROM assessment_resources ar
@@ -661,10 +677,10 @@ const generateAssessmentQuestions = async (
     .join("\n\n---\n\n")
     .substring(0, 5000) || "No resource content available";
 
-  // STEP 3: Gemini client
-  const client = await getCreationModel();
+  /* =========================
+     STEP 3: FINAL PROMPT (UNCHANGED)
+  ========================= */
 
-  // STEP 4: Final Prompt
   const questionPrompt = `
 Generate questions in ${langName} language only. All text MUST be in ${langName}.
 
@@ -703,35 +719,41 @@ STRICT RULES:
 7. Use instructor marks & time exactly
 8. No missing fields
 9. Output ONLY JSON array [ ... ]
+10. For multiple_choice questions, the options array MUST contain EXACTLY the instructor-defined number of options for that question block (num_options).
+
 `;
 
   let questions = [];
 
-  // STEP 5: Call Gemini
+  /* =========================
+     STEP 4: AI CALL (FIXED)
+     ✔ Uses generateContent abstraction
+     ✔ Random Gemini/Groq handled internally
+  ========================= */
+
   try {
-    const response = await client.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [{ role: "user", parts: [{ text: questionPrompt }] }],
-      generationConfig: {
-        maxOutputTokens: 3000,
-        temperature: 0.0,
-        responseMimeType: "application/json"
-      }
+    const aiText = await generateContent(questionPrompt, {
+      maxOutputTokens: 3000,
+      temperature: 0.7, // deterministic for exams
+      responseMimeType: "application/json"
     });
 
-    let text = response.text || response.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const cleaned = aiText
+      .trim()
+      .replace(/^```json\s*/i, "")
+      .replace(/\s*```$/i, "");
 
-    text = text.trim().replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
+    const start = cleaned.indexOf("[");
+    const end = cleaned.lastIndexOf("]") + 1;
 
-    const start = text.indexOf('[');
-    const end = text.lastIndexOf(']') + 1;
-    if (start === -1 || end === 0) throw new Error("No JSON array found");
+    if (start === -1 || end === 0) {
+      throw new Error("No JSON array found in AI response");
+    }
 
-    const jsonText = text.substring(start, end);
-    questions = JSON.parse(jsonText);
+    questions = JSON.parse(cleaned.substring(start, end));
 
     if (!Array.isArray(questions) || questions.length === 0) {
-      throw new Error("Empty questions array");
+      throw new Error("Empty questions array returned by AI");
     }
 
   } catch (error) {
@@ -739,7 +761,10 @@ STRICT RULES:
     throw error;
   }
 
-  // STEP 6: Save to DB
+  /* =========================
+     STEP 5: SAVE TO DB (UNCHANGED)
+  ========================= */
+
   await db.query(`DELETE FROM generated_questions WHERE attempt_id = $1`, [attemptId]);
 
   let totalDuration = 0;
@@ -763,7 +788,9 @@ STRICT RULES:
       // MCQ: STORE FULL TEXT
       if (q.question_type === "multiple_choice" && q.options && q.correct_answer) {
         const letter = String(q.correct_answer).trim().toUpperCase();
-        const key = Object.keys(q.options).find(k => k.trim().toUpperCase().startsWith(letter));
+        const key = Object.keys(q.options).find(k =>
+          k.trim().toUpperCase().startsWith(letter)
+        );
         if (key) {
           q.correct_answer = `${key}. ${q.options[key]}`;
         }
@@ -796,6 +823,7 @@ STRICT RULES:
 
   return { questions, duration: totalDuration };
 };
+
 
 const enrollStudent = async (assessmentId, email) => {
   try {

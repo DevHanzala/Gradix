@@ -1,5 +1,6 @@
 import db from "../DB/db.js";
-import { getCreationModel, generateContent } from "../services/geminiService.js";
+import { getCheckingModel } from "../services/ai/aiProviders.js";
+import { generateContent } from "../services/ai/generateContent.js";
 
 /**
  * Student Analytics Model
@@ -453,10 +454,10 @@ export const getLearningRecommendations = async (studentId) => {
       return recommendations;
     }
 
-    const client = await getCreationModel();
+    const client = await getCheckingModel();
     const prompt = `You are an educational AI assistant. Generate learning recommendations for a student with the following weak areas: ${JSON.stringify(weakAreas.rows)}. Respond ONLY with a valid JSON object in this exact format: { "weak_areas": [{ "topic": "string", "performance": number, "suggestion": "string" }], "study_plan": { "daily_practice": [{ "topic": "string", "focus": "string", "time_allocation": "string" }], "weekly_review": [{ "topic": "string", "activity": "string", "goal": "string" }] } }. Ensure the JSON is parseable and matches the structure exactly.`;
     let responseText = await generateContent(client, prompt, {
-      generationConfig: { maxOutputTokens: 1000, temperature: 0.5, response_mime_type: 'application/json' },
+      generationConfig: { maxOutputTokens: 1000, temperature: 0.7, response_mime_type: 'application/json' },
       thinkingConfig: { thinkingBudget: 0 },
     });
 

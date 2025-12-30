@@ -24,7 +24,12 @@ global.dbConnected = false;
 // FIXED: .env loading
 dotenv.config();
 
-console.log("GEMINI_CREATION_API_KEY loaded:", process.env.GEMINI_CREATION_API_KEY ? "Yes" : "No");
+
+console.log("GEMINI_CREATION_API_KEY_1 loaded:", process.env.GEMINI_CREATION_API_KEY_1 ? "Yes" : "No");
+console.log("GEMINI_CREATION_API_KEY_2 loaded:", process.env.GEMINI_CREATION_API_KEY_2 ? "Yes" : "No");
+console.log("GROQ_API_KEY loaded:", process.env.GROQ_API_KEY ? "Yes" : "No");
+console.log("CHECKING_API_KEY loaded:", process.env.GEMINI_CHECKING_API_KEY ? "Yes" : "No");
+
 
 const app = express();
 const PORT = process.env.PORT || 5000;

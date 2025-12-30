@@ -23,10 +23,8 @@ export const uploadResource = async (req, res) => {
   const files = req.files || [];
 
   try {
-    console.log(`Uploading resources for user ${uploadedBy}`);
     const uploadedResources = [];
 
-    // === HANDLE FILE UPLOADS (IN-MEMORY) ===
     for (const file of files) {
       const resourceData = {
         name: name || file.originalname,
@@ -39,56 +37,55 @@ export const uploadResource = async (req, res) => {
 
       const newResource = await createResource(resourceData);
 
-      // Extract text from buffer
-      const text = await extractTextFromFile(file.buffer, file.mimetype);
+      let text;
+      try {
+        text = await extractTextFromFile(file.buffer, file.mimetype);
+      } catch (err) {
+        console.warn(`Skipping file ${file.originalname}: ${err.message}`);
+        continue;
+      }
+
       const chunks = chunkText(text, 500);
 
-      // Generate embeddings & save chunks
       for (let i = 0; i < chunks.length; i++) {
         const embedding = await generateEmbedding(chunks[i]);
-        await storeResourceChunk(newResource.id, chunks[i], embedding, { chunk_index: i });
+        await storeResourceChunk(
+          newResource.id,
+          chunks[i],
+          embedding,
+          { chunk_index: i }
+        );
       }
 
       uploadedResources.push(newResource);
     }
 
-    // === HANDLE URL RESOURCE ===
     if (url) {
-      if (!name) {
-        return res.status(400).json({ success: false, message: "Name is required for URL resource." });
-      }
-
-      const resourceData = {
+      const newResource = await createResource({
         name,
         url,
         content_type: "link",
         visibility: visibility || "private",
         uploaded_by: uploadedBy,
-      };
-
-      const newResource = await createResource(resourceData);
+      });
       uploadedResources.push(newResource);
     }
 
-    if (uploadedResources.length === 0) {
-      return res.status(400).json({ success: false, message: "No files or URL provided." });
+    if (!uploadedResources.length) {
+      return res.status(400).json({ success: false, message: "No valid resources uploaded" });
     }
 
-    console.log(`${uploadedResources.length} resource(s) uploaded successfully`);
-
-    // CLEAR ALL RESOURCE CACHES FOR THIS INSTRUCTOR
-const instructorId = req.user.id;
-await redis.del(`resources:instructor:${instructorId}:visibility:all`);
-await redis.del(`resources:instructor:${instructorId}:visibility:private`);
-await redis.del(`resources:instructor:${instructorId}:visibility:public`);
+    await redis.del(`resources:instructor:${uploadedBy}:visibility:all`);
+    await redis.del(`resources:instructor:${uploadedBy}:visibility:private`);
+    await redis.del(`resources:instructor:${uploadedBy}:visibility:public`);
 
     res.status(201).json({
       success: true,
       message: "Resources uploaded successfully",
       resources: uploadedResources,
     });
+
   } catch (error) {
-    console.error("Upload resource error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to upload resources",

@@ -7,7 +7,9 @@ import {
   getAssessmentQuestions as modelGetAssessmentQuestions
 } from "../models/studentAnalyticsModel.js";
 import { redis } from "../services/redis.js";
-import { getCreationModel, generateContent } from "../services/geminiService.js";
+// import { getCreationModel, generateContent } from "../services/geminiService.js";
+import { generateContent } from "../services/ai/generateContent.js"; 
+import { getCheckingModel } from "../services/ai/aiProviders.js";
 
 export const getStudentOverview = async (req, res) => {
   try {
@@ -224,23 +226,79 @@ export const getStudentReport = async (req, res) => {
       });
     }
 
-    console.log(`📋 Generating detailed report for student ${studentId}${assessmentId ? ` (assessment ${assessmentId})` : ''}`);
+    console.log(
+      `📋 Generating detailed report for student ${studentId}${
+        assessmentId ? ` (assessment ${assessmentId})` : ''
+      }`
+    );
 
     let report;
+
     if (assessmentId) {
-      // Fetch basic details
-      const details = await getAssessmentAnalytics(studentId, parseInt(assessmentId));
+      // Fetch assessment analytics
+      const details = await getAssessmentAnalytics(
+        studentId,
+        parseInt(assessmentId)
+      );
 
-      // GENERATE RECOMMENDATIONS WITH AI — COMPULSORY FOR REPORT
-      const client = await getCreationModel();
+      /* =========================
+         AI RECOMMENDATIONS (CHECKING MODEL ONLY)
+      ========================= */
+
+      const checkingClient = await getCheckingModel();
       const weakQuestionsJson = JSON.stringify(details.weak_questions || []);
-      const prompt = `You are an educational AI assistant. Generate learning recommendations for the assessment "${details.assessment_title}" with score ${details.score || 0}%. Weak questions: ${weakQuestionsJson}. If no weak questions, provide general recommendations. Respond ONLY with valid JSON: { "weak_areas": [{ "topic": "string", "performance": number, "suggestion": "string" }], "study_plan": { "daily_practice": [{ "topic": "string", "focus": "string", "time_allocation": "string" }], "weekly_review": [{ "topic": "string", "activity": "string", "goal": "string" }] } }.`;
 
-      let responseText = await generateContent(client, prompt, {
-        generationConfig: { maxOutputTokens: 1000, temperature: 0.7, response_mime_type: 'application/json' },
+      const prompt = `
+You are an educational AI assistant.
+
+Generate learning recommendations for the assessment "${details.assessment_title}"
+with score ${details.score || 0}%.
+
+Weak questions:
+${weakQuestionsJson}
+
+If no weak questions exist, provide general improvement recommendations.
+
+STRICT RULES:
+- Respond ONLY with valid JSON
+- No markdown
+- No explanations
+- No extra text
+
+Expected JSON format:
+{
+  "weak_areas": [
+    { "topic": "string", "performance": number, "suggestion": "string" }
+  ],
+  "study_plan": {
+    "daily_practice": [
+      { "topic": "string", "focus": "string", "time_allocation": "string" }
+    ],
+    "weekly_review": [
+      { "topic": "string", "activity": "string", "goal": "string" }
+    ]
+  }
+}
+`;
+
+      const response = await checkingClient.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          maxOutputTokens: 1000,
+          temperature: 0.4 // deterministic for recommendations
+        }
       });
 
-      responseText = responseText.replace(/^```json\n/, '').replace(/\n```$/, '').trim();
+      let responseText =
+        response.text ||
+        response?.candidates?.[0]?.content?.parts?.[0]?.text ||
+        "";
+
+      responseText = responseText
+        .replace(/^```json\s*/i, '')
+        .replace(/\s*```$/i, '')
+        .trim();
 
       let recommendations = {
         weak_areas: [],
@@ -251,46 +309,49 @@ export const getStudentReport = async (req, res) => {
         recommendations = JSON.parse(responseText);
       } catch (parseError) {
         console.error("AI recommendation parse error:", parseError);
+
+        // SAFE FALLBACK
         recommendations = {
-          weak_areas: details.weak_questions?.map(area => ({
-            topic: area.question_type || 'General',
-            performance: Math.round((area.performance || 0) * 100),
-            suggestion: "Practice more in this area."
-          })) || [],
+          weak_areas:
+            details.weak_questions?.map(area => ({
+              topic: area.question_type || "General",
+              performance: Math.round((area.performance || 0) * 100),
+              suggestion: "Practice more in this area."
+            })) || [],
           study_plan: {
-            daily_practice: [{ topic: "General", focus: "Review basics", time_allocation: "30 minutes" }],
-            weekly_review: [{ topic: "All", activity: "Mock test", goal: "Improve by 10%" }]
+            daily_practice: [
+              { topic: "General", focus: "Review basics", time_allocation: "30 minutes" }
+            ],
+            weekly_review: [
+              { topic: "All", activity: "Mock test", goal: "Improve by 10%" }
+            ]
           }
         };
       }
 
-      // Build report with recommendations
-      report = {
-  student_id: studentId,
-  assessment_id: assessmentId,
-  generated_at: new Date().toISOString(),
-  score: details.score,
-  total_marks: details.total_marks,
-  student_score: details.student_score,
-  time_taken: details.time_taken,
-  total_questions: details.total_questions,
-  correct_answers: details.correct_answers,
-  incorrect_answers: details.incorrect_answers,
-  negative_marks_applied: details.negative_marks_applied || 0, // make sure this is here
-  student_answers: details.student_answers || [], // ADD THIS LINE
-  recommendations,
-assessment_title: details.assessment_title
-};
+      /* =========================
+         FINAL REPORT OBJECT
+      ========================= */
 
-console.log("=== REPORT DEBUG ===");
-console.log("details from getAssessmentAnalytics:", details);
-console.log("negative_marks_applied from details:", details.negative_marks_applied);
-console.log("Final report sent:", report);
-console.log("negative_marks_applied in report:", report.negative_marks_applied);
-console.log("=== END DEBUG ===");
+      report = {
+        student_id: studentId,
+        assessment_id: assessmentId,
+        assessment_title: details.assessment_title,
+        generated_at: new Date().toISOString(),
+        score: details.score,
+        total_marks: details.total_marks,
+        student_score: details.student_score,
+        time_taken: details.time_taken,
+        total_questions: details.total_questions,
+        correct_answers: details.correct_answers,
+        incorrect_answers: details.incorrect_answers,
+        negative_marks_applied: details.negative_marks_applied || 0,
+        student_answers: details.student_answers || [],
+        recommendations
+      };
 
     } else {
-      // General report (no changes)
+      // General report (unchanged)
       const [analytics, performance, recommendations] = await Promise.all([
         getStudentAnalytics(studentId),
         getPerformanceOverTime(studentId, 'month'),
@@ -302,7 +363,7 @@ console.log("=== END DEBUG ===");
         generated_at: new Date().toISOString(),
         overview: analytics,
         performance_trend: performance,
-        recommendations: recommendations,
+        recommendations,
         summary: {
           total_assessments_completed: analytics.completed_assessments,
           average_performance: analytics.average_score,
@@ -315,7 +376,10 @@ console.log("=== END DEBUG ===");
     if (format === 'csv') {
       const csvData = convertToCSV(report, !!assessmentId);
       res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', `attachment; filename="student-report${assessmentId ? `-${assessmentId}` : ''}.csv"`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="student-report${assessmentId ? `-${assessmentId}` : ''}.csv"`
+      );
       return res.send(csvData);
     }
 
@@ -324,6 +388,7 @@ console.log("=== END DEBUG ===");
       message: "Student report generated successfully",
       data: report
     });
+
   } catch (error) {
     console.error("❌ Get student report error:", error.stack || error.message);
     res.status(500).json({
@@ -333,6 +398,7 @@ console.log("=== END DEBUG ===");
     });
   }
 };
+
 
 /**
  * Convert report data to CSV format

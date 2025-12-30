@@ -2,64 +2,118 @@ import pdf from "pdf-parse";
 import { createWorker } from "tesseract.js";
 import { getTextExtractor } from "office-text-extractor";
 
-// Global OCR worker
+// ---------- OCR WORKER (MULTI-LANG) ----------
 let tesseractWorker = null;
-const getTesseractWorker = async () => {
+const getTesseractWorker = async (langs = "eng") => {
   if (!tesseractWorker) {
-    tesseractWorker = await createWorker("eng", 1, { logger: () => {} });
+    tesseractWorker = await createWorker(langs, 1, { logger: () => {} });
   }
   return tesseractWorker;
 };
 
-// office-text-extractor handles: DOCX, PPTX, XLSX, etc.
+// Office extractor (DOCX, PPTX, XLSX only)
 const extractor = getTextExtractor();
 
+// ---------- MAIN EXTRACTOR ----------
 export const extractTextFromFile = async (fileInput, mimeType, options = {}) => {
   const { socket, totalFiles = 1, currentFile = 1 } = options;
 
-  try {
-    const buffer = Buffer.isBuffer(fileInput) ? fileInput : Buffer.from(fileInput);
-    let text = "";
-    const basePercent = 35 + ((currentFile - 1) / totalFiles) * 25;
+  const buffer = Buffer.isBuffer(fileInput)
+    ? fileInput
+    : Buffer.from(fileInput);
 
+  let text = "";
+  const basePercent = 35 + ((currentFile - 1) / totalFiles) * 25;
+
+  try {
     if (socket) {
       socket.emit("assessment-progress", {
         percent: basePercent,
-        message: `Reading ${mimeType.split("/")[1]?.toUpperCase() || "file"}...`,
+        message: `Reading ${mimeType}...`,
       });
     }
 
-    // Office files (DOCX, PPTX, XLSX, etc.) → office-text-extractor
+    // ---------- OFFICE FILES ----------
     if (
       mimeType.includes("officedocument") ||
       mimeType.includes("msword") ||
       mimeType.includes("powerpoint") ||
-      mimeType.includes("presentation") ||
       mimeType.includes("spreadsheet")
     ) {
-      const result = await extractor.extractText({ input: buffer, type: "buffer" });
-      text = cleanText(result);
+      try {
+        const result = await extractor.extractText({
+          input: buffer,
+          type: "buffer",
+        });
+        text = cleanText(result);
+      } catch {
+        // Legacy Office fallback → OCR
+        const worker = await getTesseractWorker("eng+urd+ara+hin");
+        const { data } = await worker.recognize(buffer);
+        text = cleanText(data.text);
+      }
     }
-    // PDF → pdf-parse (better than office-text-extractor for PDFs)
+
+    // ---------- PDF (NO PAGE LIMIT) ----------
     else if (mimeType === "application/pdf") {
-      const data = await pdf(buffer);
-      text = cleanText(data.text);
+      const data = await pdf(buffer, { max: 0 });
+
+      if (!data.text || data.text.length < 1000) {
+        // OCR fallback for scanned PDFs
+        const worker = await getTesseractWorker("eng+urd+ara+hin");
+        const { data: ocrData } = await worker.recognize(buffer);
+        text = cleanText(ocrData.text);
+      } else {
+        text = cleanText(data.text);
+      }
+
+      // Guard against silent truncation
+      if (data.numpages > 50 && text.length < data.numpages * 400) {
+        throw new Error("PDF extraction incomplete");
+      }
     }
-    // TXT
+
+    // ---------- TEXT ----------
     else if (mimeType === "text/plain") {
       text = cleanText(buffer.toString("utf-8"));
     }
-    // Images → OCR
+
+    // ---------- IMAGES ----------
     else if (mimeType.startsWith("image/")) {
-      if (socket) {
-        socket.emit("assessment-progress", { percent: basePercent + 10, message: "Running OCR..." });
-      }
-      const worker = await getTesseractWorker();
+      const worker = await getTesseractWorker("eng+urd+ara+hin");
       const { data } = await worker.recognize(buffer);
       text = cleanText(data.text);
     }
+
     else {
       throw new Error(`Unsupported file type: ${mimeType}`);
+    }
+
+    // ---------- SCRIPT DETECTION ----------
+    const arabicChars = (text.match(/[\u0600-\u06FF]/g) || []).length;
+    const latinChars = (text.match(/[a-zA-Z]/g) || []).length;
+
+    if (arabicChars > latinChars * 1.5) {
+      const worker = await getTesseractWorker("urd+ara");
+      const { data } = await worker.recognize(buffer);
+      text = cleanText(data.text);
+    }
+
+    // ---------- WORD REPAIR ----------
+    text = text
+      .replace(/([a-z])([A-Z])/g, "$1 $2")
+      .replace(/\s{2,}/g, " ");
+
+    // ---------- QUALITY GUARDS ----------
+    const words = text.split(/\s+/);
+    const uniqueRatio = new Set(words).size / words.length;
+    const isRTL = arabicChars > latinChars;
+
+    if (
+      words.length < (isRTL ? 40 : 80) ||
+      uniqueRatio < 0.25
+    ) {
+      throw new Error("Low semantic quality detected");
     }
 
     if (socket) {
@@ -70,41 +124,30 @@ export const extractTextFromFile = async (fileInput, mimeType, options = {}) => 
     }
 
     return text;
+
   } catch (error) {
     console.error("Text extraction failed:", error.message);
-    if (socket) {
-      socket.emit("assessment-progress", { percent: 0, message: `Failed: ${error.message}` });
-    }
     throw error;
   }
 };
 
+// ---------- CLEAN TEXT ----------
 export const cleanText = (text) => {
   if (!text) return "";
   return text
     .replace(/\r\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .replace(/\t/g, " ")
-    .replace(/[^\x20-\x7E\n]/g, " ")
-    .trim()
-    .toLowerCase();
+    .replace(/\p{C}+/gu, " ")
+    .trim();
 };
 
+// ---------- CHUNK ----------
 export const chunkText = (text, maxWords = 500) => {
-  const words = text.split(/\s+/).filter(w => w.length > 0);
+  const words = text.split(/\s+/).filter(Boolean);
   const chunks = [];
-  let current = [];
-  let count = 0;
-
-  for (const word of words) {
-    current.push(word);
-    count++;
-    if (count >= maxWords) {
-      chunks.push(current.join(" "));
-      current = [];
-      count = 0;
-    }
+  for (let i = 0; i < words.length; i += maxWords) {
+    chunks.push(words.slice(i, i + maxWords).join(" "));
   }
-  if (current.length > 0) chunks.push(current.join(" "));
   return chunks;
 };
