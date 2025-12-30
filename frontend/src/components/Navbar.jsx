@@ -68,9 +68,20 @@ function Navbar() {
 
   const navLinks = getNavLinks();
 
-  const isActiveLink = (href) => {
-    return location.pathname === href || location.pathname.startsWith(href + "/");
-  };
+const isActiveLink = (href) => {
+  const currentPath = location.pathname;
+
+  // Exact match
+  if (currentPath === href) return true;
+
+  // Special case: My Assessments should NOT be active when on Create page
+  if (href === "/instructor/assessments" && currentPath === "/instructor/assessments/create") {
+    return false;
+  }
+
+  // Parent active if current path starts with href + "/"
+  return currentPath.startsWith(href + "/");
+};
 
   const handleMobileMenuToggle = () => setIsMobileMenuOpen(!isMobileMenuOpen);
   const closeMobileMenu = () => setIsMobileMenuOpen(false);

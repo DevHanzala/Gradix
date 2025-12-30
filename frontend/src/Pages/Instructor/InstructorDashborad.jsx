@@ -9,7 +9,6 @@ import Modal from "../../components/ui/Modal.jsx";
 import Navbar from "../../components/Navbar.jsx";
 import Footer from "../../components/Footer.jsx";
 import toast from "react-hot-toast";
-import axios from "axios";
 import {
   FaEye,
   FaEdit,

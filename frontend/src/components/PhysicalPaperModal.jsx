@@ -17,7 +17,6 @@ import {
   FaDownload,
   FaTimes,
   FaWrench,
-  FaCheckCircle,
 } from "react-icons/fa";
 
 
@@ -49,20 +48,25 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
   };
 
   const drawWatermarkOnPage = (page, font, w, h) => {
-    const wmText = "Gradewise-AI";
-    const wmSize = Math.min(w, h) / 8;
-    const textWidth = font.widthOfTextAtSize(wmText, wmSize);
+  const wmText = "Gradewise-AI";
+  const wmSize = Math.min(w, h) / 8;
+  const textWidth = font.widthOfTextAtSize(wmText, wmSize);
+  const textHeight = wmSize; // Approximate height
 
-    page.drawText(wmText, {
-      x: (w - textWidth) / 2,
-      y: h / 2 - wmSize / 2,
-      size: wmSize,
-      font,
-      color: rgb(0.85, 0.85, 0.85),
-      rotate: degrees(-45),
-      opacity: 0.08,
-    });
-  };
+  // True center: account for rotation
+  const centerX = w / 2;
+  const centerY = h / 2;
+
+  page.drawText(wmText, {
+    x: centerX - textWidth / 2,
+    y: centerY - textHeight / 2,
+    size: wmSize,
+    font,
+    color: rgb(0.85, 0.85, 0.85),
+    rotate: degrees(-45),
+    opacity: 0.16,
+  });
+};
 
   const generatePDF = async (qList) => {
     const pdfDoc = await PDFDocument.create();
@@ -118,26 +122,13 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
       return currentY;
     };
 
-    // Create root bookmark for the document
-    const pages = pdfDoc.getPages();
-    const rootRef = pdfDoc.context.nextRef();
     
     // Store bookmark references
     const bookmarkRefs = [];
-
-    // Enhanced Header Section
+    // Enhanced Header Section — Institute Name (NO LINE)
     if (form.instituteName) {
       y = drawText(form.instituteName.toUpperCase(), margin, y, Number(form.headerFontSize), boldFont, rgb(0.1, 0.1, 0.4), "center");
-      
-      // Decorative line under header
-      const lineY = y - 8;
-      page.drawLine({
-        start: { x: w / 2 - 100, y: lineY },
-        end: { x: w / 2 + 100, y: lineY },
-        thickness: 2,
-        color: rgb(0.2, 0.2, 0.5),
-      });
-      y = lineY - 20;
+      y -= 20; // Just add some space below name (no line)
     }
 
     // Information Grid with better spacing
@@ -194,7 +185,7 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
           notesY -= 12;
         }
       });
-      y = notesBoxY - 70;
+      y = notesBoxY - 50;
     }
 
     y -= 15;
@@ -216,8 +207,6 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
 
     y -= 30;
 
-    // Questions with bookmarks
-    let questionsStartPageIndex = pdfDoc.getPageCount() - 1;
     
     for (let i = 0; i < qList.length; i++) {
       const q = qList[i];
@@ -245,15 +234,6 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
       const qNumText = `Q${i + 1}.`;
       const qNumWidth = boldFont.widthOfTextAtSize(qNumText, Number(form.questionFontSize));
       
-      page.drawRectangle({
-        x: margin - 5,
-        y: y - Number(form.questionFontSize) - 2,
-        width: qNumWidth + 10,
-        height: Number(form.questionFontSize) + 8,
-        color: rgb(0.95, 0.95, 0.95),
-        borderColor: rgb(0.7, 0.7, 0.7),
-        borderWidth: 0.5,
-      });
 
       y = drawText(`${qNumText} ${q.question_text}`, margin, y, Number(form.questionFontSize), boldFont, rgb(0.1, 0.1, 0.1)) - 12;
 
@@ -262,7 +242,7 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
           if (y < 100) {
             page = pdfDoc.addPage([w, h]);
             drawWatermarkOnPage(page, font, w, h);
-            y = h - 60;
+            y = h - 40;
           }
           
           // Option circle
@@ -290,75 +270,27 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
       y -= 18;
     }
 
-    // Answer Key page with bookmark
+       // Answer Key page — ONE ANSWER PER LINE
     page = pdfDoc.addPage([w, h]);
     drawWatermarkOnPage(page, font, w, h);
     
-    const answerKeyPageIndex = pdfDoc.getPageCount() - 1;
-    const answerKeyPage = pdfDoc.getPage(answerKeyPageIndex);
-    const answerKeyBookmarkRef = pdfDoc.context.nextRef();
+    let ay = h - 80;
+    
+    // Header
+    ay = drawText("ANSWER KEY", margin, ay, 24, boldFont, rgb(0.1, 0.1, 0.4), "center") - 40;
 
-    let ay = h - 60;
-    
-    // Answer key header with decoration
-    const headerText = "ANSWER KEY";
-    const headerWidth = boldFont.widthOfTextAtSize(headerText, 22);
-    
-    page.drawRectangle({
-      x: (w - headerWidth - 40) / 2,
-      y: ay - 30,
-      width: headerWidth + 40,
-      height: 40,
-      color: rgb(0.95, 0.95, 0.98),
-      borderColor: rgb(0.3, 0.3, 0.5),
-      borderWidth: 1.5,
-    });
-    
-    ay = drawText(headerText, margin, ay, 22, boldFont, rgb(0.1, 0.1, 0.4), "center") - 35;
-
-    // Answer grid
-    const answersPerRow = 3;
-    let answerX = margin;
-    let answerCount = 0;
-    
+    // One answer per line — clean vertical list
     qList.forEach((q, i) => {
       if (ay < 100) {
         page = pdfDoc.addPage([w, h]);
         drawWatermarkOnPage(page, font, w, h);
-        ay = h - 60;
-        answerX = margin;
-        answerCount = 0;
+        ay = h - 80;
       }
-      
+
       const answerText = `Q${i + 1}: ${q.correct_answer || "N/A"}`;
-      const boxWidth = (w - 2 * margin - 20) / answersPerRow;
       
-      page.drawRectangle({
-        x: answerX,
-        y: ay - 25,
-        width: boxWidth - 10,
-        height: 30,
-        color: rgb(0.98, 0.98, 0.98),
-        borderColor: rgb(0.7, 0.7, 0.7),
-        borderWidth: 0.8,
-      });
-      
-      page.drawText(answerText, {
-        x: answerX + 10,
-        y: ay - 15,
-        size: 11,
-        font: boldFont,
-        color: rgb(0.2, 0.2, 0.2),
-      });
-      
-      answerCount++;
-      answerX += boxWidth;
-      
-      if (answerCount >= answersPerRow) {
-        ay -= 40;
-        answerX = margin;
-        answerCount = 0;
-      }
+      // Use drawText function → supports wrapping for long answers
+      ay = drawText(answerText, margin, ay, 12, boldFont, rgb(0.2, 0.2, 0.2)) - 18;
     });
 
     // Add bookmarks to PDF

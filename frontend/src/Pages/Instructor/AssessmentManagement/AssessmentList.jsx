@@ -7,12 +7,39 @@ import Modal from "../../../components/ui/Modal";
 import Navbar from "../../../components/Navbar";
 import Footer from "../../../components/Footer";
 import toast from "react-hot-toast";
+import {
+  FaEye,
+  FaEdit,
+  FaTrash,
+  FaChartBar,
+  FaFilePdf,
+  FaUserPlus,
+  FaClipboardList,
+} from "react-icons/fa";
+
+// Import Physical Paper Modal
+import PhysicalPaperModal from "../../../components/PhysicalPaperModal.jsx";
 
 function AssessmentList() {
   const { assessments, loading, getInstructorAssessments, deleteAssessment } = useAssessmentStore();
   const [modal, setModal] = useState({ isOpen: false, type: "info", title: "", message: "" });
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+
+  // Paper Modal State
+  const [paperModal, setPaperModal] = useState({
+    isOpen: false,
+    assessmentId: null,
+    title: "",
+  });
+
+  const openPaperModal = (assessment) => {
+    setPaperModal({
+      isOpen: true,
+      assessmentId: assessment.id,
+      title: assessment.title,
+    });
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -119,17 +146,14 @@ function AssessmentList() {
           </Card>
         ) : (
           <>
-            {/* Desktop Table - Hidden on Mobile */}
+            {/* Desktop Table */}
             <div className="hidden lg:block">
               <Card className="shadow-md border-0 overflow-hidden">
                 <CardHeader className="bg-gradient-to-r from-gray-50 to-blue-50 border-b-2 border-gray-200">
                   <div className="flex items-center justify-between">
                     <h2 className="text-xl font-bold text-gray-900">
-                      All Assessments
+                      All Assessments ({filteredAssessments.length})
                     </h2>
-                    <span className="bg-blue-100 text-blue-700 px-4 py-1.5 rounded-full text-sm font-semibold">
-                      {filteredAssessments.length} {filteredAssessments.length === 1 ? 'Assessment' : 'Assessments'}
-                    </span>
                   </div>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -144,7 +168,7 @@ function AssessmentList() {
                             Created
                           </th>
                           <th className="px-6 py-4 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">
-                            Questions
+                            Status
                           </th>
                           <th className="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider pr-8">
                             Actions
@@ -152,50 +176,83 @@ function AssessmentList() {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-100">
-                        {filteredAssessments.map((a) => (
-                          <tr key={a.id} className="hover:bg-blue-50 transition-colors duration-150">
-                            <td className="px-6 py-5">
-                              <div className="flex items-center">
-                                <div className="w-10 h-10 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-lg flex items-center justify-center mr-3">
-                                  <span className="text-blue-600 font-bold text-sm">📄</span>
+                        {filteredAssessments.map((assessment) => (
+                          <tr key={assessment.id} className="hover:bg-blue-50/50 transition-colors">
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="bg-blue-100 text-blue-600 p-2 rounded-lg">
+                                  <FaClipboardList className="w-4 h-4" />
                                 </div>
-                                <span className="font-semibold text-gray-900">{a.title}</span>
+                                <span className="font-semibold text-gray-900">{assessment.title}</span>
                               </div>
                             </td>
-                            <td className="px-6 py-5 text-sm text-gray-600">
-                              <div className="flex items-center gap-2">
-                                <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                                {new Date(a.created_at).toLocaleDateString()}
-                              </div>
+                            <td className="px-6 py-4 text-sm text-gray-600">
+                              {new Date(assessment.created_at).toLocaleDateString("en-US", {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              })}
                             </td>
-                            <td className="px-6 py-5 text-sm">
-                              <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-medium text-xs">
-                                {a.question_blocks?.length || 0} blocks
+                            <td className="px-6 py-4">
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                                assessment.is_executed 
+                                  ? "bg-green-100 text-green-700" 
+                                  : "bg-yellow-100 text-yellow-700"
+                              }`}>
+                                {assessment.is_executed ? "Executed" : "Draft"}
                               </span>
                             </td>
-                            <td className="px-6 py-5 text-right text-sm font-medium space-x-1">
-                              <Link 
-                                to={`/instructor/assessments/${a.id}`} 
-                                className="inline-flex items-center px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors duration-150 font-medium"
-                              >
-                                👁️ View
-                              </Link>
-                              {!a.is_executed && (
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex flex-wrap justify-end items-center gap-3">
                                 <Link 
-                                  to={`/instructor/assessments/${a.id}/edit`} 
-                                  className="inline-flex items-center px-3 py-1.5 bg-green-50 text-green-600 hover:bg-green-100 rounded-lg transition-colors duration-150 font-medium"
+                                  to={`/instructor/assessments/${assessment.id}`} 
+                                  className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-semibold hover:underline transition"
                                 >
-                                  ✏️ Edit
+                                  <FaEye />
+                                  View
                                 </Link>
-                              )}
-                              <button
-                                onClick={() => handleDeleteAssessment(a.id, a.title)}
-                                className="inline-flex items-center px-3 py-1.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors duration-150 font-medium"
-                              >
-                                🗑️ Delete
-                              </button>
+                                <Link 
+                                  to={`/instructor/assessments/${assessment.id}/enroll`} 
+                                  className="inline-flex items-center gap-1 text-green-600 hover:text-green-800 font-semibold hover:underline transition"
+                                >
+                                  <FaUserPlus />
+                                  Enroll
+                                </Link>
+                                {!assessment.is_executed && (
+                                  <Link 
+                                    to={`/instructor/assessments/${assessment.id}/edit`} 
+                                    className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold hover:underline transition"
+                                  >
+                                    <FaEdit />
+                                    Edit
+                                  </Link>
+                                )}
+                                {!assessment.is_executed && (
+                                  <button
+                                    onClick={() => handleDeleteAssessment(assessment.id, assessment.title)}
+                                    className="inline-flex items-center gap-1 text-red-600 hover:text-red-800 font-semibold hover:underline transition"
+                                  >
+                                    <FaTrash />
+                                    Delete
+                                  </button>
+                                )}
+                                {assessment.is_executed && (
+                                  <Link 
+                                    to={`/instructor/assessments/${assessment.id}/analytics`} 
+                                    className="inline-flex items-center gap-1 text-purple-600 hover:text-purple-800 font-semibold hover:underline transition"
+                                  >
+                                    <FaChartBar />
+                                    Analytics
+                                  </Link>
+                                )}
+                                <button
+                                  onClick={() => openPaperModal(assessment)}
+                                  className="inline-flex items-center gap-1 text-orange-600 hover:text-orange-800 font-semibold hover:underline transition"
+                                >
+                                  <FaFilePdf />
+                                  Paper
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -206,48 +263,75 @@ function AssessmentList() {
               </Card>
             </div>
 
-            {/* Mobile Cards - Only visible on mobile/tablet */}
+            {/* Mobile Cards */}
             <div className="lg:hidden space-y-4">
-              {filteredAssessments.map((a) => (
-                <Card key={a.id} className="shadow-md hover:shadow-lg transition-all duration-200 border-0 overflow-hidden">
-                  <CardContent className="p-0">
-                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-5 py-4 border-b border-gray-200">
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-bold text-lg text-gray-900 flex-1 pr-2">{a.title}</h3>
-                        <span className="bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full font-semibold text-xs whitespace-nowrap">
-                          {a.question_blocks?.length || 0} blocks
-                        </span>
+              {filteredAssessments.map((assessment) => (
+                <Card key={assessment.id} className="shadow-md hover:shadow-lg transition-all duration-200 border-0">
+                  <CardContent className="p-5">
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="font-bold text-lg text-gray-900 mb-1">{assessment.title}</h3>
+                        <p className="text-sm text-gray-600">
+                          Created: {new Date(assessment.created_at).toLocaleDateString()}
+                        </p>
                       </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                        <span>Created: {new Date(a.created_at).toLocaleDateString()}</span>
-                      </div>
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                        assessment.is_executed 
+                          ? "bg-green-100 text-green-700" 
+                          : "bg-yellow-100 text-yellow-700"
+                      }`}>
+                        {assessment.is_executed ? "Executed" : "Draft"}
+                      </span>
                     </div>
-                    <div className="px-5 py-4 bg-white">
-                      <div className="flex flex-wrap gap-2">
-                        <Link
-                          to={`/instructor/assessments/${a.id}`}
-                          className="flex-1 min-w-[120px] text-center px-4 py-2.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors duration-150 font-semibold text-sm"
-                        >
-                          👁️ View
-                        </Link>
-                        {!a.is_executed && (
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <Link
+                        to={`/instructor/assessments/${assessment.id}`}
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition"
+                      >
+                        <FaEye />
+                        View
+                      </Link>
+                      <Link
+                        to={`/instructor/assessments/${assessment.id}/enroll`}
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition"
+                      >
+                        <FaUserPlus />
+                        Enroll
+                      </Link>
+                      {!assessment.is_executed && (
+                        <>
                           <Link
-                            to={`/instructor/assessments/${a.id}/edit`}
-                            className="flex-1 min-w-[120px] text-center px-4 py-2.5 bg-green-50 text-green-600 hover:bg-green-100 rounded-lg transition-colors duration-150 font-semibold text-sm"
+                            to={`/instructor/assessments/${assessment.id}/edit`}
+                            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition"
                           >
-                            ✏️ Edit
+                            <FaEdit />
+                            Edit
                           </Link>
-                        )}
-                        <button
-                          onClick={() => handleDeleteAssessment(a.id, a.title)}
-                          className="flex-1 min-w-[120px] px-4 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors duration-150 font-semibold text-sm"
+                          <button
+                            onClick={() => handleDeleteAssessment(assessment.id, assessment.title)}
+                            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition"
+                          >
+                            <FaTrash />
+                            Delete
+                          </button>
+                        </>
+                      )}
+                      {assessment.is_executed && (
+                        <Link
+                          to={`/instructor/assessments/${assessment.id}/analytics`}
+                          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition"
                         >
-                          🗑️ Delete
-                        </button>
-                      </div>
+                          <FaChartBar />
+                          Analytics
+                        </Link>
+                      )}
+                      <button
+                        onClick={() => openPaperModal(assessment)}
+                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition col-span-2"
+                      >
+                        <FaFilePdf />
+                        Physical Paper
+                      </button>
                     </div>
                   </CardContent>
                 </Card>
@@ -259,6 +343,15 @@ function AssessmentList() {
 
       <Footer />
 
+      {/* Physical Paper Modal */}
+      <PhysicalPaperModal
+        isOpen={paperModal.isOpen}
+        onClose={() => setPaperModal({ ...paperModal, isOpen: false })}
+        assessmentId={paperModal.assessmentId}
+        assessmentTitle={paperModal.title}
+      />
+
+      {/* General Modal */}
       <Modal
         isOpen={modal.isOpen}
         onClose={() => setModal({ ...modal, isOpen: false })}

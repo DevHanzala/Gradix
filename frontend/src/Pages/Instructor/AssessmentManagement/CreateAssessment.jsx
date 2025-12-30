@@ -33,7 +33,6 @@ function CreateAssessment() {
   ]);
 
   const [selectedResources, setSelectedResources] = useState([]);
-  const [newFiles, setNewFiles] = useState([]);
 
   // Progress state
   const [progress, setProgress] = useState(0);
@@ -141,10 +140,6 @@ function CreateAssessment() {
     }));
   };
 
-  const handleFileChange = (e) => {
-    setNewFiles([...e.target.files]);
-  };
-
   const handleResourceToggle = (resourceId) => {
     setSelectedResources((prev) =>
       prev.includes(resourceId) ? prev.filter((id) => id !== resourceId) : [...prev, resourceId]
@@ -156,11 +151,11 @@ function CreateAssessment() {
       return "Assessment Title is required";
     }
 
-    const hasResources = selectedResources.length > 0 || newFiles.length > 0;
+    const hasResources = selectedResources.length > 0;
     const hasLinks = formData.externalLinks.some(link => link && link.trim());
 
     if (!formData.prompt?.trim() && !hasResources && !hasLinks) {
-      return "You must provide either a Prompt, Resources, or External Links";
+      return "You must provide either a Prompt, Existing Resources, or External Links";
     }
 
     for (const block of questionBlocks) {
@@ -219,7 +214,7 @@ function CreateAssessment() {
       assessmentData.append("socketId", socketRef.current.id);
     }
 
-    newFiles.forEach((file) => assessmentData.append("new_files", file));
+    // No new files appended
 
     try {
       await createAssessment(assessmentData);
@@ -319,74 +314,37 @@ function CreateAssessment() {
                   />
                 </div>
 
-                {/* Resources Section */}
+                {/* Resources Section — Only Existing */}
                 <div className="bg-gray-50 rounded-lg p-6 border-2 border-gray-100">
-                  <label className="block text-sm font-semibold text-gray-700 mb-4">📚 Resources</label>
-                  <div className="space-y-6">
-                    {/* Upload Files */}
-                    <div>
-                      <label htmlFor="new_files" className="block text-sm font-medium text-gray-700 mb-2">
-                        Upload New Files
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="file"
-                          id="new_files"
-                          multiple
-                          accept=".pdf,.doc,.docx,.txt,.ppt,.pptx,.jpg,.jpeg,.png,.webp"
-                          onChange={handleFileChange}
-                          className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-blue-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-                          disabled={isProcessing}
-                        />
-                      </div>
-                      {newFiles.length > 0 && (
-                        <div className="mt-3 bg-white rounded-lg p-3 border border-gray-200">
-                          <p className="text-xs font-semibold text-gray-600 mb-2">Selected Files:</p>
-                          <ul className="space-y-1">
-                            {newFiles.map((file, index) => (
-                              <li key={index} className="text-sm text-gray-700 flex items-center gap-2">
-                                <span className="text-blue-600">📄</span>
-                                {file.name}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
+                  <label className="block text-sm font-semibold text-gray-700 mb-4">📚 Select Existing Resources</label>
+                  {resourcesLoading ? (
+                    <div className="flex justify-center py-8">
+                      <LoadingSpinner size="sm" type="dots" color="blue" />
                     </div>
-
-                    {/* Existing Resources */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Select Existing Resources</label>
-                      {resourcesLoading ? (
-                        <div className="flex justify-center py-8">
-                          <LoadingSpinner size="sm" type="dots" color="blue" />
+                  ) : resources.length > 0 ? (
+                    <div className="space-y-2 max-h-64 overflow-y-auto border-2 border-gray-200 rounded-lg p-4 bg-white">
+                      {resources.map((resource) => (
+                        <div key={resource.id} className="flex items-center p-2 hover:bg-gray-50 rounded-md transition-colors duration-150">
+                          <input
+                            type="checkbox"
+                            id={`resource-${resource.id}`}
+                            checked={selectedResources.includes(resource.id)}
+                            onChange={() => handleResourceToggle(resource.id)}
+                            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            disabled={isProcessing}
+                          />
+                          <label htmlFor={`resource-${resource.id}`} className="ml-3 text-sm text-gray-700 cursor-pointer flex-1">
+                            <span className="font-medium">{resource.name}</span>
+                            <span className="text-gray-500 ml-2">({resource.content_type})</span>
+                          </label>
                         </div>
-                      ) : resources.length > 0 ? (
-                        <div className="space-y-2 max-h-64 overflow-y-auto border-2 border-gray-200 rounded-lg p-4 bg-white">
-                          {resources.map((resource) => (
-                            <div key={resource.id} className="flex items-center p-2 hover:bg-gray-50 rounded-md transition-colors duration-150">
-                              <input
-                                type="checkbox"
-                                id={`resource-${resource.id}`}
-                                checked={selectedResources.includes(resource.id)}
-                                onChange={() => handleResourceToggle(resource.id)}
-                                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                                disabled={isProcessing}
-                              />
-                              <label htmlFor={`resource-${resource.id}`} className="ml-3 text-sm text-gray-700 cursor-pointer flex-1">
-                                <span className="font-medium">{resource.name}</span>
-                                <span className="text-gray-500 ml-2">({resource.content_type})</span>
-                              </label>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-8 bg-white border-2 border-dashed border-gray-200 rounded-lg">
-                          <p className="text-gray-500">No resources available</p>
-                        </div>
-                      )}
+                      ))}
                     </div>
-                  </div>
+                  ) : (
+                    <div className="text-center py-8 bg-white border-2 border-dashed border-gray-200 rounded-lg">
+                      <p className="text-gray-500">No resources available. Upload them from the Resources page.</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* External Links */}
@@ -463,7 +421,6 @@ function CreateAssessment() {
                           disabled={isProcessing}
                         >
                           <option value="multiple_choice">Multiple Choice</option>
-                          {/* <option value="short_answer">Short Answer</option> */}
                           <option value="true_false">True/False</option>
                         </select>
                       </div>
