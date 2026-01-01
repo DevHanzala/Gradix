@@ -78,6 +78,9 @@ const useResourceStore = create((set) => ({
           "Content-Type": "multipart/form-data",
         },
       });
+      if (response.data.skipped?.length) {
+        toast.error("Some files were skipped due to low quality OCR");
+      }
       if (response.data.success) {
         set({ loading: false });
         return response.data.resources;
@@ -85,9 +88,19 @@ const useResourceStore = create((set) => ({
         set({ error: response.data.message, loading: false });
       }
     } catch (error) {
-      set({ error: error.response?.data?.message || "Failed to upload resources", loading: false });
-      throw error;
-    }
+  const backend = error.response?.data;
+
+  if (backend?.skipped?.length) {
+    backend.skipped.forEach((s) =>
+      toast.error(`${s.file}: ${s.reason}`)
+    );
+  } else {
+    toast.error(backend?.message || "Upload failed");
+  }
+
+  set({ loading: false });
+  throw error;
+}
   },
 
   deleteResource: async (resourceId) => {

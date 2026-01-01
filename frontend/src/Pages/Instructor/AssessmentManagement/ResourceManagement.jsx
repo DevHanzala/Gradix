@@ -213,7 +213,7 @@ function ResourceManagement() {
                 <span>📚</span>
                 <span>Existing Resources</span>
               </h2>
-              <span className="bg-white bg-opacity-20 backdrop-blur-sm px-4 py-1.5 rounded-full text-sm font-bold">
+              <span className="bg-white text-red-500 bg-opacity-20 backdrop-blur-sm px-4 py-1.5 rounded-full text-sm font-bold">
                 {resources.length} {resources.length === 1 ? 'Resource' : 'Resources'}
               </span>
             </div>
