@@ -32,6 +32,7 @@ console.log("CHECKING_API_KEY loaded:", process.env.GEMINI_CHECKING_API_KEY ? "Y
 
 
 const app = express();
+app.disable("x-powered-by");
 const PORT = process.env.PORT || 5000;
 
 // HTTP + Socket.IO Server
@@ -175,26 +176,25 @@ app.use(errorHandler);
 
 // === ENHANCED ERROR LOGGING ===
 process.on("unhandledRejection", (err) => {
-  const msg = `Unhandled Rejection: ${err.message}`;
-  console.error(msg);
+  console.error("UNHANDLED REJECTION:", err?.message || err);
   global.recentErrors.push({
-    error: err.message,
-    stack: err.stack,
+    error: err?.message || String(err),
+    stack: err?.stack,
     time: new Date().toISOString(),
   });
-  process.exit(1);
 });
 
 process.on("uncaughtException", (err) => {
-  const msg = `Uncaught Exception: ${err.message}`;
-  console.error(msg);
+  console.error("UNCAUGHT EXCEPTION:", err.message);
   global.recentErrors.push({
     error: err.message,
     stack: err.stack,
     time: new Date().toISOString(),
   });
-  process.exit(1);
 });
+
+
+
 
 // === START ===
 startServer();

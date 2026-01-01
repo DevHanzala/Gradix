@@ -17,10 +17,20 @@ import { redis } from "../services/redis.js";
 /**
  * UPLOAD RESOURCE (FILES + URL) — IN-MEMORY ONLY
  */
+
+
 export const uploadResource = async (req, res) => {
   const { name, url, visibility } = req.body;
   const uploadedBy = req.user.id;
   const files = req.files || [];
+  const skippedFiles = [];
+
+  if (!files.length && !url) {
+    return res.status(400).json({
+      success: false,
+      message: "No files or URL provided",
+    });
+  }
 
   try {
     const uploadedResources = [];
@@ -35,27 +45,48 @@ export const uploadResource = async (req, res) => {
         uploaded_by: uploadedBy,
       };
 
-      const newResource = await createResource(resourceData);
-
       let text;
       try {
         text = await extractTextFromFile(file.buffer, file.mimetype);
       } catch (err) {
-        console.warn(`Skipping file ${file.originalname}: ${err.message}`);
+        skippedFiles.push({
+          file: file.originalname,
+          reason: err.message,
+          stage: "ocr",
+        });
         continue;
       }
 
-      const chunks = chunkText(text, 500);
 
-      for (let i = 0; i < chunks.length; i++) {
-        const embedding = await generateEmbedding(chunks[i]);
-        await storeResourceChunk(
-          newResource.id,
-          chunks[i],
-          embedding,
-          { chunk_index: i }
-        );
+      const chunks = chunkText(text, 500);
+      if (!chunks.length) continue;
+
+      // Pre-flight check: ensure embedding works
+      let testEmbedding;
+      try {
+        testEmbedding = await generateEmbedding(chunks[0]);
+      } catch (err) {
+        console.warn(`Embedding failed for ${file.originalname}: ${err.message}`);
+        skippedFiles.push(file.originalname);
+        continue;
       }
+
+      // Only now create resource
+      const newResource = await createResource(resourceData);
+
+      // Store first chunk
+      await storeResourceChunk(newResource.id, chunks[0], testEmbedding, {
+        chunk_index: 0,
+      });
+
+      // Store remaining chunks
+      for (let i = 1; i < chunks.length; i++) {
+        const embedding = await generateEmbedding(chunks[i]);
+        await storeResourceChunk(newResource.id, chunks[i], embedding, {
+          chunk_index: i,
+        });
+      }
+
 
       uploadedResources.push(newResource);
     }
@@ -72,8 +103,13 @@ export const uploadResource = async (req, res) => {
     }
 
     if (!uploadedResources.length) {
-      return res.status(400).json({ success: false, message: "No valid resources uploaded" });
+      return res.status(422).json({
+        success: false,
+        message: "All uploaded files failed during processing",
+        skipped: skippedFiles,
+      });
     }
+
 
     await redis.del(`resources:instructor:${uploadedBy}:visibility:all`);
     await redis.del(`resources:instructor:${uploadedBy}:visibility:private`);
@@ -83,13 +119,13 @@ export const uploadResource = async (req, res) => {
       success: true,
       message: "Resources uploaded successfully",
       resources: uploadedResources,
+      skipped: skippedFiles,
     });
 
   } catch (error) {
-    res.status(500).json({
+    res.status(400).json({
       success: false,
-      message: "Failed to upload resources",
-      error: error.message,
+      message: error.message || "Resource processing failed",
     });
   }
 };
@@ -109,10 +145,10 @@ export const getInstructorResources = async (req, res) => {
     const cached = await redis.get(cacheKey);
     if (cached) {
       console.log(`Resources from Redis: ${cacheKey}`);
-      return res.json({ 
-        success: true, 
-        message: "Resources retrieved", 
-        data: cached 
+      return res.json({
+        success: true,
+        message: "Resources retrieved",
+        data: cached
       });
     }
 
@@ -123,16 +159,16 @@ export const getInstructorResources = async (req, res) => {
     // CACHE FOR 10 MINUTES
     await redis.set(cacheKey, resources || [], { ex: 600 });
 
-    res.json({ 
-      success: true, 
-      message: "Resources retrieved", 
-      data: resources || [] 
+    res.json({
+      success: true,
+      message: "Resources retrieved",
+      data: resources || []
     });
   } catch (error) {
     console.error("Get instructor resources error:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Failed to retrieve resources" 
+    res.status(500).json({
+      success: false,
+      message: "Failed to retrieve resources"
     });
   }
 };
@@ -184,8 +220,8 @@ export const updateResourceController = async (req, res) => {
 
     const updated = await updateResource(req.params.resourceId, req.body);
     await redis.del(`resources:instructor:${req.user.id}:visibility:all`);
-await redis.del(`resources:instructor:${req.user.id}:visibility:private`);
-await redis.del(`resources:instructor:${req.user.id}:visibility:public`);
+    await redis.del(`resources:instructor:${req.user.id}:visibility:private`);
+    await redis.del(`resources:instructor:${req.user.id}:visibility:public`);
 
     res.json({ success: true, message: "Resource updated", data: updated });
   } catch (error) {
@@ -208,8 +244,8 @@ export const deleteResourceController = async (req, res) => {
 
     await deleteResource(req.params.resourceId);
     await redis.del(`resources:instructor:${req.user.id}:visibility:all`);
-await redis.del(`resources:instructor:${req.user.id}:visibility:private`);
-await redis.del(`resources:instructor:${req.user.id}:visibility:public`);
+    await redis.del(`resources:instructor:${req.user.id}:visibility:private`);
+    await redis.del(`resources:instructor:${req.user.id}:visibility:public`);
     res.json({ success: true, message: "Resource deleted successfully" });
   } catch (error) {
     console.error("Delete resource error:", error);

@@ -23,7 +23,7 @@ export const generateEmbedding = async (text, options = {}) => {
   } = options;
 
   // 🔴 HARD GUARD — prevents bad embeddings
-  if (!text || text.length < 100) {
+  if (!text || text.length < 120) {
     throw new Error("Text chunk too small or noisy for embedding");
   }
 
