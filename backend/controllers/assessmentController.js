@@ -538,3 +538,29 @@ export const startAssessmentForStudent = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to start assessment' });
   }
 };
+
+export const previewQuestions = async (req, res) => {
+  try {
+    const assessmentId = parseInt(req.params.id);
+    const instructorId = req.user.id;
+
+    console.log(`[PREVIEW] Request from instructor ${instructorId} for assessment ${assessmentId}`);
+
+    const assessment = await getAssessmentById(assessmentId, instructorId, req.user.role);
+    if (!assessment) {
+      console.log(`[PREVIEW] Assessment ${assessmentId} not found or access denied`);
+      return res.status(404).json({ success: false, message: "Assessment not found" });
+    }
+
+    console.log(`[PREVIEW] Generating sample questions for assessment ${assessmentId}`);
+
+    const { questions } = await generateAssessmentQuestions(assessmentId, null, 'en', assessment);
+
+    console.log(`[PREVIEW] Successfully generated ${questions.length} sample questions`);
+
+    res.json({ success: true, questions });
+  } catch (error) {
+    console.error("[PREVIEW] ERROR:", error.message);
+    res.status(500).json({ success: false, message: "Failed to generate preview questions" });
+  }
+};

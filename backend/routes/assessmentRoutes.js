@@ -18,7 +18,8 @@ import {
   enrollStudentController,
   unenrollStudentController,
   getEnrolledStudentsController,
-  updateAssessmentData
+  updateAssessmentData,
+  previewQuestions
 } from '../controllers/assessmentController.js';
 
 const router = express.Router();
@@ -206,9 +207,18 @@ router.delete('/:id', protect, authorizeRoles('instructor', 'admin', 'super_admi
 router.post('/:id/enroll', protect, authorizeRoles('instructor', 'admin', 'super_admin'), enrollStudentController);
 router.delete('/:id/enroll/:studentId', protect, authorizeRoles('instructor', 'admin', 'super_admin'), unenrollStudentController);
 router.get('/:id/enrolled-students', protect, authorizeRoles('instructor', 'admin', 'super_admin'), getEnrolledStudentsController);
+// Clear external links
 router.put('/:id/clear-links', protect, authorizeRoles('instructor', 'admin', 'super_admin'), async (req, res) => {
-  const assessment = await clearLinksForAssessment(req.params.id);
-  res.json({ success: true, data: assessment });
+  try {
+    const assessment = await clearLinksForAssessment(req.params.id);
+    res.json({ success: true, data: assessment });
+  } catch (error) {
+    console.error("Clear links error:", error);
+    res.status(500).json({ success: false, message: error.message || "Failed to clear links" });
+  }
 });
+
+// Preview Questions — THIS IS THE MISSING ROUTE
+router.get('/:id/preview-questions', protect, authorizeRoles('instructor', 'admin', 'super_admin'), previewQuestions);
 
 export default router;

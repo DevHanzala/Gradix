@@ -761,20 +761,23 @@ STRICT RULES:
     throw error;
   }
 
-  /* =========================
-     STEP 5: SAVE TO DB (UNCHANGED)
+    /* =========================
+     STEP 5: SAVE TO DB ONLY IF REAL ATTEMPT (PREVIEW SAFE)
   ========================= */
-
-  await db.query(`DELETE FROM generated_questions WHERE attempt_id = $1`, [attemptId]);
 
   let totalDuration = 0;
   let questionIndex = 0;
+
+  // Only delete old questions if this is a real student attempt
+  if (attemptId) {
+    await db.query(`DELETE FROM generated_questions WHERE attempt_id = $1`, [attemptId]);
+  }
 
   for (const block of blockRows) {
     for (let i = 0; i < block.question_count && questionIndex < questions.length; i++) {
       let q = questions[questionIndex];
 
-      // FORCE INSTRUCTOR VALUES
+      // Force instructor-defined values
       q.question_type = block.question_type;
       q.positive_marks = block.positive_marks;
       q.negative_marks = block.negative_marks;
@@ -785,7 +788,7 @@ STRICT RULES:
         continue;
       }
 
-      // MCQ: STORE FULL TEXT
+      // Fix MCQ correct answer to full text
       if (q.question_type === "multiple_choice" && q.options && q.correct_answer) {
         const letter = String(q.correct_answer).trim().toUpperCase();
         const key = Object.keys(q.options).find(k =>
@@ -798,24 +801,27 @@ STRICT RULES:
 
       totalDuration += q.duration_per_question;
 
-      await db.query(
-        `INSERT INTO generated_questions (
-          attempt_id, question_order, question_type, question_text, options,
-          correct_answer, positive_marks, negative_marks, duration_per_question
-        )
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [
-          attemptId,
-          questionIndex + 1,
-          q.question_type,
-          q.question_text.trim(),
-          q.options ? JSON.stringify(q.options) : null,
-          JSON.stringify(q.correct_answer),
-          q.positive_marks,
-          q.negative_marks,
-          q.duration_per_question
-        ]
-      );
+      // ONLY INSERT INTO DB IF THIS IS A REAL STUDENT ATTEMPT
+      if (attemptId) {
+        await db.query(
+          `INSERT INTO generated_questions (
+            attempt_id, question_order, question_type, question_text, options,
+            correct_answer, positive_marks, negative_marks, duration_per_question
+          )
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+          [
+            attemptId,
+            questionIndex + 1,
+            q.question_type,
+            q.question_text.trim(),
+            q.options ? JSON.stringify(q.options) : null,
+            JSON.stringify(q.correct_answer),
+            q.positive_marks,
+            q.negative_marks,
+            q.duration_per_question
+          ]
+        );
+      }
 
       questionIndex++;
     }
