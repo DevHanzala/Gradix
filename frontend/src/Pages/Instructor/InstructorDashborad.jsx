@@ -22,7 +22,8 @@ import {
   FaChartLine,
   FaUserPlus,
   FaClipboardList,
-  FaCalendarAlt
+  FaCalendarAlt,
+  FaBinoculars,
 } from "react-icons/fa";
 
 // Physical Paper Modal
@@ -250,8 +251,8 @@ function InstructorDashboard() {
                     </span>
                     Recent Assessments
                   </h2>
-                  <Link 
-                    to="/instructor/assessments" 
+                  <Link
+                    to="/instructor/assessments"
                     className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 font-semibold text-sm sm:text-base transition-colors group"
                   >
                     View All
@@ -320,33 +321,32 @@ function InstructorDashboard() {
                                 </div>
                               </td>
                               <td className="px-6 py-4">
-                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                                  assessment.is_executed 
-                                    ? "bg-green-100 text-green-700" 
-                                    : "bg-yellow-100 text-yellow-700"
-                                }`}>
+                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${assessment.is_executed
+                                  ? "bg-green-100 text-green-700"
+                                  : "bg-yellow-100 text-yellow-700"
+                                  }`}>
                                   {assessment.is_executed ? "Executed" : "Draft"}
                                 </span>
                               </td>
                               <td className="px-6 py-4 text-sm">
                                 <div className="flex flex-wrap items-center gap-3">
-                                  <Link 
-                                    to={`/instructor/assessments/${assessment.id}`} 
+                                  <Link
+                                    to={`/instructor/assessments/${assessment.id}`}
                                     className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-semibold hover:underline transition"
                                   >
                                     <FaEye />
                                     View
                                   </Link>
-                                  <Link 
-                                    to={`/instructor/assessments/${assessment.id}/enroll`} 
+                                  <Link
+                                    to={`/instructor/assessments/${assessment.id}/enroll`}
                                     className="inline-flex items-center gap-1 text-green-600 hover:text-green-800 font-semibold hover:underline transition"
                                   >
                                     <FaUserPlus />
                                     Enroll
                                   </Link>
                                   {!assessment.is_executed && (
-                                    <Link 
-                                      to={`/instructor/assessments/${assessment.id}/edit`} 
+                                    <Link
+                                      to={`/instructor/assessments/${assessment.id}/edit`}
                                       className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold hover:underline transition"
                                     >
                                       <FaEdit />
@@ -369,8 +369,8 @@ function InstructorDashboard() {
                                     </button>
                                   )}
                                   {assessment.is_executed && (
-                                    <Link 
-                                      to={`/instructor/assessments/${assessment.id}/analytics`} 
+                                    <Link
+                                      to={`/instructor/assessments/${assessment.id}/analytics`}
                                       className="inline-flex items-center gap-1 text-purple-600 hover:text-purple-800 font-semibold hover:underline transition"
                                     >
                                       <FaChartBar />
@@ -384,6 +384,15 @@ function InstructorDashboard() {
                                     <FaFilePdf />
                                     Paper
                                   </button>
+                                  {!assessment.is_executed && (
+                                    <Link
+                                      to={`/instructor/assessments/${assessment.id}/preview`}
+                                      className="inline-flex items-center gap-1 text-teal-600 hover:text-teal-800 font-semibold hover:underline transition"
+                                    >
+                                      <FaBinoculars />
+                                      Preview
+                                    </Link>
+                                  )}
                                 </div>
                               </td>
                             </tr>
@@ -418,11 +427,10 @@ function InstructorDashboard() {
                                 </div>
                               </div>
                             </div>
-                            <span className={`inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 ${
-                              assessment.is_executed 
-                                ? "bg-green-100 text-green-700" 
-                                : "bg-yellow-100 text-yellow-700"
-                            }`}>
+                            <span className={`inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap flex-shrink-0 ${assessment.is_executed
+                              ? "bg-green-100 text-green-700"
+                              : "bg-yellow-100 text-yellow-700"
+                              }`}>
                               {assessment.is_executed ? "Executed" : "Draft"}
                             </span>
                           </div>
@@ -460,6 +468,13 @@ function InstructorDashboard() {
                                   <FaTrash />
                                   <span className="hidden xs:inline">Delete</span>
                                 </button>
+                                <Link
+                                  to={`/instructor/assessments/${assessment.id}/preview`}
+                                  className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-teal-100 text-teal-700 rounded-lg sm:rounded-xl font-semibold hover:bg-teal-200 transition-colors col-span-2"
+                                >
+                                  <FaBinoculars />
+                                  Preview
+                                </Link>
                               </>
                             )}
                             {assessment.is_executed && (

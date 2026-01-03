@@ -367,6 +367,29 @@ updateAssessment: async (assessmentId, assessmentData) => {
     }
   },
 
+    fetchPreviewQuestions: async (assessmentId) => {
+    set({ loading: true, error: null });
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("No authentication token found");
+      const response = await axios.get(`${API_URL}/assessments/${assessmentId}/preview-questions`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.data.success) {
+        set({ loading: false });
+        return response.data.questions;
+      } else {
+        throw new Error(response.data.message);
+      }
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || "Failed to generate preview questions";
+      set({ error: errorMessage, loading: false });
+      toast.error(errorMessage);
+      throw error;
+    }
+  },
+  
+
   clearError: () => {
     set({ error: null });
   },

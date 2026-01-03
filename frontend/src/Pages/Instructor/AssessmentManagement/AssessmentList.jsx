@@ -15,6 +15,7 @@ import {
   FaFilePdf,
   FaUserPlus,
   FaClipboardList,
+  FaBinoculars
 } from "react-icons/fa";
 
 // Import Physical Paper Modal
@@ -72,7 +73,7 @@ function AssessmentList() {
     }
   };
 
-  const filteredAssessments = assessments?.filter(a => 
+  const filteredAssessments = assessments?.filter(a =>
     a && a.id && a.title?.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
@@ -194,64 +195,44 @@ function AssessmentList() {
                               })}
                             </td>
                             <td className="px-6 py-4">
-                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                                assessment.is_executed 
-                                  ? "bg-green-100 text-green-700" 
-                                  : "bg-yellow-100 text-yellow-700"
-                              }`}>
+                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${assessment.is_executed
+                                ? "bg-green-100 text-green-700"
+                                : "bg-yellow-100 text-yellow-700"
+                                }`}>
                                 {assessment.is_executed ? "Executed" : "Draft"}
                               </span>
                             </td>
                             <td className="px-6 py-4 text-right">
                               <div className="flex flex-wrap justify-end items-center gap-3">
-                                <Link 
-                                  to={`/instructor/assessments/${assessment.id}`} 
-                                  className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-semibold hover:underline transition"
-                                >
-                                  <FaEye />
-                                  View
+                                <Link to={`/instructor/assessments/${assessment.id}`} className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800 font-semibold hover:underline transition">
+                                  <FaEye /> View
                                 </Link>
-                                <Link 
-                                  to={`/instructor/assessments/${assessment.id}/enroll`} 
-                                  className="inline-flex items-center gap-1 text-green-600 hover:text-green-800 font-semibold hover:underline transition"
-                                >
-                                  <FaUserPlus />
-                                  Enroll
+                                <Link to={`/instructor/assessments/${assessment.id}/enroll`} className="inline-flex items-center gap-1 text-green-600 hover:text-green-800 font-semibold hover:underline transition">
+                                  <FaUserPlus /> Enroll
                                 </Link>
                                 {!assessment.is_executed && (
-                                  <Link 
-                                    to={`/instructor/assessments/${assessment.id}/edit`} 
-                                    className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold hover:underline transition"
-                                  >
-                                    <FaEdit />
-                                    Edit
+                                  <Link to={`/instructor/assessments/${assessment.id}/edit`} className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold hover:underline transition">
+                                    <FaEdit /> Edit
                                   </Link>
                                 )}
                                 {!assessment.is_executed && (
-                                  <button
-                                    onClick={() => handleDeleteAssessment(assessment.id, assessment.title)}
-                                    className="inline-flex items-center gap-1 text-red-600 hover:text-red-800 font-semibold hover:underline transition"
-                                  >
-                                    <FaTrash />
-                                    Delete
+                                  <button onClick={() => handleDeleteAssessment(assessment.id, assessment.title)} className="inline-flex items-center gap-1 text-red-600 hover:text-red-800 font-semibold hover:underline transition">
+                                    <FaTrash /> Delete
                                   </button>
                                 )}
                                 {assessment.is_executed && (
-                                  <Link 
-                                    to={`/instructor/assessments/${assessment.id}/analytics`} 
-                                    className="inline-flex items-center gap-1 text-purple-600 hover:text-purple-800 font-semibold hover:underline transition"
-                                  >
-                                    <FaChartBar />
-                                    Analytics
+                                  <Link to={`/instructor/assessments/${assessment.id}/analytics`} className="inline-flex items-center gap-1 text-purple-600 hover:text-purple-800 font-semibold hover:underline transition">
+                                    <FaChartBar /> Analytics
                                   </Link>
                                 )}
-                                <button
-                                  onClick={() => openPaperModal(assessment)}
-                                  className="inline-flex items-center gap-1 text-orange-600 hover:text-orange-800 font-semibold hover:underline transition"
-                                >
-                                  <FaFilePdf />
-                                  Paper
+                                <button onClick={() => openPaperModal(assessment)} className="inline-flex items-center gap-1 text-orange-600 hover:text-orange-800 font-semibold hover:underline transition">
+                                  <FaFilePdf /> Paper
                                 </button>
+                                {!assessment.is_executed && (
+                                  <Link to={`/instructor/assessments/${assessment.id}/preview`} className="inline-flex items-center gap-1 text-teal-600 hover:text-teal-800 font-semibold hover:underline transition">
+                                    <FaBinoculars /> Preview
+                                  </Link>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -275,62 +256,41 @@ function AssessmentList() {
                           Created: {new Date(assessment.created_at).toLocaleDateString()}
                         </p>
                       </div>
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
-                        assessment.is_executed 
-                          ? "bg-green-100 text-green-700" 
-                          : "bg-yellow-100 text-yellow-700"
-                      }`}>
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${assessment.is_executed
+                        ? "bg-green-100 text-green-700"
+                        : "bg-yellow-100 text-yellow-700"
+                        }`}>
                         {assessment.is_executed ? "Executed" : "Draft"}
                       </span>
                     </div>
+
                     <div className="grid grid-cols-2 gap-3 text-sm">
-                      <Link
-                        to={`/instructor/assessments/${assessment.id}`}
-                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition"
-                      >
-                        <FaEye />
-                        View
+                      <Link to={`/instructor/assessments/${assessment.id}`} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition">
+                        <FaEye /> View
                       </Link>
-                      <Link
-                        to={`/instructor/assessments/${assessment.id}/enroll`}
-                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition"
-                      >
-                        <FaUserPlus />
-                        Enroll
+                      <Link to={`/instructor/assessments/${assessment.id}/enroll`} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition">
+                        <FaUserPlus /> Enroll
                       </Link>
                       {!assessment.is_executed && (
                         <>
-                          <Link
-                            to={`/instructor/assessments/${assessment.id}/edit`}
-                            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition"
-                          >
-                            <FaEdit />
-                            Edit
+                          <Link to={`/instructor/assessments/${assessment.id}/edit`} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition">
+                            <FaEdit /> Edit
                           </Link>
-                          <button
-                            onClick={() => handleDeleteAssessment(assessment.id, assessment.title)}
-                            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition"
-                          >
-                            <FaTrash />
-                            Delete
+                          <button onClick={() => handleDeleteAssessment(assessment.id, assessment.title)} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition">
+                            <FaTrash /> Delete
                           </button>
+                          <Link to={`/instructor/assessments/${assessment.id}/preview`} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-teal-100 text-teal-700 rounded-lg hover:bg-teal-200 transition col-span-2">
+                            <FaBinoculars /> Preview
+                          </Link>
                         </>
                       )}
                       {assessment.is_executed && (
-                        <Link
-                          to={`/instructor/assessments/${assessment.id}/analytics`}
-                          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition"
-                        >
-                          <FaChartBar />
-                          Analytics
+                        <Link to={`/instructor/assessments/${assessment.id}/analytics`} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition">
+                          <FaChartBar /> Analytics
                         </Link>
                       )}
-                      <button
-                        onClick={() => openPaperModal(assessment)}
-                        className="flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition col-span-2"
-                      >
-                        <FaFilePdf />
-                        Physical Paper
+                      <button onClick={() => openPaperModal(assessment)} className="flex items-center justify-center gap-2 px-4 py-2.5 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition col-span-2">
+                        <FaFilePdf /> Physical Paper
                       </button>
                     </div>
                   </CardContent>

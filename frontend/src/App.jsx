@@ -31,7 +31,7 @@ const EditAssessment = lazy(() => import("./Pages/Instructor/AssessmentManagemen
 const EnrollStudents = lazy(() => import("./Pages/Instructor/AssessmentManagement/EnrollStudents"));
 const AddStudent = lazy(() => import("./Pages/Instructor/AddStudent"));
 const AssessmentAnalytics = lazy(() => import("./Pages/Instructor/AssessmentManagement/AssessmentAnalytics"));
-
+const AssessmentPreview = lazy(() => import("./Pages/Instructor/AssessmentManagement/AssessmentPreview"));
 // Student Pages
 const StudentDashboard = lazy(() => import("./Pages/Student/StudentDashborad"));
 const TakeAssessment = lazy(() => import("./Pages/Student/AssesmentManagement/TakeAssessment"));
@@ -129,6 +129,10 @@ function App() {
                   <AssessmentList />
                 </ProtectedRoute>
               }
+            />
+            <Route
+              path="/instructor/assessments/:id/preview"
+              element={<ProtectedRoute requiredRole="instructor"><AssessmentPreview /></ProtectedRoute>}
             />
             <Route
               path="/instructor/assessments/create"
