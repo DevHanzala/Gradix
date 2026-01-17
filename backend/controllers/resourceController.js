@@ -13,12 +13,15 @@ import {
 import { getAssessmentById, storeResourceChunk } from "../models/assessmentModel.js";
 import { extractTextFromFile, chunkText } from "../services/textProcessor.js";
 import { generateEmbedding } from "../services/embeddingGenerator.js";
+
+// Redis Service
 import { redis } from "../services/redis.js";
+
+
+
 /**
  * UPLOAD RESOURCE (FILES + URL) — IN-MEMORY ONLY
  */
-
-
 export const uploadResource = async (req, res) => {
   const { name, url, visibility } = req.body;
   const uploadedBy = req.user.id;
@@ -110,7 +113,7 @@ export const uploadResource = async (req, res) => {
       });
     }
 
-
+// Invalidate Redis cache for this instructor
     await redis.del(`resources:instructor:${uploadedBy}:visibility:all`);
     await redis.del(`resources:instructor:${uploadedBy}:visibility:private`);
     await redis.del(`resources:instructor:${uploadedBy}:visibility:public`);

@@ -1,5 +1,6 @@
 import axios from "axios";
 
+// Middleware to verify Google reCAPTCHA v3 token
 const verifyCaptcha = async (req, res, next) => {
   const { captchaToken } = req.body;
 

@@ -46,9 +46,11 @@ const io = new Server(httpServer, {
 
 app.set("io", io);
 
-// Track upload sockets
+// Map to track upload sockets
 const uploadSockets = new Map();
 
+
+// Socket.IO connection
 io.on("connection", (socket) => {
   console.log(`WebSocket connected: ${socket.id}`);
 
@@ -170,7 +172,7 @@ app.get("/", (req, res) => {
   });
 });
 
-// 404 & Error (must be last)
+// === ERROR HANDLING MIDDLEWARE ===  
 app.use(notFound);
 app.use(errorHandler);
 
@@ -184,6 +186,7 @@ process.on("unhandledRejection", (err) => {
   });
 });
 
+// Catch uncaught exceptions
 process.on("uncaughtException", (err) => {
   console.error("UNCAUGHT EXCEPTION:", err.message);
   global.recentErrors.push({

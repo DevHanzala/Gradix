@@ -5,7 +5,6 @@ import {
   storeQuestionBlocks,
   getAssessmentsByInstructor,
   getAssessmentById,
-  // updateAssessment,
   deleteAssessment,
   clearLinksForAssessment,
   storeResourceChunk,
@@ -19,7 +18,8 @@ import {
   unenrollStudentController,
   getEnrolledStudentsController,
   updateAssessmentData,
-  previewQuestions
+  previewQuestions,
+  generatePhysicalPaper
 } from '../controllers/assessmentController.js';
 
 const router = express.Router();
@@ -220,5 +220,13 @@ router.put('/:id/clear-links', protect, authorizeRoles('instructor', 'admin', 's
 
 // Preview Questions — THIS IS THE MISSING ROUTE
 router.get('/:id/preview-questions', protect, authorizeRoles('instructor', 'admin', 'super_admin'), previewQuestions);
+
+// Generate Physical Paper (Multi-Language + Header Translation)
+router.post(
+  '/:id/print',
+  protect,
+  authorizeRoles('instructor', 'admin', 'super_admin'),
+  generatePhysicalPaper
+);
 
 export default router;

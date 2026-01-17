@@ -1,9 +1,9 @@
 import db from "../DB/db.js";
 import { findResourceById } from "./resourceModel.js";
-// import { getCreationModel, mapLanguageCode, } from "../services/geminiService.js";
 import { mapLanguageCode } from "../services/ai/aiService.js";
 import { generateContent } from "../services/ai/generateContent.js";
 
+// Ensure necessary tables exist and have correct schema
 const ensureAssessmentsTable = async () => {
   try {
     const tableCheck = await db.query(`
@@ -54,6 +54,7 @@ const ensureAssessmentsTable = async () => {
   }
 };
 
+// Ensure other related tables exist
 const ensureQuestionBlocksTable = async () => {
   try {
     const tableCheck = await db.query(`
@@ -112,6 +113,7 @@ const ensureQuestionBlocksTable = async () => {
   }
 };
 
+// Ensure other related tables exist
 const ensureAssessmentResourcesTable = async () => {
   try {
     const tableCheck = await db.query(`
@@ -143,6 +145,7 @@ const ensureAssessmentResourcesTable = async () => {
   }
 };
 
+// Ensure other related tables exist
 const ensureEnrollmentsTable = async () => {
   try {
     const tableCheck = await db.query(`
@@ -175,6 +178,7 @@ const ensureEnrollmentsTable = async () => {
   }
 };
 
+// Ensure other related tables exist
 const ensureResourceChunksTable = async () => {
   try {
     const tableCheck = await db.query(`
@@ -207,6 +211,7 @@ const ensureResourceChunksTable = async () => {
   }
 };
 
+// Ensure other related tables exist
 const ensureGeneratedQuestionsTable = async () => {
   try {
     const tableCheck = await db.query(`
@@ -265,6 +270,7 @@ const ensureGeneratedQuestionsTable = async () => {
   }
 };
 
+// Ensure other related tables exist
 const ensureAssessmentAttemptsTable = async () => {
   try {
     const tableCheck = await db.query(`
@@ -316,6 +322,7 @@ const ensureAssessmentAttemptsTable = async () => {
   }
 };
 
+// Ensure other related tables exist
 const ensureStudentAnswersTable = async () => {
   try {
     const tableCheck = await db.query(`
@@ -366,6 +373,7 @@ const ensureStudentAnswersTable = async () => {
   }
 };
 
+// create assessment
 const createAssessment = async (assessmentData) => {
   const { title, prompt, external_links, instructor_id, is_executed = false } = assessmentData;
   const query = `
@@ -384,6 +392,7 @@ const createAssessment = async (assessmentData) => {
   }
 };
 
+// store question blocks
 const storeQuestionBlocks = async (assessmentId, questionBlocks, instructorId) => {
   try {
     await db.query("DELETE FROM question_blocks WHERE assessment_id = $1", [assessmentId]);
@@ -422,6 +431,7 @@ const storeQuestionBlocks = async (assessmentId, questionBlocks, instructorId) =
   }
 };
 
+// get assessments by instructor
 const getAssessmentsByInstructor = async (instructorId) => {
   const query = `
     SELECT a.*, 
@@ -467,6 +477,7 @@ const getAssessmentsByInstructor = async (instructorId) => {
   }
 };
 
+// get assessment by id
 const getAssessmentById = async (assessment_id, user_id, user_role) => {
   try {
     if (!assessment_id || isNaN(parseInt(assessment_id))) {
@@ -560,6 +571,7 @@ const getAssessmentById = async (assessment_id, user_id, user_role) => {
   }
 };
 
+// update assessment
 const updateAssessment = async (assessmentId, updateData) => {
   const { title, prompt, external_links } = updateData;
   const query = `
@@ -592,6 +604,7 @@ const updateAssessment = async (assessmentId, updateData) => {
   }
 };
 
+// delete assessment
 const deleteAssessment = async (assessmentId) => {
   try {
     const { rows } = await db.query("DELETE FROM assessments WHERE id = $1 RETURNING *", [assessmentId]);
@@ -603,6 +616,7 @@ const deleteAssessment = async (assessmentId) => {
   }
 };
 
+// store resource chunk
 const storeResourceChunk = async (resourceId, chunkText, embedding, metadata) => {
   try {
     if (!Array.isArray(embedding) || embedding.length !== 384) {
@@ -624,6 +638,7 @@ const storeResourceChunk = async (resourceId, chunkText, embedding, metadata) =>
   }
 };
 
+// get assessment questions via AI
 const generateAssessmentQuestions = async (
   assessmentId,
   attemptId,
@@ -830,7 +845,7 @@ STRICT RULES:
   return { questions, duration: totalDuration };
 };
 
-
+// enroll student
 const enrollStudent = async (assessmentId, email) => {
   try {
     const { rows: userRows } = await db.query("SELECT id, role FROM users WHERE email = $1", [email]);
@@ -860,6 +875,7 @@ const enrollStudent = async (assessmentId, email) => {
   }
 };
 
+// unenroll student
 const unenrollStudent = async (assessmentId, studentId) => {
   try {
     const { rows } = await db.query(
@@ -875,6 +891,7 @@ const unenrollStudent = async (assessmentId, studentId) => {
   }
 };
 
+// get enrolled students
 const getEnrolledStudents = async (assessmentId) => {
   try {
     const { rows } = await db.query(
@@ -894,6 +911,7 @@ const getEnrolledStudents = async (assessmentId) => {
   }
 };
 
+// link resource to assessment
 const linkResourceToAssessment = async (assessmentId, resourceId) => {
   try {
     const resource = await findResourceById(resourceId);
@@ -916,6 +934,7 @@ const linkResourceToAssessment = async (assessmentId, resourceId) => {
   }
 };
 
+// clear links for assessment
 const clearLinksForAssessment = async (assessmentId) => {
   try {
     const { rowCount } = await db.query(
@@ -931,6 +950,7 @@ const clearLinksForAssessment = async (assessmentId) => {
   }
 };
 
+// Initialize all assessment-related tables
 const init = async () => {
   try {
     await ensureAssessmentsTable();

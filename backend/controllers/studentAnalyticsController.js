@@ -7,10 +7,9 @@ import {
   getAssessmentQuestions as modelGetAssessmentQuestions
 } from "../models/studentAnalyticsModel.js";
 import { redis } from "../services/redis.js";
-// import { getCreationModel, generateContent } from "../services/geminiService.js";
-import { generateContent } from "../services/ai/generateContent.js"; 
 import { getCheckingModel } from "../services/ai/aiProviders.js";
 
+// get student overview analytics
 export const getStudentOverview = async (req, res) => {
   try {
     const studentId = req.user.id;
@@ -41,6 +40,7 @@ export const getStudentOverview = async (req, res) => {
   }
 };
 
+// Get student performance over time
 export const getStudentPerformance = async (req, res) => {
   try {
     const studentId = req.user.id;
@@ -75,6 +75,7 @@ export const getStudentPerformance = async (req, res) => {
   }
 };
 
+// Get student learning recommendations
 export const getStudentRecommendations = async (req, res) => {
   try {
     const studentId = req.user.id;
@@ -102,8 +103,7 @@ export const getStudentRecommendations = async (req, res) => {
   }
 };
 
-
-
+// Get student learning recommendations
 export const getStudentAssessments = async (req, res) => {
   try {
     const studentId = req.user.id;
@@ -149,6 +149,7 @@ export const getStudentAssessments = async (req, res) => {
   }
 };
 
+// Get detailed assessment analytics for a student
 export const getAssessmentDetails = async (req, res) => {
   try {
     const studentId = req.user.id;
@@ -183,6 +184,7 @@ export const getAssessmentDetails = async (req, res) => {
 };
   
 
+// Get assessment questions and answers for a student
 export const getAssessmentQuestions = async (req, res) => {
   try {
     const studentId = req.user.id;
@@ -212,8 +214,7 @@ export const getAssessmentQuestions = async (req, res) => {
   }
 };
 
-// UPDATE IN studentAnalyticsController.js — ADD AI TO getStudentReport
-
+// Generate detailed student report with AI recommendations
 export const getStudentReport = async (req, res) => {
   try {
     const studentId = req.user.id;

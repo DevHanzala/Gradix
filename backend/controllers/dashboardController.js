@@ -1,5 +1,6 @@
 import pool from "../DB/db.js";
 
+// Get Instructor Dashboard Overview
 export const getInstructorOverview = async (req, res) => {
   try {
     const instructor_id = req.user.id;

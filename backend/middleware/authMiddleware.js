@@ -6,6 +6,7 @@ dotenv.config();
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
+// Middleware to protect routes and authorize roles
 export const protect = async (req, res, next) => {
   let token;
 
@@ -55,6 +56,7 @@ export const protect = async (req, res, next) => {
   }
 };
 
+// Middleware to authorize based on user roles
 export const authorizeRoles = (...roles) => {
   return (req, res, next) => {
     const allowedRoles = Array.isArray(roles[0]) ? roles[0] : roles;

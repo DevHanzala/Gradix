@@ -1,6 +1,7 @@
 import db from "../DB/db.js";
 import { generateAssessmentQuestions } from "../models/assessmentModel.js";
 
+// Normalize and evaluate short answer responses
 const normalizeText = (text = "") =>
   text
     .toLowerCase()
@@ -8,6 +9,7 @@ const normalizeText = (text = "") =>
     .replace(/\s+/g, " ")
     .trim();
 
+    // Evaluate short answer based on required keywords and minimum matches
 export const evaluateShortAnswer = (studentAnswer, rule) => {
   if (!studentAnswer || !rule) return false;
 
@@ -27,7 +29,7 @@ export const evaluateShortAnswer = (studentAnswer, rule) => {
   return matched >= minMatch;
 };
 
-
+// Start assessment for student
 export const startAssessmentForStudent = async (req, res) => {
   try {
     const studentId = req.user.id;
@@ -131,6 +133,7 @@ export const startAssessmentForStudent = async (req, res) => {
   }
 };
 
+// Submit assessment for student
 export const submitAssessmentForStudent = async (req, res) => {
   try {
     const studentId = req.user.id;
@@ -240,6 +243,7 @@ await db.query(
 };
 
 
+// Get submission details for student
 export const getSubmissionDetailsForStudent = async (req, res) => {
   try {
     const studentId = req.user.id;
@@ -281,6 +285,7 @@ export const getSubmissionDetailsForStudent = async (req, res) => {
   }
 };
 
+// Generate assessment data for physical paper printing by instructor
 export const getAssessmentForInstructorPrint = async (req, res) => {
   let attemptId;
   try {

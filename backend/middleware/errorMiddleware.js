@@ -1,4 +1,4 @@
-// PostgreSQL error handler middleware
+// Error handling middleware
 export const errorHandler = (err, req, res, next) => {
   let error = { ...err }
   error.message = err.message

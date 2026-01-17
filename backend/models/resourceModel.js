@@ -1,5 +1,6 @@
 import pool from "../DB/db.js";
 
+//ensure resources table exists
 export const ensureResourcesTable = async () => {
   try {
     const tableCheck = await pool.query(`
@@ -30,6 +31,7 @@ export const ensureResourcesTable = async () => {
   }
 };
 
+// ensure resource_chunks table exists
 export const ensureResourceChunksTable = async () => {
   try {
     const tableCheck = await pool.query(`
@@ -77,6 +79,7 @@ export const init = async () => {
   }
 };
 
+// Create a new resource
 export const createResource = async (resourceData) => {
   // REMOVED file_path from destructuring
   const { name, file_size, content_type, visibility, uploaded_by } = resourceData;
@@ -95,6 +98,7 @@ export const createResource = async (resourceData) => {
   }
 };
 
+// Find resources by uploader with optional visibility filter
 export const findResourcesByUploader = async (uploadedBy, visibility = null) => {
   let query = `
     SELECT r.*, u.name as uploader_name
@@ -120,6 +124,7 @@ export const findResourcesByUploader = async (uploadedBy, visibility = null) => 
   }
 };
 
+// Get all resources (files only)
 export const findAllResources = async () => {
   const query = `
     SELECT r.*, u.name as uploader_name
@@ -137,6 +142,7 @@ export const findAllResources = async () => {
   }
 };
 
+// Find resource by ID
 export const findResourceById = async (resourceId) => {
   try {
     const { rows } = await pool.query("SELECT * FROM resources WHERE id = $1", [resourceId]);
@@ -147,6 +153,7 @@ export const findResourceById = async (resourceId) => {
   }
 };
 
+// Update resource details
 export const updateResource = async (resourceId, updateData) => {
   const { name, visibility } = updateData;
   const query = `
@@ -166,6 +173,7 @@ export const updateResource = async (resourceId, updateData) => {
   }
 };
 
+// Delete resource by ID
 export const deleteResource = async (resourceId) => {
   try {
     const { rows } = await pool.query("DELETE FROM resources WHERE id = $1 RETURNING *", [resourceId]);
@@ -178,6 +186,7 @@ export const deleteResource = async (resourceId) => {
   }
 };
 
+// Link resource to assessment
 export const linkResourceToAssessment = async (assessmentId, resourceId) => {
   try {
     if (!resourceId || isNaN(parseInt(resourceId))) {
@@ -203,6 +212,7 @@ export const linkResourceToAssessment = async (assessmentId, resourceId) => {
   }
 };
 
+// Get resources linked to an assessment
 export const getAssessmentResources = async (assessmentId) => {
   try {
     const query = `
@@ -221,6 +231,7 @@ export const getAssessmentResources = async (assessmentId) => {
   }
 };
 
+// Unlink resource from assessment
 export const unlinkResourceFromAssessment = async (assessmentId, resourceId) => {
   try {
     const query = `

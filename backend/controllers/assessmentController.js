@@ -1,3 +1,4 @@
+// IMPORT ASSESSMENT MODEL FUNCTIONS
 import {
   createAssessment,
   storeQuestionBlocks,
@@ -11,19 +12,19 @@ import {
   generateAssessmentQuestions,
   storeResourceChunk,
 } from '../models/assessmentModel.js';
-import { redis } from "../services/redis.js";
-
+import { generateContent } from '../services/ai/generateContent.js';
 import { findUserByEmail } from '../models/userModel.js';
 import { createResource, linkResourceToAssessment } from '../models/resourceModel.js';
 import { uploadResource } from './resourceController.js';
 import { sendAssessmentEnrollmentEmail } from '../services/emailService.js';
-
-// THESE ARE THE NEW ONES YOU NEED:
 import { extractTextFromFile, chunkText } from '../services/textProcessor.js';
 import { generateEmbedding } from '../services/embeddingGenerator.js';
 
+// IMPORT REDIS INSTANCE
+import { redis } from "../services/redis.js";
 import pool from '../DB/db.js';
 
+//Create New Assessment
 export const createNewAssessment = async (req, res) => {
   try {
     const {
@@ -122,6 +123,7 @@ export const createNewAssessment = async (req, res) => {
   }
 };
 
+//Get Assessments for Instructor
 export const getInstructorAssessments = async (req, res) => {
   try {
     const instructor_id = req.user.id;
@@ -158,7 +160,7 @@ export const getInstructorAssessments = async (req, res) => {
   }
 };
 
-
+//Get Single Assessment
 export const getAssessment = async (req, res) => {
   try {
     const assessment_id = parseInt(req.params.id);
@@ -208,6 +210,7 @@ export const getAssessment = async (req, res) => {
 };
 
 
+//Update Assessment Data
 export const updateAssessmentData = async (req, res) => {
   try {
     const assessment_id = req.params.id;
@@ -294,6 +297,7 @@ export const updateAssessmentData = async (req, res) => {
   }
 };
 
+//Delete Assessment Data
 export const deleteAssessmentData = async (req, res) => {
   try {
     const assessment_id = req.params.id;
@@ -337,6 +341,7 @@ export const deleteAssessmentData = async (req, res) => {
   }
 };
 
+//Enroll Student to Assessment
 export const enrollStudentController = async (req, res) => {
   try {
     const assessmentId = req.params.id;
@@ -383,10 +388,10 @@ export const enrollStudentController = async (req, res) => {
 
     console.log(`✅ Student enrolled successfully for assessment ${assessmentId}`);
 
-// CLEAR STUDENT'S ASSESSMENT LIST CACHE
-await redis.del(`student:assessments:list:${student.id}`);
-// OR if you use studentId variable:
-await redis.del(`student:assessments:list:${student.id}`);
+    // CLEAR STUDENT'S ASSESSMENT LIST CACHE
+    await redis.del(`student:assessments:list:${student.id}`);
+    // OR if you use studentId variable:
+    await redis.del(`student:assessments:list:${student.id}`);
 
     res.status(200).json({
       success: true,
@@ -402,6 +407,7 @@ await redis.del(`student:assessments:list:${student.id}`);
   }
 };
 
+//Unenroll Student from Assessment
 export const unenrollStudentController = async (req, res) => {
   try {
     const assessmentId = req.params.id;
@@ -425,7 +431,7 @@ export const unenrollStudentController = async (req, res) => {
     }
 
     const result = await unenrollStudent(parseInt(assessmentId), parseInt(studentId));
-await redis.del(`student:assessments:list:${studentId}`);
+    await redis.del(`student:assessments:list:${studentId}`);
     res.status(200).json({
       success: true,
       message: 'Student unenrolled successfully',
@@ -441,6 +447,7 @@ await redis.del(`student:assessments:list:${studentId}`);
   }
 };
 
+//Get Enrolled Students for Assessment
 export const getEnrolledStudentsController = async (req, res) => {
   try {
     const assessmentId = req.params.id;
@@ -475,6 +482,7 @@ export const getEnrolledStudentsController = async (req, res) => {
   }
 };
 
+//Start Assessment for Student
 export const startAssessmentForStudent = async (req, res) => {
   try {
     const { assessmentId } = req.params;
@@ -539,6 +547,7 @@ export const startAssessmentForStudent = async (req, res) => {
   }
 };
 
+//Preview Questions for Assessment
 export const previewQuestions = async (req, res) => {
   try {
     const assessmentId = parseInt(req.params.id);
@@ -564,3 +573,137 @@ export const previewQuestions = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to generate preview questions" });
   }
 };
+
+//Generate Physical Paper for Assessment
+export const generatePhysicalPaper = async (req, res) => {
+  try {
+    const assessmentId = parseInt(req.params.id);
+    const instructorId = req.user.id;
+    const {
+      language = "en",
+      instituteName = "",
+      teacherName = "",
+      subjectName = "",
+      paperDate = "",
+      paperTime = "",
+      notes = "",
+    } = req.body;
+
+    console.log(`[PRINT] Generating paper for assessment ${assessmentId} in language: ${language}`);
+
+    const assessment = await getAssessmentById(assessmentId, instructorId, req.user.role);
+    if (!assessment) {
+      return res.status(404).json({ success: false, message: "Assessment not found" });
+    }
+
+    // Generate questions in selected language
+    const { questions } = await generateAssessmentQuestions(assessmentId, null, language, assessment);
+
+    if (!questions || questions.length === 0) {
+      return res.status(400).json({ success: false, message: "No questions generated" });
+    }
+
+    // Full language name map for AI
+    const langMap = {
+      en: "English",
+      ar: "Arabic",
+      ur: "Urdu",
+      hi: "Hindi",
+      bn: "Bengali",
+      es: "Spanish",
+      fr: "French",
+    };
+    const langName = langMap[language] || "English";
+
+    // Labels in target language
+    const labels = {
+      en: { institute: "Institute Name", teacher: "Teacher Name", subject: "Subject Name", date: "Paper Date", time: "Paper Time", notes: "Notes" },
+      ar: { institute: "اسم المعهد", teacher: "اسم المعلم", subject: "اسم المادة", date: "تاريخ الامتحان", time: "وقت الامتحان", notes: "ملاحظات" },
+      ur: { institute: "ادارے کا نام", teacher: "استاد کا نام", subject: "مضمون کا نام", date: "امتحان کی تاریخ", time: "امتحان کا وقت", notes: "نوٹس" },
+      hi: { institute: "संस्थान का नाम", teacher: "शिक्षक का नाम", subject: "विषय का नाम", date: "परीक्षा तिथि", time: "परीक्षा समय", notes: "नोट्स" },
+      bn: { institute: "প্রতিষ্ঠানের নাম", teacher: "শিক্ষকের নাম", subject: "বিষয়ের নাম", date: "পরীক্ষার তারিখ", time: "পরীক্ষার সময়", notes: "নোট" },
+      es: { institute: "Nombre del instituto", teacher: "Nombre del profesor", subject: "Nombre de la asignatura", date: "Fecha del examen", time: "Hora del examen", notes: "Notas" },
+      fr: { institute: "Nom de l'institut", teacher: "Nom de l'enseignant", subject: "Nom de la matière", date: "Date de l'examen", time: "Heure de l'examen", notes: "Notes" },
+    }[language] || labels.en;
+
+    // Build header text with target language labels
+    const headerText = `
+${labels.institute}: ${instituteName || "Not provided"}
+${labels.teacher}: ${teacherName || "Not provided"}
+${labels.subject}: ${subjectName || "Not provided"}
+${labels.date}: ${paperDate || "Not provided"}
+${labels.time}: ${paperTime || "Not provided"}
+${labels.notes}:
+${notes || "No additional notes"}
+`.trim();
+
+    let translatedHeaders = {
+      instituteName,
+      teacherName,
+      subjectName,
+      paperDate,
+      paperTime,
+      notes,
+    };
+
+    // Only translate if not English
+    if (language !== "en") {
+      const translationPrompt = `Translate the following exam paper header into natural ${langName}. 
+Keep the exact labels as they are, but translate only the values after the colon naturally.
+
+Text:
+${headerText}
+
+Output only the translated text in the same format. No extra text.`;
+
+      try {
+        const translatedAI = await generateContent(translationPrompt, { maxOutputTokens: 1000 });
+        const lines = translatedAI.split("\n").map(l => l.trim()).filter(Boolean);
+
+        translatedHeaders = {
+          instituteName: extractValue(lines, labels.institute) || instituteName,
+          teacherName: extractValue(lines, labels.teacher) || teacherName,
+          subjectName: extractValue(lines, labels.subject) || subjectName,
+          paperDate: extractValue(lines, labels.date) || paperDate,
+          paperTime: extractValue(lines, labels.time) || paperTime,
+          notes: extractNotes(lines, labels.notes) || notes,
+        };
+      } catch (err) {
+        console.warn("Header translation failed, using original text", err);
+        // Keep original if AI fails
+      }
+    }
+
+    const isRTL = ["ar", "ur", "he"].includes(language);
+
+    res.json({
+      success: true,
+      data: {
+        questions,
+        headers: translatedHeaders,
+        isRTL,
+      },
+    });
+  } catch (error) {
+    console.error("[PRINT] ERROR:", error);
+    res.status(500).json({ success: false, message: "Failed to prepare paper data" });
+  }
+};
+
+// Robust helper functions
+const extractValue = (lines, label) => {
+  const line = lines.find(l => l.startsWith(label + ":"));
+  if (line) {
+    return line.split(":").slice(1).join(":").trim();
+  }
+  return null;
+};
+
+const extractNotes = (lines, label) => {
+  const index = lines.findIndex(l => l.startsWith(label + ":"));
+  if (index !== -1 && index + 1 < lines.length) {
+    return lines.slice(index + 1).join("\n").trim();
+  }
+  return null;
+};
+
