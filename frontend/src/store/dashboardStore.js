@@ -37,6 +37,7 @@ const useDashboardStore = create((set) => ({
       throw error;
     }
   },
+  
 
   clearError: () => set({ error: null }),
 }));

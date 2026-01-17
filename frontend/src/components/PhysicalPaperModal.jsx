@@ -2,6 +2,7 @@ import { useState } from "react";
 import { PDFDocument, rgb, StandardFonts, degrees } from "pdf-lib";
 import { Document, Packer, Paragraph, TextRun, PageBreak, AlignmentType } from "docx";
 import { saveAs } from "file-saver";
+import * as fontkit from 'fontkit';
 import toast from "react-hot-toast";
 import axios from "axios";
 import LoadingSpinner from "../components/ui/LoadingSpinner";
@@ -29,10 +30,11 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
     paperTime: "",
     notes: "",
     pageSize: "A4",
-    headerFontSize: 26,
-    questionFontSize: 13,
-    optionFontSize: 12,
+    headerFontSize: 18,
+    questionFontSize: 10,
+    optionFontSize: 9,
     format: "pdf",
+    language: "en", //default English
   });
 
   const [loading, setLoading] = useState(false);
@@ -48,42 +50,60 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
   };
 
   const drawWatermarkOnPage = (page, font, w, h) => {
-  const wmText = "Gradewise-AI";
-  const wmSize = Math.min(w, h) / 8;
-  const textWidth = font.widthOfTextAtSize(wmText, wmSize);
-  const textHeight = wmSize; // Approximate height
+    const wmText = "Gradewise-AI";
+    const wmSize = Math.min(w, h) / 8;
+    const textWidth = font.widthOfTextAtSize(wmText, wmSize);
+    const textHeight = wmSize; // Approximate height
 
-  // True center: account for rotation
-  const centerX = w / 2;
-  const centerY = h / 2;
+    // True center: account for rotation
+    const centerX = w / 2;
+    const centerY = h / 2;
 
-  page.drawText(wmText, {
-    x: centerX - textWidth / 2,
-    y: centerY - textHeight / 2,
-    size: wmSize,
-    font,
-    color: rgb(0.85, 0.85, 0.85),
-    rotate: degrees(-45),
-    opacity: 0.16,
-  });
-};
+    page.drawText(wmText, {
+      x: centerX - textWidth / 2,
+      y: centerY - textHeight / 2,
+      size: wmSize,
+      font,
+      color: rgb(0.85, 0.85, 0.85),
+      rotate: degrees(-45),
+      opacity: 0.16,
+    });
+  };
+const generatePDF = async (qList, isRTL = false) => {
+  const pdfDoc = await PDFDocument.create();
+  const [w, h] = getPageDims(form.pageSize);
 
-  const generatePDF = async (qList) => {
-    const pdfDoc = await PDFDocument.create();
-    const [w, h] = getPageDims(form.pageSize);
+  // REGISTER FONTKIT — THIS IS THE KEY LINE
+  pdfDoc.registerFontkit(fontkit);
 
-    let page = pdfDoc.addPage([w, h]);
+  let page = pdfDoc.addPage([w, h]);
 
-    let font, boldFont;
+  let font, boldFont;
+
+  if (isRTL) {
     try {
-      font = await pdfDoc.embedFont(StandardFonts.TimesRoman);
-      boldFont = await pdfDoc.embedFont(StandardFonts.TimesRomanBold);
-    } catch {
+      const regularBytes = await fetch('/fonts/NotoSansArabic-Regular.ttf').then(res => res.arrayBuffer());
+      const boldBytes = await fetch('/fonts/NotoSansArabic-Bold.ttf')
+        .then(res => res.arrayBuffer())
+        .catch(() => regularBytes); // fallback if no bold
+
+      font = await pdfDoc.embedFont(regularBytes);
+      boldFont = await pdfDoc.embedFont(boldBytes);
+
+      console.log("✅ Noto Sans Arabic font loaded perfectly");
+    } catch (err) {
+      console.error("Custom font failed:", err);
+      // Safe fallback
       font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     }
+  } else {
+    font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  }
 
-    drawWatermarkOnPage(page, font, w, h);
+  drawWatermarkOnPage(page, font, w, h);
+
 
     const margin = 60;
     const lineHeight = 1.5;
@@ -94,15 +114,15 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
       let line = "";
       const lines = [];
       for (const word of words) {
-        const test = line + word + " ";
+        const test = isRTL ? word + " " + line : line + word + " "; // Reverse for RTL
         if (f.widthOfTextAtSize(test, size) > maxWidth && line) {
-          lines.push(line.trim());
+          lines.push(isRTL ? line.trim().split(" ").reverse().join(" ") : line.trim());
           line = word + " ";
         } else {
           line = test;
         }
       }
-      if (line) lines.push(line.trim());
+      if (line) lines.push(isRTL ? line.trim().split(" ").reverse().join(" ") : line.trim());
       return lines;
     };
 
@@ -114,7 +134,9 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
 
       lines.forEach(line => {
         const textWidth = f.widthOfTextAtSize(line, size);
-        const posX = align === "center" ? (w - textWidth) / 2 : x;
+        let posX = align === "center" ? (w - textWidth) / 2 : x;
+        if (isRTL && align !== "center") posX = w - margin - textWidth; // Right align for RTL
+
         page.drawText(line, { x: posX, y: currentY, size, font: f, color });
         currentY -= size * lineHeight;
       });
@@ -122,7 +144,7 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
       return currentY;
     };
 
-    
+
     // Store bookmark references
     const bookmarkRefs = [];
     // Enhanced Header Section — Institute Name (NO LINE)
@@ -176,7 +198,7 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
         borderWidth: 1,
         color: rgb(0.98, 0.98, 0.98),
       });
-      
+
       page.drawText("Instructions:", { x: margin + 10, y: notesBoxY - 15, size: 10, font: boldFont, color: rgb(0.3, 0.3, 0.3) });
       let notesY = notesBoxY - 30;
       form.notes.split("\n").forEach(line => {
@@ -197,7 +219,7 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
       thickness: 1.5,
       color: rgb(0, 0, 0),
     });
-    
+
     page.drawLine({
       start: { x: margin, y: y - 3 },
       end: { x: w - margin, y: y - 3 },
@@ -207,7 +229,7 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
 
     y -= 30;
 
-    
+
     for (let i = 0; i < qList.length; i++) {
       const q = qList[i];
 
@@ -220,7 +242,7 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
       // Store page reference for bookmark
       const currentPageIndex = pdfDoc.getPageCount() - 1;
       const currentPage = pdfDoc.getPage(currentPageIndex);
-      
+
       // Create bookmark reference for this question
       const questionBookmarkRef = pdfDoc.context.nextRef();
       bookmarkRefs.push({
@@ -233,7 +255,7 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
       // Question number with background
       const qNumText = `Q${i + 1}.`;
       const qNumWidth = boldFont.widthOfTextAtSize(qNumText, Number(form.questionFontSize));
-      
+
 
       y = drawText(`${qNumText} ${q.question_text}`, margin, y, Number(form.questionFontSize), boldFont, rgb(0.1, 0.1, 0.1)) - 12;
 
@@ -244,7 +266,7 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
             drawWatermarkOnPage(page, font, w, h);
             y = h - 40;
           }
-          
+
           // Option circle
           const optLabel = String.fromCharCode(65 + oi);
           page.drawCircle({
@@ -254,7 +276,7 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
             borderColor: rgb(0.4, 0.4, 0.4),
             borderWidth: 1,
           });
-          
+
           page.drawText(optLabel, {
             x: margin + 33,
             y: y - Number(form.optionFontSize) / 2 - 1,
@@ -270,12 +292,12 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
       y -= 18;
     }
 
-       // Answer Key page — ONE ANSWER PER LINE
+    // Answer Key page — ONE ANSWER PER LINE
     page = pdfDoc.addPage([w, h]);
     drawWatermarkOnPage(page, font, w, h);
-    
+
     let ay = h - 80;
-    
+
     // Header
     ay = drawText("ANSWER KEY", margin, ay, 24, boldFont, rgb(0.1, 0.1, 0.4), "center") - 40;
 
@@ -288,14 +310,14 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
       }
 
       const answerText = `Q${i + 1}: ${q.correct_answer || "N/A"}`;
-      
+
       // Use drawText function → supports wrapping for long answers
       ay = drawText(answerText, margin, ay, 12, boldFont, rgb(0.2, 0.2, 0.2)) - 18;
     });
 
     // Add bookmarks to PDF
-const pdfBytes = await pdfDoc.save();
-return new Blob([pdfBytes], { type: "application/pdf" });
+    const pdfBytes = await pdfDoc.save();
+    return new Blob([pdfBytes], { type: "application/pdf" });
 
   };
 
@@ -306,9 +328,9 @@ return new Blob([pdfBytes], { type: "application/pdf" });
     if (form.instituteName) {
       children.push(new Paragraph({
         children: [
-          new TextRun({ 
-            text: form.instituteName.toUpperCase(), 
-            size: form.headerFontSize * 2, 
+          new TextRun({
+            text: form.instituteName.toUpperCase(),
+            size: form.headerFontSize * 2,
             bold: true,
             color: "1a1a66"
           }),
@@ -316,7 +338,7 @@ return new Blob([pdfBytes], { type: "application/pdf" });
         alignment: AlignmentType.CENTER,
         spacing: { after: 200 }
       }));
-      
+
       children.push(new Paragraph({
         children: [
           new TextRun({ text: "━━━━━━━━━━━━━━━━━━━━━", size: 20, color: "333366" }),
@@ -338,7 +360,7 @@ return new Blob([pdfBytes], { type: "application/pdf" });
     for (let i = 0; i < Math.max(left.length, right.length); i++) {
       const leftText = left[i] || "";
       const rightText = right[i] || "";
-      
+
       children.push(new Paragraph({
         children: [
           new TextRun({ text: leftText, size: 22, bold: leftText.includes(":") }),
@@ -351,20 +373,20 @@ return new Blob([pdfBytes], { type: "application/pdf" });
 
     // Notes section
     if (form.notes.trim()) {
-      children.push(new Paragraph({ 
+      children.push(new Paragraph({
         children: [new TextRun({ text: "Instructions:", size: 24, bold: true, color: "333333" })],
         spacing: { before: 200, after: 100 }
       }));
-      
+
       form.notes.split("\n").forEach(l => {
         if (l.trim()) {
-          children.push(new Paragraph({ 
+          children.push(new Paragraph({
             children: [new TextRun({ text: `• ${l.trim()}`, size: 22, color: "555555" })],
             spacing: { after: 100 }
           }));
         }
       });
-      
+
       children.push(new Paragraph({ spacing: { after: 200 } }));
     }
 
@@ -379,9 +401,9 @@ return new Blob([pdfBytes], { type: "application/pdf" });
     // Questions
     qList.forEach((q, i) => {
       children.push(new Paragraph({
-        children: [new TextRun({ 
-          text: `Q${i + 1}. ${q.question_text}`, 
-          size: form.questionFontSize * 2, 
+        children: [new TextRun({
+          text: `Q${i + 1}. ${q.question_text}`,
+          size: form.questionFontSize * 2,
           bold: true,
           color: "1a1a1a"
         })],
@@ -391,8 +413,8 @@ return new Blob([pdfBytes], { type: "application/pdf" });
       if (q.options) {
         q.options.forEach((opt, oi) =>
           children.push(new Paragraph({
-            children: [new TextRun({ 
-              text: `${String.fromCharCode(9675)} ${String.fromCharCode(65 + oi)}. ${opt}`, 
+            children: [new TextRun({
+              text: `${String.fromCharCode(9675)} ${String.fromCharCode(65 + oi)}. ${opt}`,
               size: form.optionFontSize * 2,
               color: "333333"
             })],
@@ -416,8 +438,8 @@ return new Blob([pdfBytes], { type: "application/pdf" });
 
     qList.forEach((q, i) =>
       children.push(new Paragraph({
-        children: [new TextRun({ 
-          text: `Q${i + 1}: ${q.correct_answer || "N/A"}`, 
+        children: [new TextRun({
+          text: `Q${i + 1}: ${q.correct_answer || "N/A"}`,
           size: 26,
           bold: true,
           color: "333333"
@@ -437,24 +459,42 @@ return new Blob([pdfBytes], { type: "application/pdf" });
     try {
       const token = localStorage.getItem("token");
       const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-      const { data } = await axios.get(`${API_URL}/taking/assessments/${assessmentId}/print`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
 
-      if (!data?.questions?.length) {
-        toast.error("No questions found");
+      const { data } = await axios.post(
+        `${API_URL}/assessments/${assessmentId}/print`,
+        {
+          language: form.language,
+          instituteName: form.instituteName,
+          teacherName: form.teacherName,
+          subjectName: form.subjectName,
+          paperDate: form.paperDate,
+          paperTime: form.paperTime,
+          notes: form.notes,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!data.success || !data.data.questions?.length) {
+        toast.error("No questions received");
         setLoading(false);
         return;
       }
 
+      const qList = data.data.questions;
+      const headers = data.data.headers;
+      const isRTL = data.data.isRTL;
+
+      // Use translated headers
       const blob = form.format === "pdf"
-        ? await generatePDF(data.questions)
-        : await generateDOCX(data.questions);
+        ? await generatePDF(qList, isRTL)  // Pass isRTL to PDF gen
+        : await generateDOCX(qList);
 
       const ext = form.format === "pdf" ? "pdf" : "docx";
-      saveAs(blob, `${assessmentTitle.replace(/\s+/g, "_")}_Paper.${ext}`);
+      saveAs(blob, `${assessmentTitle.replace(/\s+/g, "_")}_Paper_${form.language.toUpperCase()}.${ext}`);
 
-      toast.success(`Paper generated successfully as ${form.format.toUpperCase()}!`);
+      toast.success(`Paper generated in ${form.language.toUpperCase()}!`);
       onClose();
     } catch (err) {
       console.error(err);
@@ -463,6 +503,7 @@ return new Blob([pdfBytes], { type: "application/pdf" });
       setLoading(false);
     }
   };
+
 
   if (!isOpen) return null;
 
@@ -480,8 +521,8 @@ return new Blob([pdfBytes], { type: "application/pdf" });
               <p className="text-indigo-100 text-xs sm:text-sm truncate max-w-xs sm:max-w-md">{assessmentTitle}</p>
             </div>
           </div>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
             className="text-white hover:bg-white/20 rounded-full p-2 transition-all duration-200 hover:rotate-90 active:scale-90"
           >
             <FaTimes className="w-5 h-5 sm:w-6 sm:h-6" />
@@ -497,13 +538,13 @@ return new Blob([pdfBytes], { type: "application/pdf" });
                 <div className="bg-blue-600 text-white p-2 rounded-lg">
                   <FaUniversity className="text-lg sm:text-xl" />
                 </div>
-                <input 
-                  type="text" 
-                  name="instituteName" 
-                  placeholder="Enter institute name" 
-                  value={form.instituteName} 
-                  onChange={handleChange} 
-                  className="w-full bg-transparent outline-none text-sm sm:text-base placeholder-gray-400 font-medium" 
+                <input
+                  type="text"
+                  name="instituteName"
+                  placeholder="Enter institute name"
+                  value={form.instituteName}
+                  onChange={handleChange}
+                  className="w-full bg-transparent outline-none text-sm sm:text-base placeholder-gray-400 font-medium"
                 />
               </div>
             </div>
@@ -514,13 +555,13 @@ return new Blob([pdfBytes], { type: "application/pdf" });
                 <div className="bg-green-600 text-white p-2 rounded-lg">
                   <FaChalkboardTeacher className="text-lg sm:text-xl" />
                 </div>
-                <input 
-                  type="text" 
-                  name="teacherName" 
-                  placeholder="Enter teacher name" 
-                  value={form.teacherName} 
-                  onChange={handleChange} 
-                  className="w-full bg-transparent outline-none text-sm sm:text-base placeholder-gray-400 font-medium" 
+                <input
+                  type="text"
+                  name="teacherName"
+                  placeholder="Enter teacher name"
+                  value={form.teacherName}
+                  onChange={handleChange}
+                  className="w-full bg-transparent outline-none text-sm sm:text-base placeholder-gray-400 font-medium"
                 />
               </div>
             </div>
@@ -531,13 +572,13 @@ return new Blob([pdfBytes], { type: "application/pdf" });
                 <div className="bg-purple-600 text-white p-2 rounded-lg">
                   <FaBook className="text-lg sm:text-xl" />
                 </div>
-                <input 
-                  type="text" 
-                  name="subjectName" 
-                  placeholder="Enter subject name" 
-                  value={form.subjectName} 
-                  onChange={handleChange} 
-                  className="w-full bg-transparent outline-none text-sm sm:text-base placeholder-gray-400 font-medium" 
+                <input
+                  type="text"
+                  name="subjectName"
+                  placeholder="Enter subject name"
+                  value={form.subjectName}
+                  onChange={handleChange}
+                  className="w-full bg-transparent outline-none text-sm sm:text-base placeholder-gray-400 font-medium"
                 />
               </div>
             </div>
@@ -549,12 +590,12 @@ return new Blob([pdfBytes], { type: "application/pdf" });
                   <div className="bg-orange-600 text-white p-2 rounded-lg">
                     <FaCalendarAlt className="text-base sm:text-lg" />
                   </div>
-                  <input 
-                    type="date" 
-                    name="paperDate" 
-                    value={form.paperDate} 
-                    onChange={handleChange} 
-                    className="w-full bg-transparent outline-none text-sm sm:text-base font-medium" 
+                  <input
+                    type="date"
+                    name="paperDate"
+                    value={form.paperDate}
+                    onChange={handleChange}
+                    className="w-full bg-transparent outline-none text-sm sm:text-base font-medium"
                   />
                 </div>
               </div>
@@ -565,12 +606,12 @@ return new Blob([pdfBytes], { type: "application/pdf" });
                   <div className="bg-red-600 text-white p-2 rounded-lg">
                     <FaClock className="text-base sm:text-lg" />
                   </div>
-                  <input 
-                    type="time" 
-                    name="paperTime" 
-                    value={form.paperTime} 
-                    onChange={handleChange} 
-                    className="w-full bg-transparent outline-none text-sm sm:text-base font-medium" 
+                  <input
+                    type="time"
+                    name="paperTime"
+                    value={form.paperTime}
+                    onChange={handleChange}
+                    className="w-full bg-transparent outline-none text-sm sm:text-base font-medium"
                   />
                 </div>
               </div>
@@ -582,16 +623,40 @@ return new Blob([pdfBytes], { type: "application/pdf" });
                 <div className="bg-yellow-600 text-white p-2 rounded-lg mt-1">
                   <FaStickyNote className="text-base sm:text-lg" />
                 </div>
-                <textarea 
-                  name="notes" 
-                  rows={3} 
-                  value={form.notes} 
-                  onChange={handleChange} 
-                  placeholder="Enter any additional instructions or notes..." 
-                  className="w-full bg-transparent outline-none text-sm sm:text-base resize-none placeholder-gray-400 font-medium" 
+                <textarea
+                  name="notes"
+                  rows={3}
+                  value={form.notes}
+                  onChange={handleChange}
+                  placeholder="Enter any additional instructions or notes..."
+                  className="w-full bg-transparent outline-none text-sm sm:text-base resize-none placeholder-gray-400 font-medium"
                 />
               </div>
             </div>
+
+            <div className="group">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Paper Language</label>
+              <div className="flex items-center gap-3 sm:gap-4 bg-gradient-to-r from-teal-50 to-cyan-50 p-3 sm:p-4 rounded-xl border-2 border-teal-200 hover:border-teal-400 transition-all duration-200 focus-within:border-teal-500 focus-within:shadow-lg">
+                <div className="bg-teal-600 text-white p-2 rounded-lg">
+                  <FaBook className="text-lg sm:text-xl" />
+                </div>
+                <select
+                  name="language"
+                  value={form.language}
+                  onChange={handleChange}
+                  className="w-full bg-transparent outline-none text-sm sm:text-base font-medium"
+                >
+                  <option value="en">🇬🇧 English</option>
+                  <option value="ar">🇸🇦 Arabic (العربية)</option>
+                  <option value="hi">🇮🇳 Hindi (हिंदी)</option>
+                  <option value="es">🇪🇸 Spanish (Español)</option>
+                  <option value="fr">🇫🇷 French (Français)</option>
+                  <option value="ur">🇵🇰 Urdu (اردو)</option>
+                  <option value="bn">🇧🇩 Bengali (বাংলা)</option>
+                </select>
+              </div>
+            </div>
+
           </div>
 
           {/* Formatting Section - Enhanced */}
@@ -605,10 +670,10 @@ return new Blob([pdfBytes], { type: "application/pdf" });
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
               <div>
                 <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">Page Size</label>
-                <select 
-                  name="pageSize" 
-                  value={form.pageSize} 
-                  onChange={handleChange} 
+                <select
+                  name="pageSize"
+                  value={form.pageSize}
+                  onChange={handleChange}
                   className="w-full p-2 sm:p-3 border-2 border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                 >
                   <option value="A4">A4</option>
@@ -618,38 +683,38 @@ return new Blob([pdfBytes], { type: "application/pdf" });
               </div>
               <div>
                 <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">Header Size</label>
-                <input 
-                  type="number" 
-                  name="headerFontSize" 
-                  min={18} 
-                  max={40} 
-                  value={form.headerFontSize} 
-                  onChange={handleChange} 
-                  className="w-full p-2 sm:p-3 border-2 border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all" 
+                <input
+                  type="number"
+                  name="headerFontSize"
+                  min={18}
+                  max={40}
+                  value={form.headerFontSize}
+                  onChange={handleChange}
+                  className="w-full p-2 sm:p-3 border-2 border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                 />
               </div>
               <div>
                 <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">Question Size</label>
-                <input 
-                  type="number" 
-                  name="questionFontSize" 
-                  min={10} 
-                  max={20} 
-                  value={form.questionFontSize} 
-                  onChange={handleChange} 
-                  className="w-full p-2 sm:p-3 border-2 border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all" 
+                <input
+                  type="number"
+                  name="questionFontSize"
+                  min={10}
+                  max={20}
+                  value={form.questionFontSize}
+                  onChange={handleChange}
+                  className="w-full p-2 sm:p-3 border-2 border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                 />
               </div>
               <div>
                 <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">Option Size</label>
-                <input 
-                  type="number" 
-                  name="optionFontSize" 
-                  min={9} 
-                  max={16} 
-                  value={form.optionFontSize} 
-                  onChange={handleChange} 
-                  className="w-full p-2 sm:p-3 border-2 border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all" 
+                <input
+                  type="number"
+                  name="optionFontSize"
+                  min={9}
+                  max={16}
+                  value={form.optionFontSize}
+                  onChange={handleChange}
+                  className="w-full p-2 sm:p-3 border-2 border-gray-300 rounded-lg text-sm sm:text-base font-semibold focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                 />
               </div>
             </div>
@@ -660,8 +725,8 @@ return new Blob([pdfBytes], { type: "application/pdf" });
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
               <div className="flex items-center gap-3 sm:gap-4">
                 <div className="bg-white/20 backdrop-blur-sm p-3 sm:p-4 rounded-xl">
-                  {form.format === "pdf" ? 
-                    <FaFilePdf className="text-3xl sm:text-5xl" /> : 
+                  {form.format === "pdf" ?
+                    <FaFilePdf className="text-3xl sm:text-5xl" /> :
                     <FaFileWord className="text-3xl sm:text-5xl" />
                   }
                 </div>
@@ -670,10 +735,10 @@ return new Blob([pdfBytes], { type: "application/pdf" });
                   <p className="text-indigo-100 text-xs sm:text-sm">Choose your preferred format</p>
                 </div>
               </div>
-              <select 
-                name="format" 
-                value={form.format} 
-                onChange={handleChange} 
+              <select
+                name="format"
+                value={form.format}
+                onChange={handleChange}
                 className="p-3 w-full sm:w-48 bg-white text-indigo-700 rounded-xl font-bold text-sm sm:text-base shadow-lg hover:shadow-xl transition-all"
               >
                 <option value="pdf">📄 PDF Format</option>
@@ -684,9 +749,9 @@ return new Blob([pdfBytes], { type: "application/pdf" });
 
           {/* Action Buttons - Enhanced */}
           <div className="flex flex-col sm:flex-row items-center justify-end gap-3 sm:gap-4 pt-4 border-t-2 border-gray-200">
-            <button 
-              onClick={onClose} 
-              disabled={loading} 
+            <button
+              onClick={onClose}
+              disabled={loading}
               className="px-6 py-3 w-full sm:w-auto border-2 border-gray-300 hover:border-gray-400 rounded-xl font-bold text-gray-700 hover:bg-gray-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
             >
               Cancel

@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom";
 import useAuthStore from "../store/authStore.js";
 import { FaFacebookF, FaTwitter, FaLinkedinIn, FaEnvelope, FaHeart, FaCheckCircle } from "react-icons/fa";
 

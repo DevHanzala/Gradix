@@ -37,6 +37,7 @@ const PerformanceChart = ({ performance }) => {
       return () => chart.destroy();
     }
   }, [performance]);
+  
 
   return <canvas ref={chartRef} style={{ maxHeight: "300px" }} />;
 };

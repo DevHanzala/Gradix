@@ -21,6 +21,7 @@ function AddStudent({ assessmentId, onStudentAdded, compact = false }) {
     password: "",
     confirmPassword: "",
   });
+  
   const [isLoading, setIsLoading] = useState(false);
   const [modal, setModal] = useState({ isOpen: false, type: "", title: "", message: "" });
 

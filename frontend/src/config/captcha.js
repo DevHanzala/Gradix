@@ -1,6 +1,3 @@
-let recaptchaLoaded = false;
-
-// src/config/captcha.js
 export const loadRecaptcha = (siteKey) => {
   return new Promise((resolve) => {
     if (window.recaptchaLoaded) return resolve();

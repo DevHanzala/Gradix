@@ -85,6 +85,7 @@ const isActiveLink = (href) => {
 
   const handleMobileMenuToggle = () => setIsMobileMenuOpen(!isMobileMenuOpen);
   const closeMobileMenu = () => setIsMobileMenuOpen(false);
+  
   const handleLogout = () => {
     logout();
     closeMobileMenu();

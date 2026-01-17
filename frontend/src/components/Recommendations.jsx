@@ -1,5 +1,3 @@
-import React from "react";
-
 const Recommendations = ({ recommendations }) => {
   return (
     <div className="mt-2">
