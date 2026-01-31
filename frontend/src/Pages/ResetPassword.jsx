@@ -4,10 +4,8 @@ import useAuthStore from "../store/authStore.js";
 import { Card, CardContent } from "../components/ui/Card.jsx";
 import LoadingSpinner from "../components/ui/LoadingSpinner.jsx";
 import Modal from "../components/ui/Modal.jsx";
-import Navbar from "../components/Navbar.jsx";
-import Footer from "../components/Footer.jsx";
 import { FaEnvelope, FaPaperPlane, FaArrowLeft, FaLock } from "react-icons/fa";
-
+import { resetPasswordSchema } from "../validation/passwordSchemas.js";
 function ResetPassword() {
   const navigate = useNavigate();
   const forgotPassword = useAuthStore((state) => state.forgotPassword);
@@ -31,20 +29,21 @@ function ResetPassword() {
     }
   };
 
-  const validateForm = () => {
-    const newErrors = {};
-    if (!formData.email) {
-      newErrors.email = "Email is required";
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Please enter a valid email address";
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  
 
   const handleForgotSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
+try {
+  resetPasswordSchema.parse(formData);
+  setErrors({});
+} catch (err) {
+  const fieldErrors = {};
+  err.errors.forEach((e) => {
+    fieldErrors[e.path[0]] = e.message;
+  });
+  setErrors(fieldErrors);
+  return;
+}
 
     setLoading(true);
 
@@ -75,7 +74,6 @@ function ResetPassword() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex flex-col">
-      <Navbar />
       <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
         <Card className="w-full max-w-md shadow-2xl border-2 border-gray-200 rounded-2xl sm:rounded-3xl overflow-hidden">
           <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 sm:p-8">
@@ -162,7 +160,6 @@ function ResetPassword() {
         </Card>
       </div>
 
-      <Footer />
 
       <Modal
         isOpen={modal.isOpen}

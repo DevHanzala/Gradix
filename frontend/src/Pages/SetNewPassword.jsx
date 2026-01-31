@@ -4,9 +4,8 @@ import useAuthStore from "../store/authStore.js";
 import { Card, CardContent } from "../components/ui/Card.jsx";
 import LoadingSpinner from "../components/ui/LoadingSpinner.jsx";
 import Modal from "../components/ui/Modal.jsx";
-import Navbar from "../components/Navbar.jsx";
-import Footer from "../components/Footer.jsx";
 import { FaLock, FaCheckCircle, FaArrowLeft, FaKey } from "react-icons/fa";
+import { setNewPasswordSchema } from "../validation/passwordSchemas.js";
 
 function SetNewPassword() {
   const navigate = useNavigate();
@@ -33,25 +32,20 @@ function SetNewPassword() {
     }
   };
 
-  const validateForm = () => {
-    const newErrors = {};
-    if (!formData.newPassword) {
-      newErrors.newPassword = "New password is required";
-    } else if (formData.newPassword.length < 8) {
-      newErrors.newPassword = "Password must be at least 8 characters";
-    } else if (!/[A-Z]/.test(formData.newPassword) || !/[0-9]/.test(formData.newPassword)) {
-      newErrors.newPassword = "Password must include uppercase letters and numbers";
-    }
-    if (formData.newPassword !== formData.confirmPassword) {
-      newErrors.confirmPassword = "Passwords do not match";
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
+try {
+  setNewPasswordSchema.parse(formData);
+  setErrors({});
+} catch (err) {
+  const fieldErrors = {};
+  err.errors.forEach((e) => {
+    fieldErrors[e.path[0]] = e.message;
+  });
+  setErrors(fieldErrors);
+  return;
+}
 
     setLoading(true);
 
@@ -78,7 +72,6 @@ function SetNewPassword() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex flex-col">
-      <Navbar />
       <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
         <Card className="w-full max-w-md shadow-2xl border-2 border-gray-200 rounded-2xl sm:rounded-3xl overflow-hidden">
           <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-6 sm:p-8">
@@ -204,7 +197,6 @@ function SetNewPassword() {
         </Card>
       </div>
 
-      <Footer />
 
       <Modal
         isOpen={modal.isOpen}

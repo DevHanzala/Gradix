@@ -2,13 +2,10 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import useAuthStore from "../../store/authStore.js";
 import useAssessmentStore from "../../store/assessmentStore.js";
-import useDashboardStore from "../../store/dashboardStore.js";
+import useInstructorAnalyticsStore from "../../store/useInstructorAssessmentAnalyticsStore.js";
 import { Card, CardHeader, CardContent } from "../../components/ui/Card.jsx";
 import LoadingSpinner from "../../components/ui/LoadingSpinner.jsx";
 import Modal from "../../components/ui/Modal.jsx";
-import Navbar from "../../components/Navbar.jsx";
-import Footer from "../../components/Footer.jsx";
-import toast from "react-hot-toast";
 import {
   FaEye,
   FaEdit,
@@ -33,15 +30,22 @@ function InstructorDashboard() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { assessments, getInstructorAssessments } = useAssessmentStore();
-  const { overview, loading, getInstructorOverview } = useDashboardStore();
+  const { overview, loading, getInstructorOverview } = useInstructorAnalyticsStore();
   const [modal, setModal] = useState({ isOpen: false, type: "info", title: "", message: "" });
   const [isLoading, setIsLoading] = useState(true);
+  const [deleteConfirm, setDeleteConfirm] = useState({
+    isOpen: false,
+    assessmentId: null,
+    title: "",
+  });
+
 
   const [paperModal, setPaperModal] = useState({
     isOpen: false,
     assessmentId: null,
     title: "",
   });
+  console.log("assessments:", assessments);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -55,7 +59,6 @@ function InstructorDashboard() {
         console.error("Failed to fetch dashboard data:", error);
         const errorMessage = error.response?.data?.message || error.message || "Failed to fetch dashboard data.";
         setModal({ isOpen: true, type: "error", title: "Error", message: errorMessage });
-        toast.error(errorMessage);
         if (error.response?.status === 403 || error.message === "No authentication token found") {
           navigate("/login");
         }
@@ -69,7 +72,6 @@ function InstructorDashboard() {
 
   const showModal = (type, title, message) => {
     setModal({ isOpen: true, type, title, message });
-    toast[type === "success" ? "success" : "error"](message);
   };
 
   const openPaperModal = (assessment) => {
@@ -152,7 +154,6 @@ function InstructorDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
-      <Navbar />
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
         {/* Welcome Section - Enhanced */}
         <div className="mb-8 sm:mb-10">
@@ -355,18 +356,19 @@ function InstructorDashboard() {
                                   )}
                                   {!assessment.is_executed && (
                                     <button
-                                      onClick={() => {
-                                        if (window.confirm(`Delete "${assessment.title}"?`)) {
-                                          useAssessmentStore.getState().deleteAssessment(assessment.id)
-                                            .then(() => showModal("success", "Deleted!", "Assessment removed successfully"))
-                                            .catch(() => showModal("error", "Error", "Failed to delete"));
-                                        }
-                                      }}
+                                      onClick={() =>
+                                        setDeleteConfirm({
+                                          isOpen: true,
+                                          assessmentId: assessment.id,
+                                          title: assessment.title,
+                                        })
+                                      }
                                       className="inline-flex items-center gap-1 text-red-600 hover:text-red-800 font-semibold hover:underline transition"
                                     >
                                       <FaTrash />
                                       Delete
                                     </button>
+
                                   )}
                                   {assessment.is_executed && (
                                     <Link
@@ -460,9 +462,14 @@ function InstructorDashboard() {
                                   <span className="hidden xs:inline">Edit</span>
                                 </Link>
                                 <button
-                                  onClick={() => window.confirm(`Delete "${assessment.title}"?`) &&
-                                    useAssessmentStore.getState().deleteAssessment(assessment.id)
+                                  onClick={() =>
+                                    setDeleteConfirm({
+                                      isOpen: true,
+                                      assessmentId: assessment.id,
+                                      title: assessment.title,
+                                    })
                                   }
+
                                   className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-red-100 text-red-700 rounded-lg sm:rounded-xl font-semibold hover:bg-red-200 transition-colors"
                                 >
                                   <FaTrash />
@@ -505,7 +512,6 @@ function InstructorDashboard() {
         )}
       </div>
 
-      <Footer />
 
       {/* Physical Paper Modal */}
       <PhysicalPaperModal
@@ -524,6 +530,37 @@ function InstructorDashboard() {
       >
         {modal.message}
       </Modal>
+
+      <Modal
+        isOpen={deleteConfirm.isOpen}
+        onClose={() =>
+          setDeleteConfirm({
+            isOpen: false,
+            assessmentId: null,
+            title: "",
+          })
+        }
+        type="warning"
+        title="Delete Assessment?"
+        confirmText="Yes, Delete"
+        cancelText="Cancel"
+        onConfirm={async () => {
+          try {
+            await useAssessmentStore
+              .getState()
+              .deleteAssessment(deleteConfirm.assessmentId);
+
+            showModal("success", "Deleted!", "Assessment removed successfully");
+          } catch {
+            showModal("error", "Error", "Failed to delete assessment");
+          }
+        }}
+      >
+        Are you sure you want to delete{" "}
+        <strong>{deleteConfirm.title}</strong>?
+        This action cannot be undone.
+      </Modal>
+
     </div>
   );
 }

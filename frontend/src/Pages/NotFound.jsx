@@ -1,13 +1,10 @@
 import { Link } from "react-router-dom"
 import { Card, CardContent } from "../components/ui/Card.jsx"
-import Navbar from "../components/Navbar.jsx"
-import Footer from "../components/Footer.jsx"
 import { FaHome, FaArrowLeft, FaQuestionCircle } from "react-icons/fa"
 
 function NotFound() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30 flex flex-col">
-      <Navbar />
 
       {/* Centered Content */}
       <div className="flex-1 flex items-center justify-center px-4 py-12 sm:py-16">
@@ -73,7 +70,6 @@ function NotFound() {
         </Card>
       </div>
 
-      <Footer />
     </div>
   )
 }

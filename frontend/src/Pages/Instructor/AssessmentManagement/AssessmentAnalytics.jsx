@@ -2,8 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardHeader, CardContent } from "../../../components/ui/Card";
 import LoadingSpinner from "../../../components/ui/LoadingSpinner";
-import Navbar from "../../../components/Navbar";
-import Footer from "../../../components/Footer";
 import useInstructorAnalyticsStore from "../../../store/useInstructorAssessmentAnalyticsStore";
 import { FaList, FaTable, FaCalendarAlt, FaCheckCircle, FaEye, FaChartBar, FaArrowUp } from "react-icons/fa";
 
@@ -114,7 +112,6 @@ function AssessmentAnalytics() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      <Navbar />
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-8 sm:py-12 max-w-7xl">
 
         {/* Header */}
@@ -187,7 +184,7 @@ function AssessmentAnalytics() {
             <div className="hidden lg:block mb-10">
               <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 border-0 overflow-hidden">
                 <CardHeader className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
-                  <h3 className="text-xl font-semibold">Student Results — {selectedAssessment?.title}</h3>
+                  <h3 className="text-xl font-semibold"> {selectedAssessment?.title}</h3>
                 </CardHeader>
                 <CardContent className="p-0">
                   {students.length > 0 ? (
@@ -409,7 +406,6 @@ function AssessmentAnalytics() {
         </button>
       )}
 
-      <Footer />
 
       {/* Custom CSS for animations */}
       <style jsx>{`

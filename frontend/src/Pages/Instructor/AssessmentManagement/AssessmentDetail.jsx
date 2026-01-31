@@ -4,15 +4,11 @@ import useAssessmentStore from "../../../store/assessmentStore.js";
 import { Card, CardHeader, CardContent } from "../../../components/ui/Card";
 import LoadingSpinner from "../../../components/ui/LoadingSpinner";
 import Modal from "../../../components/ui/Modal";
-import Navbar from "../../../components/Navbar";
-import Footer from "../../../components/Footer";
-import toast from "react-hot-toast";
 import { FaInfoCircle, FaCalendarAlt, FaLink, FaQuestionCircle, FaFileAlt, FaExclamationCircle, FaEdit, FaUsers, FaPrint } from "react-icons/fa";
 
 // THIS IS THE MISSING IMPORT — NOW ADDED
 import PhysicalPaperModal from "../../../components/PhysicalPaperModal.jsx";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 function AssessmentDetail() {
   const { id } = useParams();
@@ -27,20 +23,32 @@ function AssessmentDetail() {
     assessmentId: null,
     title: "",
   });
-
+ 
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
         if (!id || isNaN(parseInt(id))) {
-          toast.error("Invalid assessment ID");
+          setModal({
+            isOpen: true,
+            type: "error",
+            title: "Invalid Assessment",
+            message: "Invalid assessment ID.",
+          });
           navigate("/instructor/assessments");
           return;
         }
+
         await getAssessmentById(parseInt(id));
       } catch (error) {
         const msg = error.response?.data?.message || error.message || "Failed to load assessment";
-        toast.error(msg);
+        setModal({
+          isOpen: true,
+          type: "error",
+          title: "Error",
+          message: msg,
+        });
+
         if (error.response?.status === 404) navigate("/instructor/assessments");
       } finally {
         setIsLoading(false);
@@ -49,10 +57,15 @@ function AssessmentDetail() {
     fetchData();
   }, [id, getAssessmentById, navigate]);
 
-  const showModal = (type, title, message) => {
-    setModal({ isOpen: true, type, title, message });
-    toast[type === "success" ? "success" : "error"](message);
-  };
+
+  useEffect(() => {
+  if (currentAssessment) {
+    console.log("🧪 Assessment fetched:", currentAssessment);
+    console.log("📦 Resources count:", currentAssessment.resources?.length);
+    console.table(currentAssessment.resources);
+  }
+}, [currentAssessment]);
+
 
   // THIS OPENS THE PHYSICAL PAPER MODAL
   const openPaperModal = (assessment) => {
@@ -66,12 +79,10 @@ function AssessmentDetail() {
   if (isLoading || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-        <Navbar />
         <div className="flex flex-col justify-center items-center py-32">
           <LoadingSpinner size="lg" type="spinner" color="blue" />
           <span className="mt-4 text-gray-600 font-medium">Loading assessment...</span>
         </div>
-        <Footer />
       </div>
     );
   }
@@ -79,7 +90,6 @@ function AssessmentDetail() {
   if (error || !currentAssessment) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-        <Navbar />
         <div className="max-w-2xl mx-auto px-4 py-16">
           <Card className="shadow-lg border-0">
             <CardContent className="text-center py-16">
@@ -88,8 +98,8 @@ function AssessmentDetail() {
               <p className="text-gray-600 mb-8 max-w-md mx-auto">
                 The requested assessment could not be loaded. It may have been deleted or you don't have access to it.
               </p>
-              <Link 
-                to="/instructor/assessments" 
+              <Link
+                to="/instructor/assessments"
                 className="inline-flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-semibold shadow-md hover:shadow-lg"
               >
                 ← Back to Assessments
@@ -97,19 +107,17 @@ function AssessmentDetail() {
             </CardContent>
           </Card>
         </div>
-        <Footer />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      <Navbar />
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-8 sm:py-12 max-w-7xl">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-2 mb-4">
-            <Link 
+            <Link
               to="/instructor/assessments"
               className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 transition-colors duration-200"
             >
@@ -136,18 +144,18 @@ function AssessmentDetail() {
               </div>
               <div className="flex flex-wrap gap-2 text-sm">
                 {!currentAssessment.is_executed && (
-                  <Link 
-                    to={`/instructor/assessments/${id}/edit`} 
+                  <Link
+                    to={`/instructor/assessments/${id}/edit`}
                     className="flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all duration-200 font-semibold backdrop-blur-sm"
                   >
                     <FaEdit /> Edit
                   </Link>
                 )}
-                <Link 
-                  to={`/instructor/assessments/${id}/enroll`} 
+                <Link
+                  to={`/instructor/assessments/${id}/enroll`}
                   className="flex items-center gap-2  px-4 py-2.5 rounded-lg transition-all duration-200 font-semibold backdrop-blur-sm"
                 >
-                  <FaUsers /> Students
+                  <FaUsers /> Enroll
                 </Link>
                 <button
                   onClick={() => openPaperModal(currentAssessment)}
@@ -173,10 +181,12 @@ function AssessmentDetail() {
                   <span className="font-semibold text-gray-600 uppercase text-xs tracking-wide">Title</span>
                   <p className="mt-2 font-semibold text-gray-900 text-base">{currentAssessment.title}</p>
                 </div>
+                {currentAssessment.prompt && (
                 <div className="bg-gradient-to-br from-gray-50 to-blue-50 p-5 rounded-xl border-2 border-gray-200 hover:border-blue-300 transition-colors duration-200">
                   <span className="font-semibold text-gray-600 uppercase text-xs tracking-wide">Prompt</span>
-                  <p className="mt-2 text-gray-900">{currentAssessment.prompt || "—"}</p>
+                  <p className="mt-2 text-gray-900">{currentAssessment.prompt || "Not Provided"}</p>
                 </div>
+                )}
               </div>
             </section>
 
@@ -201,6 +211,7 @@ function AssessmentDetail() {
             </section>
 
             {/* External Links */}
+            {currentAssessment.external_links?.length > 0 && (
             <section>
               <h3 className="text-xl font-bold flex items-center gap-2 mb-5 text-gray-900">
                 <div className="w-10 h-10 bg-gradient-to-br from-purple-100 to-purple-200 rounded-lg flex items-center justify-center">
@@ -208,14 +219,13 @@ function AssessmentDetail() {
                 </div>
                 External Links
               </h3>
-              {currentAssessment.external_links?.length > 0 ? (
                 <div className="space-y-3">
                   {currentAssessment.external_links.map((link, i) => (
-                    <a 
-                      key={i} 
-                      href={link} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
+                    <a
+                      key={i}
+                      href={link}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="flex items-center gap-3 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-200 hover:border-purple-400 rounded-xl transition-all duration-200 group"
                     >
                       <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-purple-200 transition-colors duration-200">
@@ -226,14 +236,8 @@ function AssessmentDetail() {
                     </a>
                   ))}
                 </div>
-              ) : (
-                <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-8 text-center">
-                  <FaLink className="mx-auto text-4xl text-gray-300 mb-2" />
-                  <p className="text-gray-500 italic">No external links</p>
-                </div>
-              )}
             </section>
-
+                )}
             {/* Question Blocks - Desktop */}
             <section className="hidden lg:block">
               <h3 className="text-xl font-bold flex items-center gap-2 mb-5 text-gray-900">
@@ -268,7 +272,7 @@ function AssessmentDetail() {
                             <td className="px-6 py-4 text-sm text-gray-600">{b.duration_per_question}s</td>
                             <td className="px-6 py-4 text-sm text-gray-600">
                               {b.question_type === "multiple_choice" ? b.num_options :
-                               b.question_type === "matching" ? `${b.num_first_side}/${b.num_second_side}` : "—"}
+                                b.question_type === "matching" ? `${b.num_first_side}/${b.num_second_side}` : "N/A"}
                             </td>
                             <td className="px-6 py-4 text-sm">
                               <span className="bg-green-100 text-green-700 px-2 py-1 rounded font-semibold">
@@ -325,13 +329,13 @@ function AssessmentDetail() {
                       <div>
                         <strong className="text-gray-600 text-xs uppercase">Options:</strong>
                         <p className="text-gray-900 font-semibold">
-                          {b.question_type === "multiple_choice" ? b.num_options : b.question_type === "matching" ? `${b.num_first_side}/${b.num_second_side}` : "—"}
+                          {b.question_type === "multiple_choice" ? b.num_options : b.question_type === "matching" ? `${b.num_first_side}/${b.num_second_side}` : "N/A"}
                         </p>
                       </div>
                       <div>
                         <strong className="text-gray-600 text-xs uppercase">+/-Marks:</strong>
                         <p className="text-gray-900 font-semibold">
-                          <span className="text-green-600">+{b.positive_marks ?? "—"}</span> / 
+                          <span className="text-green-600">+{b.positive_marks ?? "—"}</span> /
                           <span className="text-red-600 ml-1">-{b.negative_marks ?? "—"}</span>
                         </p>
                       </div>
@@ -347,6 +351,7 @@ function AssessmentDetail() {
             </section>
 
             {/* Resources */}
+            {currentAssessment.resources?.length > 0 && (
             <section>
               <h3 className="text-xl font-bold flex items-center gap-2 mb-5 text-gray-900">
                 <div className="w-10 h-10 bg-gradient-to-br from-orange-100 to-orange-200 rounded-lg flex items-center justify-center">
@@ -354,11 +359,10 @@ function AssessmentDetail() {
                 </div>
                 Resources
               </h3>
-              {currentAssessment.resources?.length > 0 ? (
                 <div className="space-y-3">
                   {currentAssessment.resources.map((r, i) => (
-                    <div 
-                      key={i} 
+                    <div
+                      key={i}
                       className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-gradient-to-r from-orange-50 to-yellow-50 p-5 rounded-xl border-2 border-orange-200 hover:border-orange-400 transition-all duration-200"
                     >
                       <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -367,34 +371,19 @@ function AssessmentDetail() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-gray-900 truncate">{r.name}</p>
-                          <p className="text-xs text-gray-600 bg-orange-100 inline-block px-2 py-0.5 rounded mt-1 font-medium">
-                            {r.file_type}
-                          </p>
+                        
                         </div>
                       </div>
-                      <a 
-                        href={r.file_path} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="px-4 py-2 bg-orange-600 text-white hover:bg-orange-700 rounded-lg transition-colors duration-200 font-semibold text-sm whitespace-nowrap"
-                      >
-                        View/Download
-                      </a>
+                 
                     </div>
                   ))}
-                </div>
-              ) : (
-                <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-8 text-center">
-                  <FaFileAlt className="mx-auto text-4xl text-gray-300 mb-2" />
-                  <p className="text-gray-500 italic">No resources attached</p>
-                </div>
-              )}
+                </div> 
             </section>
+            )}
           </CardContent>
         </Card>
       </div>
 
-      <Footer />
 
       {/* Physical Paper Modal */}
       <PhysicalPaperModal

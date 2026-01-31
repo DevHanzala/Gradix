@@ -3,11 +3,8 @@ import useAuthStore from "../../store/authStore.js";
 import { Card, CardHeader, CardContent } from "../../components/ui/Card.jsx";
 import LoadingSpinner from "../../components/ui/LoadingSpinner.jsx";
 import Modal from "../../components/ui/Modal.jsx";
-import Navbar from "../../components/Navbar.jsx";
-import Footer from "../../components/Footer.jsx";
 import { 
   FaUser, 
-  FaChartBar, 
   FaUsers, 
   FaCheckCircle, 
   FaClock, 
@@ -21,7 +18,6 @@ import {
   FaSync,
   FaCalendarAlt,
   FaShieldAlt,
-  FaExclamationTriangle
 } from "react-icons/fa";
 
 function SuperAdminDashboard() {
@@ -30,6 +26,9 @@ function SuperAdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState({ isOpen: false, type: "info", title: "", message: "" });
   const [actionLoading, setActionLoading] = useState(null);
+const [pendingDelete, setPendingDelete] = useState(null);
+
+
 
   useEffect(() => {
     fetchUsers();
@@ -64,22 +63,39 @@ function SuperAdminDashboard() {
     }
   };
 
-  const handleDeleteUser = async (userId, userName) => {
-    if (!window.confirm(`Are you sure you want to delete ${userName}? This action cannot be undone.`)) {
-      return;
-    }
+const handleDeleteUser = (userId, userName) => {
+  setPendingDelete({ userId, userName });
+  showModal(
+    "warning",
+    "Confirm Deletion",
+    `Are you sure you want to delete ${userName}? This action cannot be undone.`
+  );
+};
 
-    try {
-      setActionLoading(`delete-${userId}`);
-      await deleteUser(userId);
-      await fetchUsers();
-      showModal("success", "Success", `Successfully deleted ${userName}.`);
-    } catch (error) {
-      showModal("error", "Error", `Failed to delete user. ${error.response?.data?.message || "Please try again."}`);
-    } finally {
-      setActionLoading(null);
-    }
-  };
+const confirmDeleteUser = async () => {
+  if (!pendingDelete) return;
+
+  try {
+    setActionLoading(`delete-${pendingDelete.userId}`);
+    await deleteUser(pendingDelete.userId);
+    await fetchUsers();
+    showModal(
+      "success",
+      "User Deleted",
+      `${pendingDelete.userName} has been deleted successfully.`
+    );
+  } catch (error) {
+    showModal(
+      "error",
+      "Error",
+      error.response?.data?.message || "Failed to delete user."
+    );
+  } finally {
+    setActionLoading(null);
+    setPendingDelete(null);
+  }
+};
+
 
   const getUserStats = () => {
     const stats = users.reduce(
@@ -111,16 +127,7 @@ function SuperAdminDashboard() {
     }
   };
 
-  const getProviderBadgeColor = (provider) => {
-    switch (provider) {
-      case "google":
-        return "bg-blue-100 text-blue-800 border-blue-200";
-      case "manual":
-        return "bg-gray-100 text-gray-800 border-gray-200";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
-    }
-  };
+  
 
   const filteredUsers = users.filter((u) => u.role !== "super_admin");
 
@@ -169,7 +176,6 @@ function SuperAdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-purple-50/30 to-blue-50/30">
-      <Navbar />
 
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
         {/* Welcome Section - Enhanced */}
@@ -461,16 +467,21 @@ function SuperAdminDashboard() {
         </Card>
       </div>
 
-      <Footer />
+<Modal
+  isOpen={modal.isOpen}
+  onClose={() => {
+    setModal({ ...modal, isOpen: false });
+    setPendingDelete(null);
+  }}
+  onConfirm={pendingDelete ? confirmDeleteUser : undefined}
+  type={modal.type}
+  title={modal.title}
+  loading={pendingDelete && actionLoading === `delete-${pendingDelete.userId}`}
+  confirmText="Delete User"
+>
+  {modal.message}
+</Modal>
 
-      <Modal
-        isOpen={modal.isOpen}
-        onClose={() => setModal({ ...modal, isOpen: false })}
-        type={modal.type}
-        title={modal.title}
-      >
-        {modal.message}
-      </Modal>
     </div>
   );
 }

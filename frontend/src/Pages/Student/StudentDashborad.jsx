@@ -4,8 +4,6 @@ import useAuthStore from "../../store/authStore";
 import useStudentAnalyticsStore from "../../store/useStudentAnalyticsStore";
 import { Card, CardHeader, CardContent } from "../../components/ui/Card";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
-import Navbar from "../../components/Navbar";
-import Footer from "../../components/Footer";
 import { 
   FaClipboardList, 
   FaCheckCircle, 
@@ -31,7 +29,7 @@ function StudentDashboard() {
 
   useEffect(() => {
     fetchOverview();
-  }, [fetchOverview]);
+  }, []);
 
   useEffect(() => {
     if (analytics) {
@@ -47,13 +45,19 @@ function StudentDashboard() {
     }
   }, [analytics]);
 
-  const getAssessmentStatus = (assessment) => {
-    const completedAttempt = analytics.recent_performance?.find(a => a.assessment_id === assessment.id);
-    if (completedAttempt) {
-      return { status: "completed", color: "green", text: "Completed" };
-    }
+const getAssessmentStatus = (assessment) => {
+  if (!analytics?.recent_performance) {
     return { status: "available", color: "blue", text: "Available" };
-  };
+  }
+
+  const completedAttempt = analytics.recent_performance.find(
+    (a) => a.assessment_id === assessment.id
+  );
+
+  return completedAttempt
+    ? { status: "completed", color: "green", text: "Completed" }
+    : { status: "available", color: "blue", text: "Available" };
+};
 
   const formatDate = (dateString) => {
     if (!dateString) return "No deadline";
@@ -106,7 +110,6 @@ function StudentDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
-      <Navbar />
 
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
         {/* Welcome Header - Enhanced */}
@@ -347,7 +350,6 @@ function StudentDashboard() {
         </Card>
       </div>
 
-      <Footer />
     </div>
   );
 }

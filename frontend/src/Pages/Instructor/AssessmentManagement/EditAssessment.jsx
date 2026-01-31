@@ -1,22 +1,29 @@
-import { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import useAssessmentStore from "../../../store/assessmentStore.js";
 import useResourceStore from "../../../store/resourceStore.js";
 import { Card, CardHeader, CardContent } from "../../../components/ui/Card";
 import LoadingSpinner from "../../../components/ui/LoadingSpinner";
 import Modal from "../../../components/ui/Modal";
-import Navbar from "../../../components/Navbar";
-import Footer from "../../../components/Footer";
-import toast from "react-hot-toast";
-import { io } from "socket.io-client";
+import { validateAssessmentForm, validateFiles } from "../../../scheema/editAssessmnetSchemas.js";
 
 function EditAssessment() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
   const { currentAssessment, loading, error, getAssessmentById, updateAssessment } = useAssessmentStore();
   const { resources, fetchAllResources, loading: resourcesLoading } = useResourceStore();
   const [modal, setModal] = useState({ isOpen: false, type: "info", title: "", message: "" });
+ 
+
+  useEffect(() => {
+    fetchAllResources();
+  }, [fetchAllResources]);
+
+  useEffect(() => {
+    if (!currentAssessment || currentAssessment.id !== Number(id)) {
+      getAssessmentById(id);
+    }
+  }, [id, currentAssessment, getAssessmentById]);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -37,46 +44,8 @@ function EditAssessment() {
 
   const [selectedResources, setSelectedResources] = useState([]);
   const [newFiles, setNewFiles] = useState([]);
-
-  const [progress, setProgress] = useState(0);
-  const [progressMessage, setProgressMessage] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [questionBlocksTouched, setQuestionBlocksTouched] = useState(false);
-
-  const socketRef = useRef(null);
-
-  useEffect(() => {
-    console.log(`🔍 EditAssessment: id from useParams = "${id}", pathname = "${location.pathname}"`);
-    const fetchData = async () => {
-      try {
-        if (!id || isNaN(parseInt(id))) {
-          console.warn(`⚠️ Invalid assessment ID: "${id}" at ${location.pathname}`);
-          setModal({
-            isOpen: true,
-            type: "error",
-            title: "Invalid Assessment",
-            message: "The assessment ID is invalid. Redirecting to assessments list.",
-          });
-          toast.error("Invalid assessment ID");
-          navigate("/instructor/assessments");
-          return;
-        }
-        await fetchAllResources();
-        await getAssessmentById(parseInt(id));
-      } catch (err) {
-        console.error("❌ Error fetching assessment or resources:", err);
-        const errorMessage = err.response?.data?.message || err.message || "Failed to fetch assessment or resources";
-        setModal({ isOpen: true, type: "error", title: "Error", message: errorMessage });
-        toast.error(errorMessage);
-        if (err.response?.status === 403 || err.message === "No authentication token found") {
-          setTimeout(() => navigate("/login"), 2000);
-        } else if (err.response?.status === 404 || err.message === "Invalid assessment ID") {
-          navigate("/instructor/assessments");
-        }
-      }
-    };
-    fetchData();
-  }, [id, getAssessmentById, fetchAllResources, navigate, location.pathname]);
 
   useEffect(() => {
     if (currentAssessment) {
@@ -105,31 +74,6 @@ function EditAssessment() {
       console.log(`🔍 Loaded selectedResources:`, currentAssessment.resources?.map(r => r.id));
     }
   }, [currentAssessment]);
-
-  useEffect(() => {
-    const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-    const socket = io(API_URL, {
-      transports: ["websocket"],
-      withCredentials: true,
-    });
-
-    socketRef.current = socket;
-
-    socket.on("connect", () => {
-      console.log("Socket connected:", socket.id);
-    });
-
-    socket.on("assessment-progress", (data) => {
-      setProgress(data.percent);
-      setProgressMessage(data.message);
-    });
-
-    socket.on("disconnect", () => {
-      console.log("Socket disconnected");
-    });
-
-    return () => socket.disconnect();
-  }, []);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -204,7 +148,17 @@ function EditAssessment() {
   };
 
   const handleFileChange = (e) => {
-    setNewFiles([...e.target.files]);
+    const files = Array.from(e.target.files);
+    
+    // Validate files using Zod
+    const validation = validateFiles(files);
+    if (!validation.success) {
+      setModal({ isOpen: true, type: "error", title: "File Validation Error", message: validation.error });
+      e.target.value = ''; // Clear the input
+      return;
+    }
+    
+    setNewFiles(files);
   };
 
   const handleResourceToggle = (resourceId) => {
@@ -213,46 +167,26 @@ function EditAssessment() {
     );
   };
 
-  const validateForm = () => {
-    if (!formData.title || !formData.title.trim()) {
-      return "Assessment Title is required";
-    }
-
-    const hasResources = selectedResources.length > 0 || newFiles.length > 0;
-    const hasLinks = formData.externalLinks.some(link => link && link.trim());
-
-    if (!formData.prompt?.trim() && !hasResources && !hasLinks) {
-      return "You must provide either a Prompt, Resources, or External Links";
-    }
-
-    for (const block of questionBlocks) {
-      if (!block.question_count || block.question_count < 1) {
-        return "Question count must be at least 1";
-      }
-      if (!block.duration_per_question || block.duration_per_question < 30) {
-        return "Duration per question must be at least 30 seconds";
-      }
-      if (block.question_type === "multiple_choice" && (!block.num_options || block.num_options < 2)) {
-        return "Multiple choice needs at least 2 options";
-      }
-    }
-
-    return null;
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const validationError = validateForm();
-    if (validationError) {
-      setModal({ isOpen: true, type: "error", title: "Validation Error", message: validationError });
+    // Validate form using Zod
+    const validation = validateAssessmentForm({
+      title: formData.title,
+      prompt: formData.prompt,
+      externalLinks: formData.externalLinks,
+      questionBlocks,
+      selectedResources,
+      newFiles
+    });
+
+    if (!validation.success) {
+      setModal({ isOpen: true, type: "error", title: "Validation Error", message: validation.error });
       return;
     }
 
     setIsProcessing(true);
-    setProgress(0);
-    setProgressMessage("Updating...");
-
+    
     const assessmentData = new FormData();
 
     console.log("DEBUG: Frontend EditAssessment - Title before append:", formData.title, "Trimmed:", formData.title.trim());
@@ -278,7 +212,7 @@ function EditAssessment() {
     
     assessmentData.append("selected_resources", JSON.stringify(selectedResources));
     newFiles.forEach(f => assessmentData.append("new_files", f));
-    if (socketRef.current?.id) assessmentData.append("socketId", socketRef.current.id);
+    
 
     console.log("DEBUG: Frontend EditAssessment - FormData contents:");
     for (let [key, value] of assessmentData.entries()) {
@@ -309,7 +243,6 @@ function EditAssessment() {
   if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-        <Navbar />
         <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <Card className="shadow-lg border-0">
             <CardContent className="p-8">
@@ -327,7 +260,6 @@ function EditAssessment() {
             </CardContent>
           </Card>
         </div>
-        <Footer />
         <Modal
           isOpen={modal.isOpen}
           onClose={() => setModal({ ...modal, isOpen: false })}
@@ -342,7 +274,6 @@ function EditAssessment() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      <Navbar />
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         {/* Header Section */}
         <div className="mb-8">
@@ -366,27 +297,6 @@ function EditAssessment() {
             </div>
           )}
         </div>
-
-        {/* Progress Bar */}
-        {isProcessing && (
-          <Card className="mb-6 border-blue-300 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                  <p className="text-sm font-medium text-blue-900">{progressMessage}</p>
-                </div>
-                <p className="text-lg font-bold text-blue-900">{Math.round(progress)}%</p>
-              </div>
-              <div className="w-full bg-blue-200 rounded-full h-3 overflow-hidden shadow-inner">
-                <div
-                  className="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full transition-all duration-500 ease-out shadow-sm"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Assessment Details Card */}
@@ -414,6 +324,7 @@ function EditAssessment() {
                 </div>
 
                 {/* Prompt Textarea */}
+                
                 <div>
                   <label htmlFor="prompt" className="block text-sm font-semibold text-gray-700 mb-2">
                     AI Prompt <span className="text-gray-500 font-normal">(Optional if using resources or links)</span>
@@ -544,84 +455,83 @@ function EditAssessment() {
           <Card className="shadow-md hover:shadow-lg transition-shadow duration-300 border-0">
             <CardHeader className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-t-lg">
               <h2 className="text-xl font-semibold">❓ Question Configuration</h2>
-            </CardHeader>
-            <CardContent className="p-6 sm:p-8">
-              <div className="space-y-6">
-                {questionBlocks.map((block, index) => (
-                  <div key={index} className="p-6 border-2 border-gray-200 rounded-xl bg-gradient-to-br from-white to-gray-50 hover:border-blue-300 transition-all duration-300">
-                    <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                        <span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm">Block {index + 1}</span>
-                      </h3>
-                      {questionBlocks.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeQuestionBlock(index)}
-                          className="text-red-600 hover:text-red-800 font-medium hover:bg-red-50 px-3 py-1 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                          disabled={currentAssessment.is_executed}
-                        >
-                          🗑️ Remove
-                        </button>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Question Type</label>
-                        <select
-                          value={block.question_type}
-                          onChange={(e) => handleBlockChange(index, "question_type", e.target.value)}
-                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-300 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          disabled={currentAssessment.is_executed}
-                        >
-                          <option value="multiple_choice">Multiple Choice</option>
-                          <option value="short_answer">Short Answer</option>
-                          <option value="true_false">True/False</option>
-                        </select>
-                      </div>
+</CardHeader>
+<CardContent className="p-6 sm:p-8">
+<div className="space-y-6">
+{questionBlocks.map((block, index) => (
+<div key={index} className="p-6 border-2 border-gray-200 rounded-xl bg-gradient-to-br from-white to-gray-50 hover:border-blue-300 transition-all duration-300">
+<div className="flex justify-between items-center mb-6">
+<h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+<span className="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-sm">Block {index + 1}</span>
+</h3>
+{questionBlocks.length > 1 && (
+<button
+type="button"
+onClick={() => removeQuestionBlock(index)}
+className="text-red-600 hover:text-red-800 font-medium hover:bg-red-50 px-3 py-1 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+disabled={currentAssessment.is_executed}
+>
+🗑️ Remove
+</button>
+)}
+</div>
+<div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+<div>
+<label className="block text-sm font-medium text-gray-700 mb-2">Question Type</label>
+<select
+value={block.question_type}
+onChange={(e) => handleBlockChange(index, "question_type", e.target.value)}
+className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-300 bg-white disabled:bg-gray-100 disabled:cursor-not-allowed"
+disabled={currentAssessment.is_executed}
+>
+<option value="multiple_choice">Multiple Choice</option>
+<option value="short_answer">Short Answer</option>
+<option value="true_false">True/False</option>
+</select>
+</div>
+<div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Question Count</label>
+                    <input
+                      type="number"
+                      value={block.question_count}
+                      onChange={(e) => handleBlockChange(index, "question_count", e.target.value)}
+                      min="1"
+                      placeholder="e.g. 5"
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      disabled={currentAssessment.is_executed}
+                    />
+                  </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Question Count</label>
-                        <input
-                          type="number"
-                          value={block.question_count}
-                          onChange={(e) => handleBlockChange(index, "question_count", e.target.value)}
-                          min="1"
-                          placeholder="e.g. 5"
-                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          disabled={currentAssessment.is_executed}
-                        />
-                      </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Duration (seconds)</label>
+                    <input
+                      type="number"
+                      value={block.duration_per_question}
+                      onChange={(e) => handleBlockChange(index, "duration_per_question", e.target.value)}
+                      min="30"
+                      placeholder="e.g. 120"
+                      className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      disabled={currentAssessment.is_executed}
+                    />
+                  </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Duration (seconds)</label>
-                        <input
-                          type="number"
-                          value={block.duration_per_question}
-                          onChange={(e) => handleBlockChange(index, "duration_per_question", e.target.value)}
-                          min="30"
-                          placeholder="e.g. 120"
-                          className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                          disabled={currentAssessment.is_executed}
-                        />
-                      </div>
-
-                      {block.question_type === "multiple_choice" && (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Number of Options</label>
-                          <input
-                            type="number"
-                            value={block.num_options}
-                            onChange={(e) => handleBlockChange(index, "num_options", e.target.value)}
-                            min="2"
-                            max="6"
-                            placeholder="2 to 6"
-                            className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                            disabled={currentAssessment.is_executed}
-                          />
-                        </div>
-                      )}
-
+                  {block.question_type === "multiple_choice" && (
                     <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Number of Options</label>
+                      <input
+                        type="number"
+                        value={block.num_options}
+                        onChange={(e) => handleBlockChange(index, "num_options", e.target.value)}
+                        min="2"
+                        max="6"
+                        placeholder="2 to 6"
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 hover:border-gray-300 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        disabled={currentAssessment.is_executed}
+                      />
+                    </div>
+                  )}
+
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Negative Marks</label>
                     <input
                       type="number"
@@ -683,8 +593,6 @@ function EditAssessment() {
       </div>
     </form>
   </div>
-
-  <Footer />
 
   <Modal
     isOpen={modal.isOpen}

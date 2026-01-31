@@ -1,19 +1,26 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import useAssessmentStore from "../../../store/assessmentStore.js";
 import useResourceStore from "../../../store/resourceStore.js";
 import { Card, CardHeader, CardContent } from "../../../components/ui/Card";
 import LoadingSpinner from "../../../components/ui/LoadingSpinner";
 import Modal from "../../../components/ui/Modal";
-import Navbar from "../../../components/Navbar";
-import Footer from "../../../components/Footer";
-import { io } from "socket.io-client";
-
+import { createAssessmentSchema } from "../../../scheema/assessmentSchemas.js";
 function CreateAssessment() {
   const navigate = useNavigate();
   const { createAssessment, loading, error } = useAssessmentStore();
   const { resources, fetchAllResources, loading: resourcesLoading } = useResourceStore();
   const [modal, setModal] = useState({ isOpen: false, type: "info", title: "", message: "" });
+const [isProcessing, setIsProcessing] = useState(false);
+
+
+
+
+useEffect(() => {
+  fetchAllResources();
+}, [fetchAllResources]);
+
+
 
   const [formData, setFormData] = useState({
     title: "",
@@ -34,42 +41,7 @@ function CreateAssessment() {
 
   const [selectedResources, setSelectedResources] = useState([]);
 
-  // Progress state
-  const [progress, setProgress] = useState(0);
-  const [progressMessage, setProgressMessage] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  // Socket ref
-  const socketRef = useRef(null);
-
-  useEffect(() => {
-    fetchAllResources();
-
-    const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-    const socket = io(API_URL, {
-      transports: ["websocket"],
-      withCredentials: true,
-    });
-
-    socketRef.current = socket;
-
-    socket.on("connect", () => {
-      console.log("Socket connected:", socket.id);
-    });
-
-    socket.on("assessment-progress", (data) => {
-      setProgress(data.percent);
-      setProgressMessage(data.message);
-    });
-
-    socket.on("disconnect", () => {
-      console.log("Socket disconnected");
-    });
-
-    return () => {
-      socket.disconnect();
-    };
-  }, [fetchAllResources]);
+ 
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -84,16 +56,16 @@ function CreateAssessment() {
       prev.map((block, i) =>
         i === index
           ? {
-              ...block,
-              [field]:
-                field === "question_count" || field === "duration_per_question" || field === "num_options"
-                  ? Math.max(Number.parseInt(value) || 1, 1)
-                  : field === "positive_marks" || field === "negative_marks"
-                    ? value === "" || value === null
-                      ? null
-                      : Math.max(Number.parseFloat(value) || 0, 0)
-                    : value,
-            }
+            ...block,
+            [field]:
+              field === "question_count" || field === "duration_per_question" || field === "num_options"
+                ? Math.max(Number.parseInt(value) || 1, 1)
+                : field === "positive_marks" || field === "negative_marks"
+                  ? value === "" || value === null
+                    ? null
+                    : Math.max(Number.parseFloat(value) || 0, 0)
+                  : value,
+          }
           : block
       )
     );
@@ -144,75 +116,58 @@ function CreateAssessment() {
     setSelectedResources((prev) =>
       prev.includes(resourceId) ? prev.filter((id) => id !== resourceId) : [...prev, resourceId]
     );
+    console.log(selectedResources);
   };
 
-  const validateForm = () => {
-    if (!formData.title || !formData.title.trim()) {
-      return "Assessment Title is required";
-    }
-
-    const hasResources = selectedResources.length > 0;
-    const hasLinks = formData.externalLinks.some(link => link && link.trim());
-
-    if (!formData.prompt?.trim() && !hasResources && !hasLinks) {
-      return "You must provide either a Prompt, Existing Resources, or External Links";
-    }
-
-    for (const block of questionBlocks) {
-      if (!block.question_count || block.question_count < 1) {
-        return "Question count must be at least 1";
-      }
-      if (!block.duration_per_question || block.duration_per_question < 30) {
-        return "Duration per question must be at least 30 seconds";
-      }
-      if (block.question_type === "multiple_choice" && (!block.num_options || block.num_options < 2)) {
-        return "Multiple choice needs at least 2 options";
-      }
-    }
-
-    return null;
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+const validationResult = createAssessmentSchema.safeParse({
+  title: formData.title,
+  prompt: formData.prompt,
+  selectedResources,
+ externalLinks: formData.externalLinks.filter((l) => l.trim() !== ""),
+  questionBlocks,
+});
 
-    const validationError = validateForm();
-    if (validationError) {
-      setModal({
-        isOpen: true,
-        type: "error",
-        title: "Validation Error",
-        message: validationError,
-      });
-      return;
-    }
+if (!validationResult.success) {
+  setModal({
+    isOpen: true,
+    type: "error",
+    title: "Validation Error",
+message: validationResult.error.issues?.[0]?.message || "Invalid data",
+  });
+  return;
+}
+
 
     setIsProcessing(true);
-    setProgress(0);
-    setProgressMessage("Starting...");
-
+    
     const assessmentData = new FormData();
-    assessmentData.append("title", formData.title ? formData.title.trim() : null);
+    assessmentData.append("title", formData.title.trim());
     assessmentData.append("prompt", formData.prompt.trim());
-    assessmentData.append("externalLinks", JSON.stringify(formData.externalLinks.filter((link) => link.trim())));
-    assessmentData.append(
-      "question_blocks",
-      JSON.stringify(
-        questionBlocks.map((block) => ({
-          question_type: block.question_type,
-          question_count: block.question_count,
-          duration_per_question: block.duration_per_question,
-          num_options: block.question_type === "multiple_choice" ? block.num_options : null,
-          positive_marks: block.positive_marks || 1,
-          negative_marks: block.negative_marks || 0,
-        }))
-      )
-    );
-    assessmentData.append("selected_resources", JSON.stringify(selectedResources));
+// When appending FormData:
+assessmentData.append(
+  "external_links", 
+  JSON.stringify(formData.externalLinks.filter(link => link.trim()))
+);
+assessmentData.append(
+  "selected_resources", 
+  JSON.stringify(selectedResources)
+);
+assessmentData.append(
+  "question_blocks",
+  JSON.stringify(questionBlocks.map(block => ({
+    question_type: block.question_type,
+    question_count: Number(block.question_count),
+    duration_per_question: Number(block.duration_per_question),
+    num_options: block.question_type === "multiple_choice" ? Number(block.num_options) : null,
+    positive_marks: Number(block.positive_marks || 1),
+    negative_marks: Number(block.negative_marks || 0),
+  })))
+);
 
-    if (socketRef.current?.id) {
-      assessmentData.append("socketId", socketRef.current.id);
-    }
+
 
     // No new files appended
 
@@ -243,7 +198,6 @@ function CreateAssessment() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      <Navbar />
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         {/* Header Section */}
@@ -251,27 +205,6 @@ function CreateAssessment() {
           <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">Create New Assessment</h1>
           <p className="text-gray-600">Design a comprehensive assessment with customizable question blocks</p>
         </div>
-
-        {/* Progress Bar */}
-        {isProcessing && (
-          <Card className="mb-6 border-blue-300 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-lg">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                  <p className="text-sm font-medium text-blue-900">{progressMessage}</p>
-                </div>
-                <p className="text-lg font-bold text-blue-900">{Math.round(progress)}%</p>
-              </div>
-              <div className="w-full bg-blue-200 rounded-full h-3 overflow-hidden shadow-inner">
-                <div
-                  className="bg-gradient-to-r from-blue-500 to-indigo-600 h-3 rounded-full transition-all duration-500 ease-out shadow-sm"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Assessment Details Card */}
@@ -547,7 +480,6 @@ function CreateAssessment() {
         </form>
       </div>
 
-      <Footer />
 
       <Modal
         isOpen={modal.isOpen}

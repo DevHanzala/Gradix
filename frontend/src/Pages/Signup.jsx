@@ -1,27 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { z } from "zod";
 import useAuthStore from "../store/authStore.js";
 import { Card, CardHeader, CardContent } from "../components/ui/Card.jsx";
 import LoadingSpinner from "../components/ui/LoadingSpinner.jsx";
 import Modal from "../components/ui/Modal.jsx";
-import Navbar from "../components/Navbar.jsx";
-import Footer from "../components/Footer.jsx";
-import toast from "react-hot-toast";
-import { loadRecaptcha, getCaptchaToken } from "../config/captcha.js";
+import {  getCaptchaToken } from "../config/captcha.js";
 import { FaUser, FaEnvelope, FaLock, FaUserPlus, FaGoogle, FaGraduationCap } from "react-icons/fa";
-
-const signupSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters").max(50, "Name must be less than 50 characters"),
-  email: z.string().email("Please enter a valid email address"),
-  password: z
-    .string()
-    .min(8, "Password must be at least 8 characters")
-    .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-      "Password must contain at least one uppercase letter, one lowercase letter, and one number",
-    ),
-});
+import { redirectByRole } from "../utils/redirectByRole.js";
+import useRecaptchaInit from "../hooks/useRecaptchaInit.js";
+import { signupSchema } from "../scheema/authSchemas.js";
 
 function Signup() {
   const navigate = useNavigate();
@@ -38,13 +25,9 @@ function Signup() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [modal, setModal] = useState({ isOpen: false, type: "info", title: "", message: "" });
 
-  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+  const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY
+  useRecaptchaInit(siteKey);
 
-  useEffect(() => {
-    if (siteKey) {
-      loadRecaptcha(siteKey).catch(console.error);
-    }
-  }, [siteKey]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -56,7 +39,6 @@ function Signup() {
 
   const showModal = (type, title, message) => {
     setModal({ isOpen: true, type, title, message });
-    toast[type === "success" ? "success" : "error"](message);
   };
 
   const handleSubmit = async (e) => {
@@ -98,22 +80,7 @@ function Signup() {
       showModal("success", "Welcome!", `Successfully signed up with Google! Welcome, ${user.name}!`);
 
       setTimeout(() => {
-        switch (user.role) {
-          case "super_admin":
-            navigate("/super-admin/dashboard");
-            break;
-          case "admin":
-            navigate("/admin/dashboard");
-            break;
-          case "instructor":
-            navigate("/instructor/dashboard");
-            break;
-          case "student":
-            navigate("/student/dashboard");
-            break;
-          default:
-            navigate("/profile");
-        }
+        redirectByRole(user.role, navigate);
       }, 2000);
     } catch (error) {
       const errorMessage = error.response?.data?.message || error.message || "Google signup failed. Please try again.";
@@ -125,7 +92,6 @@ function Signup() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50">
-      <Navbar />
 
       <div className="flex items-center justify-center py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
         <Card className="w-full max-w-md shadow-2xl border-2 border-gray-200 rounded-2xl sm:rounded-3xl overflow-hidden">
@@ -303,7 +269,6 @@ function Signup() {
         </Card>
       </div>
 
-      <Footer />
 
       <Modal
         isOpen={modal.isOpen}

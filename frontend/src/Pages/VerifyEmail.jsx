@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import useAuthStore from "../store/authStore.js";
-import Navbar from "../components/Navbar.jsx";
-import Footer from "../components/Footer.jsx";
 import LoadingSpinner from "../components/ui/LoadingSpinner.jsx";
 import { FaCheckCircle, FaTimesCircle, FaEnvelope, FaArrowRight } from "react-icons/fa";
 
@@ -56,7 +54,6 @@ function VerifyEmail() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col">
-        <Navbar />
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="bg-white p-8 sm:p-10 rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-md text-center border-2 border-gray-200">
             <div className="bg-gradient-to-br from-blue-100 to-purple-100 w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -70,14 +67,12 @@ function VerifyEmail() {
             </div>
           </div>
         </div>
-        <Footer />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col">
-      <Navbar />
       <div className="flex-1 flex items-center justify-center p-4">
         <div className="bg-white p-8 sm:p-10 rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-md text-center border-2 border-gray-200">
           <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-8">Email Verification</h2>
@@ -162,7 +157,6 @@ function VerifyEmail() {
           )}
         </div>
       </div>
-      <Footer />
     </div>
   );
 }

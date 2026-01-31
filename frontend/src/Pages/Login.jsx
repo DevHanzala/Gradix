@@ -1,21 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { z } from "zod";
 import useAuthStore from "../store/authStore.js";
 import { Card, CardHeader, CardContent } from "../components/ui/Card.jsx";
 import LoadingSpinner from "../components/ui/LoadingSpinner.jsx";
 import Modal from "../components/ui/Modal.jsx";
-import Navbar from "../components/Navbar.jsx";
-import Footer from "../components/Footer.jsx";
-import toast from "react-hot-toast";
 import axios from "axios";
-import { loadRecaptcha, getCaptchaToken } from "../config/captcha.js";
+import {  getCaptchaToken } from "../config/captcha.js";
 import { FaEnvelope, FaLock, FaSignInAlt, FaGoogle, FaUserCircle } from "react-icons/fa";
-
-const loginSchema = z.object({
-  email: z.string().email("Please enter a valid email address"),
-  password: z.string().min(1, "Password is required"),
-});
+import { redirectByRole } from "../utils/redirectByRole.js";
+import useRecaptchaInit from "../hooks/useRecaptchaInit.js";
+import { loginSchema } from "../scheema/authSchemas.js";
 
 function Login() {
   const navigate = useNavigate();
@@ -28,12 +22,9 @@ function Login() {
   const [modal, setModal] = useState({ isOpen: false, type: "info", title: "", message: "" });
 
   const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+ useRecaptchaInit(siteKey);
 
-  useEffect(() => {
-    if (siteKey) {
-      loadRecaptcha(siteKey).catch(console.error);
-    }
-  }, [siteKey]);
+
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -43,27 +34,9 @@ function Login() {
 
   const showModal = (type, title, message) => {
     setModal({ isOpen: true, type, title, message });
-    toast[type === "success" ? "success" : "error"](message);
   };
 
-  const redirectUser = (user) => {
-    switch (user.role) {
-      case "super_admin":
-        navigate("/super-admin/dashboard");
-        break;
-      case "admin":
-        navigate("/admin/dashboard");
-        break;
-      case "instructor":
-        navigate("/instructor/dashboard");
-        break;
-      case "student":
-        navigate("/student/dashboard");
-        break;
-      default:
-        navigate("/profile");
-    }
-  };
+  
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -81,12 +54,12 @@ function Login() {
       showModal("success", "Login Successful!", `Welcome back, ${response.name}!`);
 
       setTimeout(() => {
-        redirectUser(response);
+        redirectByRole(response.role, navigate);
       }, 1500);
     } catch (error) {
-      if (error instanceof z.ZodError) {
+      if (error instanceof ZodError) {
         const fieldErrors = {};
-        error.errors.forEach((err) => {
+        error.errors.forEach((err) => { 
           fieldErrors[err.path[0]] = err.message;
         });
         setErrors(fieldErrors);
@@ -110,7 +83,7 @@ function Login() {
       showModal("success", "Welcome!", `Successfully signed in with Google! Welcome back, ${response.name}!`);
 
       setTimeout(() => {
-        redirectUser(response);
+        redirectByRole(response.role, navigate);
       }, 1500);
     } catch (error) {
       console.error("Google login error:", error);
@@ -123,7 +96,6 @@ function Login() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <Navbar />
       <div className="flex items-center justify-center py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
         <Card className="w-full max-w-md shadow-2xl border-2 border-gray-200 rounded-2xl sm:rounded-3xl overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 sm:p-8">
@@ -269,7 +241,6 @@ function Login() {
         </Card>
       </div>
 
-      <Footer />
 
       <Modal
         isOpen={modal.isOpen}

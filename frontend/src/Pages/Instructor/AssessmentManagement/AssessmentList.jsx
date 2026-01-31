@@ -4,9 +4,6 @@ import useAssessmentStore from "../../../store/assessmentStore.js";
 import { Card, CardHeader, CardContent } from "../../../components/ui/Card";
 import LoadingSpinner from "../../../components/ui/LoadingSpinner";
 import Modal from "../../../components/ui/Modal";
-import Navbar from "../../../components/Navbar";
-import Footer from "../../../components/Footer";
-import toast from "react-hot-toast";
 import {
   FaEye,
   FaEdit,
@@ -26,6 +23,7 @@ function AssessmentList() {
   const [modal, setModal] = useState({ isOpen: false, type: "info", title: "", message: "" });
   const [searchTerm, setSearchTerm] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+const [deleteTarget, setDeleteTarget] = useState(null);
 
   // Paper Modal State
   const [paperModal, setPaperModal] = useState({
@@ -48,7 +46,13 @@ function AssessmentList() {
       try {
         await getInstructorAssessments();
       } catch (error) {
-        showModal("error", "Error", "Failed to fetch assessments. Please try again.");
+setModal({
+  isOpen: true,
+  type: "error",
+  title: "Error",
+  message: "Failed to fetch assessments. Please try again.",
+});
+
       } finally {
         setIsLoading(false);
       }
@@ -56,22 +60,17 @@ function AssessmentList() {
     fetchData();
   }, [getInstructorAssessments]);
 
-  const showModal = (type, title, message) => {
-    setModal({ isOpen: true, type, title, message });
-    toast[type === "success" ? "success" : "error"](message);
-  };
+  
 
-  const handleDeleteAssessment = async (assessmentId, assessmentTitle) => {
-    if (window.confirm(`Are you sure you want to delete "${assessmentTitle}"?`)) {
-      try {
-        await deleteAssessment(assessmentId);
-        showModal("success", "Success", "Assessment deleted successfully!");
-        await getInstructorAssessments();
-      } catch (error) {
-        showModal("error", "Error", "Failed to delete assessment.");
-      }
-    }
-  };
+const handleDeleteAssessment = (assessmentId, assessmentTitle) => {
+  setDeleteTarget({ id: assessmentId, title: assessmentTitle });
+  setModal({
+    isOpen: true,
+    type: "warning",
+    title: "Confirm Deletion",
+    message: `Are you sure you want to delete "${assessmentTitle}"? This action cannot be undone.`,
+  });
+};
 
   const filteredAssessments = assessments?.filter(a =>
     a && a.id && a.title?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -79,7 +78,6 @@ function AssessmentList() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      <Navbar />
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-8 sm:py-12">
         {/* Header */}
         <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -301,7 +299,6 @@ function AssessmentList() {
         )}
       </div>
 
-      <Footer />
 
       {/* Physical Paper Modal */}
       <PhysicalPaperModal
@@ -313,13 +310,34 @@ function AssessmentList() {
 
       {/* General Modal */}
       <Modal
-        isOpen={modal.isOpen}
-        onClose={() => setModal({ ...modal, isOpen: false })}
-        type={modal.type}
-        title={modal.title}
-      >
-        {modal.message}
-      </Modal>
+  isOpen={modal.isOpen}
+  onClose={() => {
+    setModal({ ...modal, isOpen: false });
+    setDeleteTarget(null);
+  }}
+  type={modal.type}
+  title={modal.title}
+  onConfirm={
+    deleteTarget
+      ? async () => {
+          await deleteAssessment(deleteTarget.id);
+          setModal({
+            isOpen: true,
+            type: "success",
+            title: "Deleted",
+            message: "Assessment deleted successfully!",
+          });
+          setDeleteTarget(null);
+          await getInstructorAssessments();
+        }
+      : undefined
+  }
+  confirmText="Yes, Delete"
+  cancelText="Cancel"
+>
+  {modal.message}
+</Modal>
+
     </div>
   );
 }

@@ -1,8 +1,11 @@
 import { create } from "zustand";
-import axios from "axios";
-import toast from "react-hot-toast";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+import {
+  fetchResourcesAPI,
+  fetchAllResourcesAPI,
+  getResourceByIdAPI,
+  uploadResourcesAPI,
+  deleteResourceAPI,
+} from "../api/resource.api.js";
 
 const useResourceStore = create((set) => ({
   resources: [],
@@ -11,126 +14,71 @@ const useResourceStore = create((set) => ({
   error: null,
 
   fetchResources: async () => {
-    set({ loading: true, error: null });
     try {
-      const token = localStorage.getItem("token");
-      const response = await axios.get(`${API_URL}/resources`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.data.success) {
-        set({ resources: response.data.data, loading: false });
-      } else {
-        set({ error: response.data.message, loading: false });
-      }
-    } catch (error) {
-      set({ error: error.response?.data?.message || "Failed to fetch resources", loading: false });
-      toast.error(error.response?.data?.message || "Failed to fetch resources");
+      set({ loading: true, error: null });
+      const res = await fetchResourcesAPI();
+      set({ resources: res.data.data || [], loading: false });
+    } catch (err) {
+      set({ error: err.message, loading: false });
     }
   },
 
   fetchAllResources: async () => {
-    set({ loading: true, error: null });
     try {
-      const token = localStorage.getItem("token");
-      const response = await axios.get(`${API_URL}/resources/all`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.data.success) {
-        set({ resources: response.data.data, loading: false });
-      } else {
-        set({ error: response.data.message, loading: false });
-      }
-    } catch (error) {
-      set({ error: error.response?.data?.message || "Failed to fetch system resources", loading: false });
-      toast.error(error.response?.data?.message || "Failed to fetch system resources");
+      set({ loading: true, error: null });
+      const res = await fetchAllResourcesAPI();
+      set({ resources: res.data.data || [], loading: false });
+    } catch (err) {
+      set({ error: err.message, loading: false });
     }
   },
 
   getResourceById: async (resourceId) => {
-    set({ loading: true, error: null });
     try {
-      const token = localStorage.getItem("token");
-      const response = await axios.get(`${API_URL}/resources/${resourceId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.data.success) {
-        set({ currentResource: response.data.data, loading: false });
-        return response.data.data;
-      } else {
-        throw new Error(response.data.message || "Failed to fetch resource");
-      }
-    } catch (error) {
-      set({ error: error.response?.data?.message || "Failed to fetch resource", loading: false });
-      toast.error(error.response?.data?.message || "Failed to fetch resource");
-      throw error;
+      set({ loading: true, error: null });
+      const res = await getResourceByIdAPI(resourceId);
+      set({ currentResource: res.data.data, loading: false });
+      return res.data.data;
+    } catch (err) {
+      set({ error: err.message, loading: false });
+      throw err;
     }
   },
 
   uploadResources: async (files) => {
-    set({ loading: true, error: null });
     try {
-      const token = localStorage.getItem("token");
-      const formData = new FormData();
-      files.forEach((file) => formData.append("files", file));
-      const response = await axios.post(`${API_URL}/resources`, formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
-        },
-      });
-      if (response.data.skipped?.length) {
-        toast.error("Some files were skipped due to low quality OCR");
-      }
-      if (response.data.success) {
-        set({ loading: false });
-        return response.data.resources;
-      } else {
-        set({ error: response.data.message, loading: false });
-      }
-    } catch (error) {
-  const backend = error.response?.data;
+      set({ loading: true, error: null });
+      const res = await uploadResourcesAPI(files);
 
-  if (backend?.skipped?.length) {
-    backend.skipped.forEach((s) =>
-      toast.error(`${s.file}: ${s.reason}`)
-    );
-  } else {
-    toast.error(backend?.message || "Upload failed");
-  }
-
-  set({ loading: false });
-  throw error;
-}
-  },
-
-  deleteResource: async (resourceId) => {
-    set({ loading: true, error: null });
-    try {
-      const token = localStorage.getItem("token");
-      const response = await axios.delete(`${API_URL}/resources/${resourceId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.data.success) {
-        set((state) => ({
-          resources: state.resources.filter((resource) => resource.id !== resourceId),
-          loading: false,
-        }));
-      } else {
-        set({ error: response.data.message, loading: false });
-      }
-    } catch (error) {
-      set({ error: error.response?.data?.message || "Failed to delete resource", loading: false });
-      throw error;
+      set({ loading: false });
+      return res.data.resources || [];
+    } catch (err) {
+      set({ loading: false });
+      throw err;
     }
   },
 
-  clearError: () => {
-    set({ error: null });
+  deleteResource: async (resourceId) => {
+    try {
+      set({ loading: true, error: null });
+      await deleteResourceAPI(resourceId);
+
+      set((state) => ({
+        resources: state.resources.filter(
+          (r) => r.id !== resourceId
+        ),
+        loading: false,
+      }));
+
+    } catch (err) {
+      set({ error: err.message, loading: false });
+      throw err;
+    }
   },
 
-  clearCurrentResource: () => {
-    set({ currentResource: null });
-  },
+  clearError: () => set({ error: null }),
+
+  clearCurrentResource: () => set({ currentResource: null }),
 }));
 
 export default useResourceStore;

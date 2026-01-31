@@ -3,11 +3,8 @@ import useAuthStore from "../../store/authStore.js";
 import { Card, CardHeader, CardContent } from "../../components/ui/Card.jsx";
 import LoadingSpinner from "../../components/ui/LoadingSpinner.jsx";
 import Modal from "../../components/ui/Modal.jsx";
-import Navbar from "../../components/Navbar.jsx";
-import Footer from "../../components/Footer.jsx";
 import { 
   FaUser, 
-  FaChartBar, 
   FaUsers, 
   FaCheckCircle, 
   FaClock,
@@ -126,8 +123,6 @@ function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
-      <Navbar />
-
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
         {/* Welcome Section - Enhanced */}
         <div className="mb-8 sm:mb-10">
@@ -398,9 +393,6 @@ function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
-
-      <Footer />
-
       <Modal
         isOpen={modal.isOpen}
         onClose={() => setModal({ ...modal, isOpen: false })}

@@ -1,8 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import useAuthStore from "../store/authStore.js";
 import { Card, CardHeader, CardContent } from "../components/ui/Card.jsx";
-import Navbar from "../components/Navbar.jsx";
-import Footer from "../components/Footer.jsx";
 import { 
   FaUser, 
   FaEnvelope, 
@@ -88,7 +86,6 @@ function Profile() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
-      <Navbar />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         {user ? (
@@ -244,7 +241,6 @@ function Profile() {
         )}
       </div>
 
-      <Footer />
     </div>
   );
 }

@@ -4,10 +4,13 @@ import useAssessmentStore from "../../store/assessmentStore.js";
 import useAuthStore from "../../store/authStore.js";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
 import Modal from "../../components/ui/Modal";
-import Navbar from "../../components/Navbar";
-import Footer from "../../components/Footer";
-import toast from "react-hot-toast";
 import { FaUser, FaEnvelope, FaLock, FaUserPlus, FaArrowLeft, FaUserGraduate } from "react-icons/fa";
+import {
+  registerStudentSchema,
+  enrollStudentSchema,
+} from "../../scheema/studentSchemas.js";
+import { email } from "zod";
+
 
 function AddStudent({ assessmentId, onStudentAdded, compact = false }) {
   const navigate = useNavigate();
@@ -31,7 +34,6 @@ function AddStudent({ assessmentId, onStudentAdded, compact = false }) {
 
   const showModal = (type, title, message, redirect = false) => {
     setModal({ isOpen: true, type, title, message });
-    toast[type === "success" ? "success" : "error"](message);
 
     if (type === "success" && redirect) {
       setTimeout(() => {
@@ -52,23 +54,16 @@ function AddStudent({ assessmentId, onStudentAdded, compact = false }) {
 
   const handleRegister = async (e) => {
     e.preventDefault();
-
-    if (!formData.name.trim()) {
-      showModal("error", "Invalid Input", "Full name is required");
-      return;
-    }
-    if (!formData.email.trim()) {
-      showModal("error", "Invalid Input", "Email is required");
-      return;
-    }
-    if (formData.password.length < 6) {
-      showModal("error", "Invalid Input", "Password must be at least 6 characters");
-      return;
-    }
-    if (formData.password !== formData.confirmPassword) {
-      showModal("error", "Invalid Input", "Passwords do not match");
-      return;
-    }
+try {
+  registerStudentSchema.parse(formData);
+} catch (err) {
+  showModal(
+    "error",
+    "Invalid Input",
+    err.errors?.[0]?.message || "Invalid form data"
+  );
+  return;
+}
 
     setIsLoading(true);
     try {
@@ -94,22 +89,30 @@ function AddStudent({ assessmentId, onStudentAdded, compact = false }) {
     }
   };
 
-  const handleEnroll = async (e) => {
-    e.preventDefault();
-    if (!formData.email.trim()) {
-      showModal("error", "Error", "Email is required");
-      return;
-    }
+const handleEnroll = async (e) => {
+  console.log("Enroll calling.....")
+  e.preventDefault();
+  try {
+    enrollStudentSchema.parse({ email: formData.email });
+  } catch (err) {
+    showModal(
+      "error",
+      "Invalid Input",
+      err.errors?.[0]?.message || "Invalid email"
+    );
+    return;
+  }
 
-    try {
-      await enrollStudent(assessmentId, formData.email.trim());
-      showModal("success", "Success", "Student enrolled successfully!");
-      setFormData((prev) => ({ ...prev, email: "" }));
-      onStudentAdded?.();
-    } catch (err) {
-      showModal("error", "Error", err.message || "Enrollment failed");
-    }
-  };
+  try {
+    await enrollStudent(assessmentId, formData.email.trim());
+    console.log(email)
+    showModal("success", "Success", "Student enrolled successfully!");
+    setFormData((prev) => ({ ...prev, email: "" }));
+    onStudentAdded?.();
+  } catch (err) {
+    showModal("error", "Error", err.message || "Enrollment failed");
+  }
+};
 
   const inputClass = "w-full pl-10 pr-4 py-3 border-2 border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-blue-200 focus:border-blue-500 transition-all";
   const labelClass = "block text-sm font-bold text-gray-700 mb-2";
@@ -264,26 +267,15 @@ function AddStudent({ assessmentId, onStudentAdded, compact = false }) {
   if (!compact) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
-        <Navbar />
         <div className="max-w-2xl mx-auto px-4 py-8 sm:py-12">
           <div className="mb-8">
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Add New Student</h1>
             <p className="text-gray-600 text-sm sm:text-base">Register a new student or enroll an existing one</p>
           </div>
           <div className="bg-white rounded-2xl shadow-2xl border-2 border-gray-200 p-6 sm:p-8">
-            <div className="mb-6 pb-6 border-b-2 border-gray-200">
-              <button
-                onClick={() => setMode((m) => (m === "register" ? "enroll" : "register"))}
-                className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-bold hover:underline transition-colors"
-              >
-                <FaArrowLeft />
-                Switch to {mode === "register" ? "enroll existing" : "register new"}
-              </button>
-            </div>
             {formContent}
           </div>
         </div>
-        <Footer />
         <Modal
           isOpen={modal.isOpen}
           onClose={() => setModal({ ...modal, isOpen: false })}

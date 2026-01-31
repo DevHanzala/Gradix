@@ -4,16 +4,12 @@ import useAssessmentStore from "../../../store/assessmentStore.js";
 import { Card, CardHeader, CardContent } from "../../../components/ui/Card";
 import LoadingSpinner from "../../../components/ui/LoadingSpinner";
 import Modal from "../../../components/ui/Modal";
-import Navbar from "../../../components/Navbar";
-import Footer from "../../../components/Footer";
 import AddStudent from "../AddStudent.jsx";
-import toast from "react-hot-toast";
 
 function EnrollStudents() {
   const { assessmentId } = useParams();
   const { getEnrolledStudents, unenrollStudent, enrolledStudents, loading } = useAssessmentStore();
   const [modal, setModal] = useState({ isOpen: false, type: "info", title: "", message: "" });
-  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetch = async () => {
@@ -43,12 +39,10 @@ function EnrollStudents() {
 
   const showModal = (type, title, message) => {
     setModal({ isOpen: true, type, title, message });
-    toast[type === "success" ? "success" : "error"](message);
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
       <div className="w-full mx-auto px-4 sm:px-4 lg:px-8 xl:px-10 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Enroll Students</h1>
@@ -72,7 +66,7 @@ function EnrollStudents() {
               <h2 className="text-xl font-semibold text-gray-900">Enrolled Students</h2>
             </CardHeader>
             <CardContent className="pt-2">
-              {isLoading || loading ? (
+              { loading ? (
                 <div className="flex flex-col items-center py-12">
                   <LoadingSpinner size="lg" color="white" type="spinner" />
                   <p className="mt-3 text-gray-600">Loading...</p>
@@ -140,7 +134,6 @@ function EnrollStudents() {
         </div>
       </div>
 
-      <Footer />
 
       <Modal isOpen={modal.isOpen} onClose={() => setModal({ ...modal, isOpen: false })} type={modal.type} title={modal.title}>
         {modal.message}

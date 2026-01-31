@@ -1,9 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Card, CardHeader, CardContent } from "../../components/ui/Card";
 import LoadingSpinner from "../../components/ui/LoadingSpinner";
-import Navbar from "../../components/Navbar";
-import Footer from "../../components/Footer";
-import toast from "react-hot-toast";
 import useStudentAnalyticsStore from "../../store/useStudentAnalyticsStore.js";
 import {
   FaEye,
@@ -16,7 +13,7 @@ import {
   FaTimesCircle,
   FaArrowUp
 } from "react-icons/fa";
-import axios from "axios";
+import Modal from "../../components/ui/Modal.jsx";
 
 const StudentAnalytics = () => {
   const {
@@ -29,12 +26,15 @@ const StudentAnalytics = () => {
     fetchAssessmentDetails,
     setSelectedAssessment,
     downloadReport,
+    fetchAssessmentQuestions,
+    questions,
+    questionsLoading,
+
   } = useStudentAnalyticsStore();
 
   const [showType, setShowType] = useState(null);
-  const [questionsData, setQuestionsData] = useState([]);
-  const [questionsLoading, setQuestionsLoading] = useState(false);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [modal, setModal] = useState({ isOpen: false, type: "", title: "", message: "" });
 
   const resultsRef = useRef(null);
   const questionsRef = useRef(null);
@@ -53,11 +53,12 @@ const StudentAnalytics = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+
   useEffect(() => {
     if (selectedAssessment && showType === "results" && selectedAssessmentDetails) {
       setTimeout(() => {
-        resultsRef.current?.scrollIntoView({ 
-          behavior: "smooth", 
+        resultsRef.current?.scrollIntoView({
+          behavior: "smooth",
           block: "start"
         });
       }, 300);
@@ -65,15 +66,21 @@ const StudentAnalytics = () => {
   }, [selectedAssessmentDetails, showType]);
 
   useEffect(() => {
-    if (selectedAssessment && showType === "questions" && questionsData.length > 0) {
+    if (
+      selectedAssessment &&
+      showType === "questions" &&
+      Array.isArray(questions) &&
+      questions.length > 0
+    ) {
+
       setTimeout(() => {
-        questionsRef.current?.scrollIntoView({ 
-          behavior: "smooth", 
+        questionsRef.current?.scrollIntoView({
+          behavior: "smooth",
           block: "start"
         });
       }, 300);
     }
-  }, [questionsData, showType]);
+  }, [questions, showType]);
 
   const formatTime = (seconds) => {
     if (!seconds) return "0m 0s";
@@ -89,27 +96,15 @@ const StudentAnalytics = () => {
   const handleSeeResults = (id) => {
     setSelectedAssessment(id);
     setShowType("results");
-    setQuestionsData([]);
     fetchAssessmentDetails(id);
   };
 
   const handleSeeQuestions = async (id) => {
     setSelectedAssessment(id);
     setShowType("questions");
-    setQuestionsLoading(true);
-    try {
-      const token = localStorage.getItem("token");
-      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-      const { data } = await axios.get(`${API_URL}/student-analytics/assessment/${id}/questions`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setQuestionsData(data.success ? data.data : []);
-    } catch (err) {
-      toast.error("Failed to load questions");
-    } finally {
-      setQuestionsLoading(false);
-    }
+    await fetchAssessmentQuestions(id);
   };
+
 
   if (loading)
     return (
@@ -134,7 +129,6 @@ const StudentAnalytics = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
-      <Navbar />
 
       <div className="mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         {/* Header */}
@@ -148,15 +142,14 @@ const StudentAnalytics = () => {
 
         {/* Assessment List */}
         <div ref={assessmentsRef} className="space-y-4 sm:space-y-6 max-w-5xl mx-auto scroll-mt-24">
-          {assessments.length > 0 ? (
+       {Array.isArray(assessments) && assessments.length > 0 ? (
             assessments.map((a) => (
               <Card
                 key={a.id}
-                className={`w-full shadow-xl hover:shadow-2xl transition-all duration-300 border-2 transform hover:-translate-y-1 ${
-                  selectedAssessment === a.id 
-                    ? "border-indigo-500 ring-4 ring-indigo-200" 
+                className={`w-full shadow-xl hover:shadow-2xl transition-all duration-300 border-2 transform hover:-translate-y-1 ${selectedAssessment === a.id
+                    ? "border-indigo-500 ring-4 ring-indigo-200"
                     : "border-gray-200"
-                }`}
+                  }`}
               >
                 <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 sm:p-5 text-white rounded-t-xl">
                   <h3 className="text-lg sm:text-xl font-bold mb-1">{a.title}</h3>
@@ -211,8 +204,8 @@ const StudentAnalytics = () => {
 
         {/* Results View */}
         {showType === "results" && selectedAssessmentDetails && (
-          <div 
-            ref={resultsRef} 
+          <div
+            ref={resultsRef}
             className="mt-10 sm:mt-12 space-y-6 sm:space-y-8 max-w-5xl mx-auto scroll-mt-24 animate-fadeIn"
           >
             <Card className="shadow-2xl border-2 border-indigo-300 transform transition-all duration-500">
@@ -262,8 +255,8 @@ const StudentAnalytics = () => {
 
         {/* Questions View */}
         {showType === "questions" && (
-          <div 
-            ref={questionsRef} 
+          <div
+            ref={questionsRef}
             className="mt-10 sm:mt-12 space-y-6 sm:space-y-8 max-w-5xl mx-auto scroll-mt-24"
           >
             {/* Floating Back Arrow - Only at the end */}
@@ -295,7 +288,7 @@ const StudentAnalytics = () => {
                   <p className="mt-4 text-gray-600 font-semibold">Loading questions...</p>
                 </CardContent>
               </Card>
-            ) : questionsData.length > 0 ? (
+            ) : Array.isArray(questions) && questions.length > 0 ? (
               <>
                 <div className="text-center mb-6 animate-fadeIn">
                   <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">
@@ -304,9 +297,9 @@ const StudentAnalytics = () => {
                   <p className="text-gray-600">Review all questions and your answers</p>
                 </div>
 
-                {questionsData.map((q, i) => (
-                  <Card 
-                    key={i} 
+                {questions.map((q, i) => (
+                  <Card
+                    key={i}
                     className="shadow-2xl border-2 border-gray-200 overflow-hidden transform transition-all duration-300 hover:shadow-3xl animate-slideInUp"
                     style={{ animationDelay: `${i * 0.1}s` }}
                   >
@@ -347,11 +340,10 @@ const StudentAnalytics = () => {
                           </p>
                         </div>
 
-                        <div className={`border-2 p-5 sm:p-6 rounded-xl text-center transform transition-all hover:scale-105 ${
-                          q.is_correct
+                        <div className={`border-2 p-5 sm:p-6 rounded-xl text-center transform transition-all hover:scale-105 ${q.is_correct
                             ? "bg-gradient-to-br from-green-50 to-emerald-50 border-green-200"
                             : "bg-gradient-to-br from-red-50 to-pink-50 border-red-200"
-                        }`}>
+                          }`}>
                           {q.is_correct ? (
                             <FaCheckCircle className="text-3xl sm:text-4xl text-green-600 mx-auto mb-2" />
                           ) : (
@@ -405,6 +397,16 @@ const StudentAnalytics = () => {
         )}
       </div>
 
+
+      {/* Modal for notifications */}
+      <Modal
+        isOpen={modal.isOpen}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+        onClose={() => setModal({ isOpen: false, type: "", title: "", message: "" })}
+      />
+
       {/* Scroll to Top Button */}
       {showScrollTop && (
         <button
@@ -416,7 +418,6 @@ const StudentAnalytics = () => {
         </button>
       )}
 
-      <Footer />
 
       {/* Custom CSS for animations */}
       <style jsx>{`

@@ -1,8 +1,6 @@
 import { Link } from "react-router-dom"
 import useAuthStore from "../store/authStore.js"
 import { Card, CardContent } from "../components/ui/Card.jsx"
-import Navbar from "../components/Navbar.jsx"
-import Footer from "../components/Footer.jsx"
 import { 
   FaRocket, 
   FaChartLine, 
@@ -83,7 +81,6 @@ function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 overflow-hidden">
-      <Navbar />
 
       {/* Hero Section - Enhanced */}
       <div className="relative overflow-hidden">
@@ -251,7 +248,6 @@ function Home() {
         </div>
       </div>
 
-      <Footer />
       
       <style jsx>{`
         @keyframes blob {

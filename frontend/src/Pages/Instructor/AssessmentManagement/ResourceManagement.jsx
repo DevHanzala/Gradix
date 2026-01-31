@@ -4,39 +4,43 @@ import useResourceStore from "../../../store/resourceStore.js";
 import { Card, CardHeader, CardContent } from "../../../components/ui/Card";
 import LoadingSpinner from "../../../components/ui/LoadingSpinner";
 import Modal from "../../../components/ui/Modal";
-import Navbar from "../../../components/Navbar";
-import Footer from "../../../components/Footer";
-import toast from "react-hot-toast";
+import { validateFiles } from "../../../scheema/resourceSchema.js";
 
 function ResourceManagement() {
   const navigate = useNavigate();
   const { resources, loading, fetchResources, uploadResources, deleteResource, clearCurrentResource } = useResourceStore();
   const [modal, setModal] = useState({ isOpen: false, type: "info", title: "", message: "" });
   const [dragActive, setDragActive] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
 
-  // Load resources on mount
   useEffect(() => {
     fetchResources();
     return () => clearCurrentResource();
   }, [fetchResources, clearCurrentResource]);
 
-  // Handle resource upload
   const handleResourceUpload = async (e) => {
     const files = Array.from(e.target.files);
-    if (files.length === 0) {
-      toast.error("No files selected.");
+    
+    // Validate files using Zod
+    const validation = validateFiles(files);
+    if (!validation.success) {
+      showModal("error", "Validation Error", validation.error);
       return;
     }
+
     try {
       await uploadResources(files);
-      toast.success(`${files.length} resource(s) uploaded and chunked successfully.`);
+      showModal("success", "Success", `${files.length} resource(s) uploaded and chunked successfully.`);
       fetchResources();
     } catch (error) {
-      toast.error(error.message || "Failed to upload resources.");
+      showModal("error", "Error", error.message || "Failed to upload resources.");
     }
   };
 
-  // Handle drag events
+  const showModal = (type, title, message) => {
+    setModal({ isOpen: true, type, title, message });
+  };
+
   const handleDrag = (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -47,38 +51,53 @@ function ResourceManagement() {
     }
   };
 
-  // Handle drop
   const handleDrop = async (e) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
     
     const files = Array.from(e.dataTransfer.files);
-    if (files.length === 0) return;
+    
+    // Validate files using Zod
+    const validation = validateFiles(files);
+    if (!validation.success) {
+      showModal("error", "Validation Error", validation.error);
+      return;
+    }
     
     try {
       await uploadResources(files);
-      toast.success(`${files.length} resource(s) uploaded and chunked successfully.`);
+      showModal("success", "Upload Successful", `${files.length} resource(s) uploaded and processed successfully.`);
       fetchResources();
     } catch (error) {
-      toast.error(error.message || "Failed to upload resources.");
+      showModal("error", "Upload Failed", error.message || "Failed to upload resources.");
     }
   };
 
-  // Handle resource deletion
-  const handleDeleteResource = async (resourceId) => {
-    if (window.confirm("Are you sure you want to delete this resource?")) {
-      try {
-        await deleteResource(resourceId);
-        toast.success("Resource deleted successfully.");
-        fetchResources();
-      } catch (error) {
-        toast.error(error.message || "Failed to delete resource.");
-      }
+  const handleDeleteClick = (resourceId) => {
+    setPendingDeleteId(resourceId);
+    setModal({
+      isOpen: true,
+      type: "warning",
+      title: "Confirm Deletion",
+      message: "Are you sure you want to delete this resource? This action cannot be undone.",
+    });
+  };
+
+  const confirmDeleteResource = async () => {
+    if (!pendingDeleteId) return;
+
+    try {
+      await deleteResource(pendingDeleteId);
+      showModal("success", "Success", "Resource deleted successfully.");
+      fetchResources();
+    } catch (error) {
+      showModal("error", "Error", error.message || "Failed to delete resource.");
+    } finally {
+      setPendingDeleteId(null);
     }
   };
 
-  // Format file size
   const formatFileSize = (bytes) => {
     if (!bytes) return "N/A";
     const sizes = ["Bytes", "KB", "MB", "GB"];
@@ -87,7 +106,6 @@ function ResourceManagement() {
     return Math.round(bytes / Math.pow(1024, i), 2) + " " + sizes[i];
   };
 
-  // Get file type icon
   const getFileIcon = (fileType) => {
     const type = fileType?.toLowerCase() || '';
     if (type.includes('pdf')) return '📕';
@@ -98,7 +116,6 @@ function ResourceManagement() {
     return '📁';
   };
 
-  // Get file type badge color
   const getFileTypeBadge = (fileType) => {
     const type = fileType?.toLowerCase() || '';
     if (type.includes('pdf')) return 'bg-red-100 text-red-700';
@@ -109,23 +126,19 @@ function ResourceManagement() {
     return 'bg-green-100 text-green-700';
   };
 
-  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-        <Navbar />
         <div className="flex flex-col items-center justify-center h-96">
           <LoadingSpinner type="dots" color="blue" />
           <p className="mt-4 text-gray-600 font-medium">Loading resources...</p>
         </div>
-        <Footer />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
-      <Navbar />
       <div className="mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 max-w-7xl">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
@@ -252,11 +265,10 @@ function ResourceManagement() {
                     </div>
                     <div className="flex gap-2 w-full sm:w-auto">
                       <button
-                        onClick={() => handleDeleteResource(resource.id)}
+                        onClick={() => handleDeleteClick(resource.id)}
                         className="flex-1 sm:flex-initial px-5 py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors duration-200 font-semibold text-sm flex items-center justify-center gap-2"
                       >
-                        <span>🗑️</span>
-                        <span>Delete</span>
+                        🗑️ Delete
                       </button>
                     </div>
                   </div>
@@ -266,12 +278,18 @@ function ResourceManagement() {
           </CardContent>
         </Card>
       </div>
-      <Footer />
+
       <Modal
         isOpen={modal.isOpen}
-        onClose={() => setModal({ ...modal, isOpen: false })}
+        onClose={() => {
+          setModal({ ...modal, isOpen: false });
+          setPendingDeleteId(null);
+        }}
         type={modal.type}
         title={modal.title}
+        onConfirm={modal.type === "warning" ? confirmDeleteResource : undefined}
+        confirmText="Delete"
+        cancelText="Cancel"
       >
         {modal.message}
       </Modal>
