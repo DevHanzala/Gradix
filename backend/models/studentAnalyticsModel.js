@@ -1,65 +1,26 @@
-import db from "../DB/db.js";
+import * as analyticsRepo from "../repositories/studentAnalyticsRepository.js";
+import {
+  validateStudentAnalyticsQuery,
+  validatePerformanceTimeRange,
+  validateAssessmentAnalyticsQuery,
+} from "../validator/studentAnalytics.validator.js";
 import { getCheckingModel } from "../services/ai/aiProviders.js";
 import { generateContent } from "../services/ai/generateContent.js";
 
-/**
- * Student Analytics Model
- * Handles student progress tracking, performance analysis, and strengths/weaknesses
- */
+// ==================== STUDENT OVERVIEW ANALYTICS ====================
 
-/**
- * Get student's overall performance analytics
- * @param {number} studentId - Student ID
- * @returns {Object} Student analytics data
- */
-//No AI
 export const getStudentAnalytics = async (studentId) => {
   try {
+    // VALIDATE INPUT
+    const validationErrors = validateStudentAnalyticsQuery({ studentId });
+    if (validationErrors.length > 0) {
+      throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
+    }
+
     console.log(`📊 Getting analytics for student ${studentId}`);
 
-    const enrolledAssessments = await db.query(`
-      SELECT 
-        a.id,
-        a.title,
-        a.prompt,
-        e.enrolled_at
-      FROM enrollments e
-      JOIN assessments a ON e.assessment_id = a.id
-      WHERE e.student_id = $1
-      ORDER BY e.enrolled_at DESC
-    `, [studentId]);
-
-    const completedAssessments = await db.query(`
-      SELECT 
-        a.id,
-        a.title,
-        aa.completed_at AS submitted_at,
-        aa.score AS obtained_score,
-        (SELECT COALESCE(SUM(gq.positive_marks), 0)
-         FROM generated_questions gq
-         JOIN assessment_attempts aa2 ON gq.attempt_id = aa2.id
-         WHERE aa2.assessment_id = a.id AND aa2.id = aa.id) AS total_marks,
-        CASE WHEN (SELECT COALESCE(SUM(gq.positive_marks), 0)
-          FROM generated_questions gq
-          JOIN assessment_attempts aa2 ON gq.attempt_id = aa2.id
-          WHERE aa2.assessment_id = a.id AND aa2.id = aa.id) > 0
-          THEN ROUND((aa.score / (SELECT COALESCE(SUM(gq.positive_marks), 0)
-            FROM generated_questions gq
-            JOIN assessment_attempts aa2 ON gq.attempt_id = aa2.id
-            WHERE aa2.assessment_id = a.id AND aa2.id = aa.id) * 100)::numeric, 2)
-          ELSE 0 END AS percentage,
-        EXTRACT(EPOCH FROM (aa.completed_at - aa.started_at)) AS time_taken
-      FROM assessment_attempts aa
-      JOIN assessments a ON aa.assessment_id = a.id
-      WHERE aa.student_id = $1 
-        AND aa.completed_at IS NOT NULL
-        AND aa.status = 'completed'
-      GROUP BY a.id, a.title, aa.completed_at, aa.started_at, aa.id, aa.score
-      ORDER BY aa.completed_at ASC
-    `, [studentId]);
-
-    const assessments = completedAssessments.rows;
-    const enrolled = enrolledAssessments.rows;
+    const enrolled = await analyticsRepo.findEnrolledAssessmentsQuery(studentId);
+    const assessments = await analyticsRepo.findCompletedAssessmentsQuery(studentId);
 
     const totalEnrolled = enrolled.length;
     const completedCount = assessments.length;
@@ -99,75 +60,8 @@ export const getStudentAnalytics = async (studentId) => {
       time_taken: a.time_taken
     }));
 
-    const questionAnalysis = await db.query(`
-      SELECT 
-        gq.question_type,
-        sa.score AS scored_marks,
-        gq.positive_marks,
-        CASE 
-          WHEN sa.score >= gq.positive_marks * 0.8 THEN 'strength'
-          WHEN sa.score <= gq.positive_marks * 0.6 THEN 'weakness'
-          ELSE 'average'
-        END as performance_category
-      FROM student_answers sa
-      JOIN generated_questions gq ON sa.question_id = gq.id
-      JOIN assessment_attempts aa ON sa.attempt_id = aa.id
-      WHERE aa.student_id = $1 
-        AND aa.completed_at IS NOT NULL
-        AND sa.score IS NOT NULL
-    `, [studentId]);
-
-    const strengths = [];
-    const weaknesses = [];
-    const subjectBreakdown = {};
-
-    questionAnalysis.rows.forEach(q => {
-      const topic = q.question_type || 'General';
-      const questionType = q.question_type || 'multiple_choice';
-
-      if (!subjectBreakdown[topic]) {
-        subjectBreakdown[topic] = {
-          total_questions: 0,
-          correct_answers: 0,
-          average_score: 0
-        };
-      }
-      subjectBreakdown[topic].total_questions++;
-      subjectBreakdown[topic].correct_answers += q.scored_marks || 0;
-
-      if (q.performance_category === 'strength') {
-        strengths.push({
-          topic,
-          question_type: questionType,
-          difficulty: 'medium',
-          score: q.scored_marks,
-          max_score: q.positive_marks
-        });
-      } else if (q.performance_category === 'weakness') {
-        weaknesses.push({
-          topic,
-          question_type: questionType,
-          difficulty: 'medium',
-          score: q.scored_marks,
-          max_score: q.positive_marks
-        });
-      }
-    });
-
-    Object.keys(subjectBreakdown).forEach(topic => {
-      const breakdown = subjectBreakdown[topic];
-      breakdown.average_score = breakdown.total_questions > 0 
-        ? Math.round((breakdown.correct_answers / breakdown.total_questions) * 100) 
-        : 0;
-    });
-
-    const topStrengths = strengths
-      .sort((a, b) => (b.score / b.max_score) - (a.score / a.max_score))
-      .slice(0, 3);
-
-    const topWeaknesses = weaknesses
-      .sort((a, b) => (a.score / a.max_score) - (b.score / b.max_score))
-      .slice(0, 3);
+    const questionAnalysis = await analyticsRepo.findQuestionAnalysisQuery(studentId);
+    const { strengths, weaknesses, subjectBreakdown } = processQuestionAnalysis(questionAnalysis);
 
     return {
       total_assessments: totalEnrolled,
@@ -176,14 +70,10 @@ export const getStudentAnalytics = async (studentId) => {
       total_time_spent: totalTimeSpent,
       enrolled_assessments: enrolled,
       progress_trend: progressTrend,
-      strengths: topStrengths,
-      weaknesses: topWeaknesses,
+      strengths,
+      weaknesses,
       recent_performance: recentPerformance,
-      subject_breakdown: Object.entries(subjectBreakdown).map(([topic, data]) => ({
-        topic,
-        total_questions: data.total_questions,
-        average_score: data.average_score
-      }))
+      subject_breakdown: subjectBreakdown
     };
   } catch (error) {
     console.error("❌ getStudentAnalytics error:", error);
@@ -191,15 +81,18 @@ export const getStudentAnalytics = async (studentId) => {
   }
 };
 
-/**
- * Get student's performance over time
- * @param {number} studentId - Student ID
- * @param {string} timeRange - 'week', 'month', or 'year'
- * @returns {Array} Performance data points
- */
-//No AI
 export const getPerformanceOverTime = async (studentId, timeRange) => {
   try {
+    const validationErrors = validateStudentAnalyticsQuery({ studentId });
+    if (validationErrors.length > 0) {
+      throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
+    }
+
+    const rangeValidation = validatePerformanceTimeRange(timeRange);
+    if (rangeValidation.length > 0) {
+      throw new Error(`Validation failed: ${rangeValidation.join(', ')}`);
+    }
+
     let dateFilter = "";
     switch (timeRange) {
       case 'week':
@@ -215,202 +108,60 @@ export const getPerformanceOverTime = async (studentId, timeRange) => {
         dateFilter = "";
     }
 
-    const query = `
-      SELECT 
-        date,
-        AVG(percentage) as average_score,
-        assessments_taken,
-        total_time
-      FROM (
-        SELECT 
-          DATE(aa.completed_at) as date,
-          (aa.score / (SELECT COALESCE(SUM(gq.positive_marks), 0)
-            FROM generated_questions gq
-            JOIN assessment_attempts aa2 ON gq.attempt_id = aa2.id
-            WHERE aa2.assessment_id = aa.assessment_id AND aa2.id = aa.id) * 100) as percentage,
-          COUNT(DISTINCT aa.id) as assessments_taken,
-          SUM(EXTRACT(EPOCH FROM (aa.completed_at - aa.started_at))) as total_time
-        FROM assessment_attempts aa
-        JOIN assessments a ON aa.assessment_id = a.id
-        WHERE aa.student_id = $1 
-          AND aa.completed_at IS NOT NULL
-          AND aa.status = 'completed'
-          ${dateFilter}
-        GROUP BY aa.id, DATE(aa.completed_at), aa.assessment_id, aa.score
-      ) as sub
-      GROUP BY date, assessments_taken, total_time
-      ORDER BY date ASC
-    `;
-
-    const result = await db.query(query, [studentId]);
-    return result.rows;
+    const performance = await analyticsRepo.findPerformanceOverTimeQuery(studentId, dateFilter);
+    return performance;
   } catch (error) {
     console.error("❌ Error getting performance over time:", error);
     throw error;
   }
 };
 
-/**
- * Get student's completed assessments list
- * @param {number} studentId - Student ID
- * @returns {Array} List of assessments
- */
-//No AI
 export const getStudentAssessmentsList = async (studentId) => {
   try {
-    const query = `
-      SELECT 
-        a.id,
-        a.title,
-        aa.score AS obtained_score,
-        (SELECT COALESCE(SUM(gq.positive_marks), 0)
-         FROM generated_questions gq
-         JOIN assessment_attempts aa2 ON gq.attempt_id = aa2.id
-         WHERE aa2.assessment_id = a.id AND aa2.id = aa.id) AS total_marks,
-        CASE WHEN (SELECT COALESCE(SUM(gq.positive_marks), 0)
-          FROM generated_questions gq
-          JOIN assessment_attempts aa2 ON gq.attempt_id = aa2.id
-          WHERE aa2.assessment_id = a.id AND aa2.id = aa.id) > 0
-          THEN ROUND((aa.score / (SELECT COALESCE(SUM(gq.positive_marks), 0)
-            FROM generated_questions gq
-            JOIN assessment_attempts aa2 ON gq.attempt_id = aa2.id
-            WHERE aa2.assessment_id = a.id AND aa2.id = aa.id) * 100)::numeric, 2)
-          ELSE 0 END AS percentage,
-        aa.completed_at AS date
-      FROM assessment_attempts aa
-      JOIN assessments a ON aa.assessment_id = a.id
-      WHERE aa.student_id = $1 
-        AND aa.completed_at IS NOT NULL
-        AND aa.status = 'completed'
-      GROUP BY a.id, a.title, aa.completed_at, aa.id, aa.score
-      ORDER BY aa.completed_at DESC
-    `;
-    const result = await db.query(query, [studentId]);
-    return result.rows;
+    const validationErrors = validateStudentAnalyticsQuery({ studentId });
+    if (validationErrors.length > 0) {
+      throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
+    }
+
+    const assessments = await analyticsRepo.findCompletedAssessmentsQuery(studentId);
+    return assessments;
   } catch (error) {
     console.error("❌ Error getting student assessments list:", error);
     throw error;
   }
 };
 
-/**
- * Get analytics for a specific assessment
- * @param {number} studentId - Student ID
- * @param {number} assessmentId - Assessment ID
- * @returns {Object} Assessment analytics
- */
-/**
- */
-/**
- * Get analytics for a specific assessment — NO AI RECOMMENDATIONS HERE
- */
-// UPDATE IN studentAnalyticsModel.js — COMPLETE FUNCTION (NO AI HERE)
-//No AI
 export const getAssessmentAnalytics = async (studentId, assessmentId) => {
   try {
-    const attempt = await db.query(`
-      SELECT 
-        aa.id as attempt_id,
-        EXTRACT(EPOCH FROM (aa.completed_at - aa.started_at)) as time_taken,
-        a.title as assessment_title,
-        a.created_at as assessment_created_at,
-        aa.score as student_score,
-        (SELECT COALESCE(SUM(gq.positive_marks), 0)
-         FROM generated_questions gq
-         WHERE gq.attempt_id = aa.id) AS total_marks,
-        CASE WHEN (SELECT COALESCE(SUM(gq.positive_marks), 0)
-          FROM generated_questions gq
-          WHERE gq.attempt_id = aa.id) > 0
-          THEN ROUND((aa.score / (SELECT COALESCE(SUM(gq.positive_marks), 0)
-            FROM generated_questions gq
-            WHERE gq.attempt_id = aa.id) * 100)::numeric, 2)
-          ELSE 0 END AS percentage
-      FROM assessment_attempts aa
-      JOIN assessments a ON aa.assessment_id = a.id
-      WHERE aa.student_id = $1 
-        AND aa.assessment_id = $2
-        AND aa.completed_at IS NOT NULL
-        AND aa.status = 'completed'
-      GROUP BY aa.id, a.title, a.created_at, aa.completed_at, aa.started_at, aa.score
-      ORDER BY aa.completed_at DESC
-      LIMIT 1
-    `, [studentId, assessmentId]);
+    const validationErrors = validateAssessmentAnalyticsQuery({ studentId, assessmentId });
+    if (validationErrors.length > 0) {
+      throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
+    }
 
-    if (attempt.rows.length === 0) {
+    const attempt = await analyticsRepo.findAttemptDetailsQuery(studentId, assessmentId);
+    if (!attempt) {
       throw new Error('No completed attempt found for this assessment');
     }
 
-    const { attempt_id, time_taken, assessment_title, assessment_created_at, student_score, total_marks, percentage } = attempt.rows[0];
+    const { attempt_id, time_taken, assessment_title, assessment_created_at, student_score, total_marks, percentage } = attempt;
 
-    // FIXED QUERY — HANDLES SHORT ANSWER JSONB + OTHER TYPES
-    const questionStats = await db.query(`
-      SELECT 
-        COUNT(DISTINCT gq.id) as total_questions,
-        SUM(CASE 
-          WHEN sa.student_answer IS NULL THEN 0
-          WHEN gq.question_type = 'short_answer' THEN
-            CASE WHEN sa.score > 0 THEN 1 ELSE 0 END
-          ELSE
-            CASE WHEN TRIM(LOWER(REGEXP_REPLACE(sa.student_answer, '[^a-zA-Z0-9]', '', 'g'))) = 
-                     TRIM(LOWER(REGEXP_REPLACE((gq.correct_answer)::text, '[^a-zA-Z0-9]', '', 'g'))) 
-            THEN 1 ELSE 0 END
-        END) as correct_answers,
-        SUM(CASE 
-          WHEN sa.student_answer IS NULL THEN 0
-          WHEN gq.question_type = 'short_answer' THEN
-            CASE WHEN sa.score <= 0 AND sa.student_answer IS NOT NULL THEN 1 ELSE 0 END
-          ELSE
-            CASE WHEN TRIM(LOWER(REGEXP_REPLACE(sa.student_answer, '[^a-zA-Z0-9]', '', 'g'))) != 
-                     TRIM(LOWER(REGEXP_REPLACE((gq.correct_answer)::text, '[^a-zA-Z0-9]', '', 'g'))) 
-            THEN 1 ELSE 0 END
-        END) as incorrect_answers,
-        SUM(CASE 
-          WHEN sa.student_answer IS NULL THEN 0
-          WHEN gq.question_type = 'short_answer' THEN
-            CASE WHEN sa.score < 0 THEN ABS(sa.score) ELSE 0 END
-          ELSE
-            CASE WHEN TRIM(LOWER(REGEXP_REPLACE(sa.student_answer, '[^a-zA-Z0-9]', '', 'g'))) != 
-                     TRIM(LOWER(REGEXP_REPLACE((gq.correct_answer)::text, '[^a-zA-Z0-9]', '', 'g'))) 
-            THEN COALESCE(gq.negative_marks, 0) ELSE 0 END
-        END) as negative_marks_applied
-      FROM generated_questions gq
-      LEFT JOIN student_answers sa ON sa.question_id = gq.id AND sa.attempt_id = $1
-      WHERE gq.attempt_id = $1
-    `, [attempt_id]);
-
-    const weak_questions = await db.query(`
-      SELECT 
-        gq.question_type,
-        gq.question_text,
-        (sa.score::NUMERIC / NULLIF(gq.positive_marks, 0)) as performance,
-        sa.score as scored_marks,
-        gq.positive_marks
-      FROM student_answers sa
-      JOIN generated_questions gq ON sa.question_id = gq.id
-      WHERE sa.attempt_id = $1
-        AND (sa.score::NUMERIC / NULLIF(gq.positive_marks, 0)) <= 0.6
-      ORDER BY performance ASC
-    `, [attempt_id]);
-
-    const studentAnswers = await db.query(`
-      SELECT score
-      FROM student_answers
-      WHERE attempt_id = $1
-    `, [attempt_id]);
+    const questionStats = await analyticsRepo.findQuestionStatsQuery(attempt_id);
+    const weakQuestions = await analyticsRepo.findWeakQuestionsQuery(attempt_id);
+    const studentAnswers = await analyticsRepo.findStudentAnswerScoresQuery(attempt_id);
 
     return {
       assessment_title,
       assessment_created_at,
       score: percentage,
       time_taken: Math.floor(time_taken || 0),
-      total_questions: questionStats.rows[0].total_questions || 0,
-      correct_answers: questionStats.rows[0].correct_answers || 0,
-      incorrect_answers: questionStats.rows[0].incorrect_answers || 0,
-      negative_marks_applied: questionStats.rows[0].negative_marks_applied || 0,
-      total_marks: total_marks,
-      student_score: student_score,
-      student_answers: studentAnswers.rows,
-      weak_questions: weak_questions.rows,
+      total_questions: questionStats?.total_questions || 0,
+      correct_answers: questionStats?.correct_answers || 0,
+      incorrect_answers: questionStats?.incorrect_answers || 0,
+      negative_marks_applied: questionStats?.negative_marks_applied || 0,
+      total_marks,
+      student_score,
+      student_answers: studentAnswers,
+      weak_questions: weakQuestions,
       weak_areas: [],
       recommendations: { weak_areas: [], study_plan: { daily_practice: [], weekly_review: [] } }
     };
@@ -420,77 +171,59 @@ export const getAssessmentAnalytics = async (studentId, assessmentId) => {
   }
 };
 
-/**
- * Get student's learning recommendations (aggregate)
- * @param {number} studentId - Student ID
- * @returns {Object} Learning recommendations
- */
 export const getLearningRecommendations = async (studentId) => {
   try {
-    const weakAreas = await db.query(`
-      SELECT 
-        gq.question_type,
-        COUNT(*) as question_count,
-        AVG(sa.score * 1.0 / gq.positive_marks) as average_performance
-      FROM student_answers sa
-      JOIN generated_questions gq ON sa.question_id = gq.id
-      JOIN assessment_attempts aa ON sa.attempt_id = aa.id
-      WHERE aa.student_id = $1 
-        AND aa.completed_at IS NOT NULL
-        AND sa.score IS NOT NULL
-        AND sa.score <= gq.positive_marks * 0.6
-      GROUP BY gq.question_type
-      ORDER BY average_performance ASC
-      LIMIT 5
-    `, [studentId]);
+    const validationErrors = validateStudentAnalyticsQuery({ studentId });
+    if (validationErrors.length > 0) {
+      throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
+    }
 
+    const weakAreas = await analyticsRepo.findWeakAreasQuery(studentId);
     let recommendations = {
       weak_areas: [],
       study_plan: { daily_practice: [], weekly_review: [] },
-      next_assessments: await getRecommendedAssessments(studentId)
+      next_assessments: await analyticsRepo.findRecommendedAssessmentsQuery(studentId)
     };
 
-    if (weakAreas.rows.length === 0) {
-      return recommendations;
-    }
-
-    const client = await getCheckingModel();
-    const prompt = `You are an educational AI assistant. Generate learning recommendations for a student with the following weak areas: ${JSON.stringify(weakAreas.rows)}. Respond ONLY with a valid JSON object in this exact format: { "weak_areas": [{ "topic": "string", "performance": number, "suggestion": "string" }], "study_plan": { "daily_practice": [{ "topic": "string", "focus": "string", "time_allocation": "string" }], "weekly_review": [{ "topic": "string", "activity": "string", "goal": "string" }] } }. Ensure the JSON is parseable and matches the structure exactly.`;
-    let responseText = await generateContent(client, prompt, {
-      generationConfig: { maxOutputTokens: 1000, temperature: 0.7, response_mime_type: 'application/json' },
-      thinkingConfig: { thinkingBudget: 0 },
-    });
-
-    responseText = responseText.replace(/^```json\n/, '').replace(/\n```$/, '').trim();
+    if (weakAreas.length === 0) return recommendations;
 
     try {
+      const client = await getCheckingModel();
+      const prompt = `You are an educational AI assistant. Generate learning recommendations for a student with the following weak areas: ${JSON.stringify(weakAreas)}. Respond ONLY with a valid JSON object in this exact format: { "weak_areas": [{ "topic": "string", "performance": number, "suggestion": "string" }], "study_plan": { "daily_practice": [{ "topic": "string", "focus": "string", "time_allocation": "string" }], "weekly_review": [{ "topic": "string", "activity": "string", "goal": "string" }] } }. Ensure the JSON is parseable and matches the structure exactly.`;
+      
+      let responseText = await generateContent(client, prompt, {
+        generationConfig: { maxOutputTokens: 1000, temperature: 0.7, response_mime_type: 'application/json' },
+        thinkingConfig: { thinkingBudget: 0 },
+      });
+
+      responseText = responseText.replace(/^```json\n/, '').replace(/\n```$/, '').trim();
       const aiRecommendations = JSON.parse(responseText);
+      
       if (!aiRecommendations.weak_areas || !Array.isArray(aiRecommendations.weak_areas) ||
           !aiRecommendations.study_plan || !aiRecommendations.study_plan.daily_practice ||
           !aiRecommendations.study_plan.weekly_review) {
         throw new Error('Invalid AI response structure');
       }
+      
       recommendations = {
         weak_areas: aiRecommendations.weak_areas,
         study_plan: aiRecommendations.study_plan,
-        next_assessments: await getRecommendedAssessments(studentId)
+        next_assessments: await analyticsRepo.findRecommendedAssessmentsQuery(studentId)
       };
     } catch (parseError) {
       console.error("❌ AI recommendation parsing error:", parseError);
-      console.log("Debug: Raw response text:", responseText);
-      console.log("Falling back to default recommendations");
       recommendations = {
-        weak_areas: weakAreas.rows.map(area => ({
+        weak_areas: weakAreas.map(area => ({
           topic: area.question_type || 'General',
           performance: Math.round(area.average_performance * 100),
           suggestion: getSuggestionForArea(area.question_type, 'medium')
         })),
-        study_plan: generateStudyPlan(weakAreas.rows.map(area => ({
+        study_plan: generateStudyPlan(weakAreas.map(area => ({
           topic: area.question_type || 'General',
           performance: Math.round(area.average_performance * 100),
           suggestion: getSuggestionForArea(area.question_type, 'medium')
         }))),
-        next_assessments: await getRecommendedAssessments(studentId)
+        next_assessments: await analyticsRepo.findRecommendedAssessmentsQuery(studentId)
       };
     }
 
@@ -501,171 +234,104 @@ export const getLearningRecommendations = async (studentId) => {
   }
 };
 
-/**
- * Get suggestion for weak area (fallback if AI fails)
- */
-const getSuggestionForArea = (questionType, difficulty) => {
-  const suggestions = {
-    multiple_choice: {
-      easy: "Practice basic concepts and eliminate obvious wrong answers",
-      medium: "Focus on understanding key concepts and common distractors",
-      hard: "Deep dive into complex scenarios and edge cases"
-    },
-    true_false: {
-      easy: "Review fundamental facts and definitions",
-      medium: "Practice identifying subtle nuances in statements",
-      hard: "Focus on complex logical reasoning"
-    },
-    short_answer: {
-      easy: "Practice concise writing and key term identification",
-      medium: "Work on structured responses and evidence-based answers",
-      hard: "Develop analytical thinking and comprehensive explanations"
-    },
-    essay: {
-      easy: "Practice basic essay structure and organization",
-      medium: "Focus on argument development and evidence integration",
-      hard: "Work on critical analysis and synthesis of complex ideas"
-    },
-    match_the_column: {
-      easy: "Practice matching basic terms and definitions",
-      medium: "Focus on understanding relationships between concepts",
-      hard: "Work on complex matching with multiple possibilities"
-    },
-    general: {
-      easy: "Review basic concepts and practice simple questions",
-      medium: "Focus on core principles and standard problems",
-      hard: "Explore advanced topics and challenging scenarios"
-    }
-  };
-
-  return suggestions[questionType?.toLowerCase()]?.[difficulty] || suggestions.general[difficulty] || "Practice more questions in this area";
-};
-
-/**
- * Generate study plan based on weak areas (fallback if AI fails)
- */
-const generateStudyPlan = (weakAreas) => {
-  const plan = {
-    daily_practice: weakAreas.slice(0, 2).map(area => ({
-      topic: area.topic,
-      focus: area.suggestion,
-      time_allocation: "30 minutes"
-    })),
-    weekly_review: weakAreas.slice(0, 3).map(area => ({
-      topic: area.topic,
-      activity: "Practice test",
-      goal: `Improve ${area.topic} performance by 20%`
-    })),
-    monthly_assessment: "Take a comprehensive assessment to measure progress"
-  };
-
-  return plan;
-};
-
-/**
- * Get recommended assessments for student
- */
-const getRecommendedAssessments = async (studentId) => {
-  try {
-    const query = `
-      SELECT 
-        a.id,
-        a.title,
-        a.prompt as description,
-        NULL as duration,
-        NULL as total_marks
-      FROM enrollments e
-      JOIN assessments a ON e.assessment_id = a.id
-      WHERE e.student_id = $1 
-        AND a.id NOT IN (
-          SELECT DISTINCT assessment_id 
-          FROM assessment_attempts 
-          WHERE student_id = $1 AND completed_at IS NOT NULL
-        )
-      ORDER BY a.created_at DESC
-      LIMIT 3
-    `;
-
-    const result = await db.query(query, [studentId]);
-    return result.rows;
-  } catch (error) {
-    console.error("❌ Error getting recommended assessments:", error);
-    return [];
-  }
-};
-
-/**
- * Get questions and answers for a specific assessment attempt
- * @param {number} studentId - Student ID
- * @param {number} assessmentId - Assessment ID
- * @returns {Array} List of questions with answers and scores
- */
-//No AI
 export const getAssessmentQuestions = async (studentId, assessmentId) => {
   try {
-    const attemptQuery = `
-      SELECT id as attempt_id
-      FROM assessment_attempts
-      WHERE student_id = $1 AND assessment_id = $2 AND completed_at IS NOT NULL AND status = 'completed'
-      ORDER BY completed_at DESC
-      LIMIT 1
-    `;
-    const attemptRes = await db.query(attemptQuery, [studentId, assessmentId]);
-    if (attemptRes.rows.length === 0) {
+    const validationErrors = validateAssessmentAnalyticsQuery({ studentId, assessmentId });
+    if (validationErrors.length > 0) {
+      throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
+    }
+
+    const attempt = await analyticsRepo.findStudentAttemptIdQuery(studentId, assessmentId);
+    if (!attempt) {
       throw new Error('No completed attempt found for this assessment');
     }
-    const attemptId = attemptRes.rows[0].attempt_id;
 
-    const questionsQuery = `
-      SELECT 
-        gq.id,
-        gq.question_order,
-        gq.question_text,
-        gq.question_type,
-        gq.options,
-        gq.positive_marks,
-        gq.correct_answer,
-        sa.student_answer,
-        sa.score,
-        sa.is_correct,
-        gq.negative_marks
-      FROM generated_questions gq
-      LEFT JOIN student_answers sa ON sa.question_id = gq.id AND sa.attempt_id = $1
-      WHERE gq.attempt_id = $1
-      ORDER BY gq.question_order
-    `;
-    const questionsRes = await db.query(questionsQuery, [attemptId]);
+    const attemptId = attempt.attempt_id;
+    const questions = await analyticsRepo.findAttemptQuestionsQuery(attemptId);
 
-   return questionsRes.rows.map(q => {
-  let expected = "";
-  if (q.question_type === 'short_answer' && typeof q.correct_answer === 'object') {
-    expected = q.correct_answer.required_keywords?.[0] || "";
-  } else {
-    expected = String(q.correct_answer).trim().toLowerCase();
-  }
+    return questions.map(q => {
+      let expected = "";
+      if (q.question_type === 'short_answer' && typeof q.correct_answer === 'object') {
+        expected = q.correct_answer.required_keywords?.[0] || "";
+      } else {
+        expected = String(q.correct_answer).trim().toLowerCase();
+      }
 
-  const student = String(q.student_answer || "").trim().toLowerCase();
+      const student = String(q.student_answer || "").trim().toLowerCase();
+      const isCorrect = student === expected;
+      const score = isCorrect ? q.positive_marks : (q.student_answer ? -q.negative_marks : 0);
 
-  const isCorrect = student === expected;
-
-  const score = isCorrect ? q.positive_marks : (q.student_answer ? -q.negative_marks : 0);
-
-  return {
-    question_id: q.id,
-    question_order: q.question_order,
-    question: q.question_text,
-    type: q.question_type,
-    options: q.options,
-    max_marks: q.positive_marks,
-    correct_answer: q.correct_answer, // keep original for display
-    student_answer: q.student_answer,
-    score: score,
-    is_correct: isCorrect,
-    negative_marks: q.negative_marks
-  };
-});
+      return {
+        question_id: q.id,
+        question_order: q.question_order,
+        question: q.question_text,
+        type: q.question_type,
+        options: q.options,
+        max_marks: q.positive_marks,
+        correct_answer: q.correct_answer,
+        student_answer: q.student_answer,
+        score,
+        is_correct: isCorrect,
+        negative_marks: q.negative_marks
+      };
+    });
   } catch (error) {
     console.error("❌ Error getting assessment questions:", error);
     throw error;
   }
 };
+
+// ==================== HELPER FUNCTIONS ====================
+
+const processQuestionAnalysis = (questionAnalysis) => {
+  const strengths = [];
+  const weaknesses = [];
+  const subjectBreakdown = {};
+
+  questionAnalysis.forEach(q => {
+    const topic = q.question_type || 'General';
+    const questionType = q.question_type || 'multiple_choice';
+
+    if (!subjectBreakdown[topic]) {
+      subjectBreakdown[topic] = { total_questions: 0, correct_answers: 0, average_score: 0 };
+    }
+    subjectBreakdown[topic].total_questions++;
+    subjectBreakdown[topic].correct_answers += q.scored_marks || 0;
+
+    if (q.performance_category === 'strength') {
+      strengths.push({ topic, question_type: questionType, difficulty: 'medium', score: q.scored_marks, max_score: q.positive_marks });
+    } else if (q.performance_category === 'weakness') {
+      weaknesses.push({ topic, question_type: questionType, difficulty: 'medium', score: q.scored_marks, max_score: q.positive_marks });
+    }
+  });
+
+  Object.keys(subjectBreakdown).forEach(topic => {
+    const breakdown = subjectBreakdown[topic];
+    breakdown.average_score = breakdown.total_questions > 0 
+      ? Math.round((breakdown.correct_answers / breakdown.total_questions) * 100) : 0;
+  });
+
+  return {
+    strengths: strengths.sort((a, b) => (b.score / b.max_score) - (a.score / a.max_score)).slice(0, 3),
+    weaknesses: weaknesses.sort((a, b) => (a.score / a.max_score) - (b.score / b.max_score)).slice(0, 3),
+    subjectBreakdown: Object.entries(subjectBreakdown).map(([topic, data]) => ({ topic, total_questions: data.total_questions, average_score: data.average_score }))
+  };
+};
+
+const getSuggestionForArea = (questionType, difficulty) => {
+  const suggestions = {
+    multiple_choice: { easy: "Practice basic concepts and eliminate obvious wrong answers", medium: "Focus on understanding key concepts and common distractors", hard: "Deep dive into complex scenarios and edge cases" },
+    true_false: { easy: "Review fundamental facts and definitions", medium: "Practice identifying subtle nuances in statements", hard: "Focus on complex logical reasoning" },
+    short_answer: { easy: "Practice concise writing and key term identification", medium: "Work on structured responses and evidence-based answers", hard: "Develop analytical thinking and comprehensive explanations" },
+    essay: { easy: "Practice basic essay structure and organization", medium: "Focus on argument development and evidence integration", hard: "Work on critical analysis and synthesis of complex ideas" },
+    match_the_column: { easy: "Practice matching basic terms and definitions", medium: "Focus on understanding relationships between concepts", hard: "Work on complex matching with multiple possibilities" },
+    general: { easy: "Review basic concepts and practice simple questions", medium: "Focus on core principles and standard problems", hard: "Explore advanced topics and challenging scenarios" }
+  };
+  return suggestions[questionType?.toLowerCase()]?.[difficulty] || suggestions.general[difficulty] || "Practice more questions in this area";
+};
+
+const generateStudyPlan = (weakAreas) => ({
+  daily_practice: weakAreas.slice(0, 2).map(area => ({ topic: area.topic, focus: area.suggestion, time_allocation: "30 minutes" })),
+  weekly_review: weakAreas.slice(0, 3).map(area => ({ topic: area.topic, activity: "Practice test", goal: `Improve ${area.topic} performance by 20%` })),
+  monthly_assessment: "Take a comprehensive assessment to measure progress"
+});

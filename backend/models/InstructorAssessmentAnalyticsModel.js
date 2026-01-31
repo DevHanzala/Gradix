@@ -1,88 +1,66 @@
-  import db from "../DB/db.js";
+import * as analyticsRepo from "../repositories/instructorAnalyticsRepository.js";
+import {
+  validateAnalyticsQuery,
+  validateAssessmentStudentsQuery,
+  validateStudentAttemptQuery,
+} from "../validator/instructorAnalytics.validator.js";
 
-  /**
-   * Instructor Assessment Analytics Model
-   */
+// ==================== EXECUTED ASSESSMENTS ====================
 
-  /**
-   * Fetch executed assessments for an instructor
-   */
-  export const getInstructorExecutedAssessmentsModel = async (instructorId) => {
-    const result = await db.query(
-      `SELECT a.id, a.title, a.created_at, COUNT(aa.id) as completed_attempts
-      FROM assessments a
-      LEFT JOIN assessment_attempts aa ON a.id = aa.assessment_id
-      WHERE a.instructor_id = $1
-        AND aa.completed_at IS NOT NULL
-        AND aa.status = 'completed'
-      GROUP BY a.id, a.title, a.created_at
-      HAVING COUNT(aa.id) > 0`,
-      [instructorId]
-    );
-    return result.rows;
-  };
+/**
+ * Fetch executed assessments for an instructor
+ */
+export const getInstructorExecutedAssessmentsModel = async (instructorId) => {
+  // VALIDATE INPUT
+  const validationErrors = validateAnalyticsQuery({ instructorId });
+  if (validationErrors.length > 0) {
+    throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
+  }
 
-  /**
-   * Fetch students who completed a specific assessment
-   */
-  export const getAssessmentStudentsModel = async (assessmentId, instructorId) => {
+  const assessments = await analyticsRepo.findExecutedAssessmentsByInstructorQuery(instructorId);
+  return assessments;
+};
+
+// ==================== ASSESSMENT STUDENTS ====================
+
+/**
+ * Fetch students who completed a specific assessment with analytics
+ */
+export const getAssessmentStudentsModel = async (assessmentId, instructorId) => {
   try {
-    const result = await db.query(`
-      SELECT 
-        aa.student_id,
-        u.name,
-        aa.score as obtained_score,
-        aa.completed_at,
-        aa.started_at,
-        COUNT(gq.id) as total_questions,
-        COALESCE(SUM(gq.positive_marks), 0) as max_possible_score
-      FROM assessment_attempts aa
-      JOIN assessments a ON a.id = aa.assessment_id
-      JOIN users u ON u.id = aa.student_id
-      JOIN generated_questions gq ON gq.attempt_id = aa.id
-      LEFT JOIN student_answers sa ON sa.question_id = gq.id AND sa.attempt_id = aa.id
-      WHERE a.id = $1 AND a.instructor_id = $2
-        AND aa.completed_at IS NOT NULL AND aa.status = 'completed'
-      GROUP BY aa.id, aa.student_id, u.name, aa.started_at, aa.completed_at, aa.score
-      ORDER BY aa.completed_at DESC
-    `, [assessmentId, instructorId]);
+    // VALIDATE INPUT
+    const validationErrors = validateAssessmentStudentsQuery({ assessmentId, instructorId });
+    if (validationErrors.length > 0) {
+      throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
+    }
 
-    // Smart correct count using saved score for short answer, string compare for others
-    const detailedResult = await db.query(`
-      SELECT 
-        aa.student_id,
-        COUNT(CASE 
-          WHEN gq.question_type = 'short_answer' THEN
-            CASE WHEN sa.score > 0 THEN 1 ELSE NULL END
-          ELSE
-            CASE WHEN TRIM(LOWER(REGEXP_REPLACE(sa.student_answer, '[^a-zA-Z0-9]', '', 'g'))) = 
-                     TRIM(LOWER(REGEXP_REPLACE((gq.correct_answer)::text, '[^a-zA-Z0-9]', '', 'g'))) 
-            THEN 1 ELSE NULL END
-        END) as correct_answers
-      FROM assessment_attempts aa
-      JOIN generated_questions gq ON gq.attempt_id = aa.id
-      LEFT JOIN student_answers sa ON sa.question_id = gq.id AND sa.attempt_id = aa.id
-      WHERE aa.assessment_id = $1 AND aa.student_id IN (
-        SELECT student_id FROM assessment_attempts WHERE assessment_id = $1 AND status = 'completed'
-      )
-      GROUP BY aa.student_id
-    `, [assessmentId]);
+    // Fetch basic student info
+    const students = await analyticsRepo.findAssessmentStudentsBasicQuery(assessmentId, instructorId);
 
+    // Fetch correct answer counts
+    const correctAnswers = await analyticsRepo.findStudentCorrectAnswersQuery(assessmentId);
+
+    // Create map for quick lookup
     const correctMap = {};
-    detailedResult.rows.forEach(row => {
+    correctAnswers.forEach((row) => {
       correctMap[row.student_id] = Number(row.correct_answers || 0);
     });
 
-    return result.rows.map(row => {
-      const timeDiff = row.started_at && row.completed_at 
-        ? Math.round((new Date(row.completed_at) - new Date(row.started_at)) / 1000) 
-        : 0;
+    // Process and calculate analytics for each student
+    return students.map((row) => {
+      // Calculate time taken
+      const timeDiff =
+        row.started_at && row.completed_at
+          ? Math.round((new Date(row.completed_at) - new Date(row.started_at)) / 1000)
+          : 0;
       const minutes = Math.floor(timeDiff / 60);
       const seconds = timeDiff % 60;
 
-      const percentage = row.max_possible_score > 0 
-        ? Math.round((row.obtained_score / row.max_possible_score) * 100)
-        : 0;
+      // Calculate percentage
+      const percentage =
+        row.max_possible_score > 0
+          ? Math.round((row.obtained_score / row.max_possible_score) * 100)
+          : 0;
 
       return {
         student_id: row.student_id,
@@ -91,72 +69,76 @@
         correct_answers: correctMap[row.student_id] || 0,
         percentage,
         time_used: `${minutes}m ${seconds}s`,
-        time_taken: timeDiff
+        time_taken: timeDiff,
       };
     });
   } catch (error) {
     console.error("Error fetching students:", error);
-    return [];
+    throw error; // Re-throw instead of returning empty array to surface validation errors
   }
 };
 
+// ==================== STUDENT ATTEMPT QUESTIONS ====================
 
-  /**
-   * Fetch questions and answers for a specific student's attempt
-   */
-  export const getStudentAttemptQuestionsModel = async (assessmentId, studentId, instructorId) => {
+/**
+ * Fetch questions and answers for a specific student's attempt
+ */
+export const getStudentAttemptQuestionsModel = async (assessmentId, studentId, instructorId) => {
   try {
+    // VALIDATE INPUT
+    const validationErrors = validateStudentAttemptQuery({ assessmentId, studentId, instructorId });
+    if (validationErrors.length > 0) {
+      throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
+    }
+
     // Verify instructor owns the assessment
-    const check = await db.query(`SELECT 1 FROM assessments WHERE id = $1 AND instructor_id = $2`, [assessmentId, instructorId]);
-    if (check.rows.length === 0) throw new Error("Access denied");
+    const hasAccess = await analyticsRepo.verifyInstructorOwnershipQuery(assessmentId, instructorId);
+    if (!hasAccess) {
+      throw new Error("Access denied");
+    }
 
-    // Get latest attempt
-    const attempt = await db.query(`
-      SELECT id FROM assessment_attempts 
-      WHERE assessment_id = $1 AND student_id = $2 AND status = 'completed' 
-      ORDER BY completed_at DESC LIMIT 1
-    `, [assessmentId, studentId]);
+    // Get latest completed attempt
+    const attempt = await analyticsRepo.findLatestCompletedAttemptQuery(assessmentId, studentId);
+    if (!attempt) {
+      return [];
+    }
 
-    if (attempt.rows.length === 0) return [];
+    const attemptId = attempt.id;
 
-    const attemptId = attempt.rows[0].id;
+    // Get all questions with answers
+    const questions = await analyticsRepo.findAttemptQuestionsWithAnswersQuery(attemptId);
 
-    // Get all questions
-    const result = await db.query(`
-      SELECT 
-        gq.question_order, gq.question_text, gq.question_type, gq.options,
-        gq.correct_answer, sa.student_answer, sa.score, gq.positive_marks, gq.negative_marks
-      FROM generated_questions gq
-      LEFT JOIN student_answers sa ON sa.question_id = gq.id AND sa.attempt_id = $1
-      WHERE gq.attempt_id = $1
-      ORDER BY gq.question_order
-    `, [attemptId]);
-
-    const clean = (str) => {
-      if (str === null || str === undefined) return "";
-      return String(str)
-        .replace(/\\"/g, '"')
-        .replace(/^["'\s]+|["'\s]+$/g, '')
-        .trim()
-        .toLowerCase()
-        .replace(/[^a-z0-9]/g, '');
-    };
-
-    return result.rows.map(q => {
-      const studentClean = clean(q.student_answer);
-      const correctClean = clean(q.correct_answer);
+    // Process each question to determine correctness
+    return questions.map((q) => {
+      const studentClean = cleanAnswer(q.student_answer);
+      const correctClean = cleanAnswer(q.correct_answer);
 
       const isCorrect = studentClean === correctClean;
 
       return {
         ...q,
         is_correct: isCorrect,
-        score: isCorrect ? q.positive_marks : (q.score || -Math.abs(q.negative_marks || 0))
+        score: isCorrect ? q.positive_marks : q.score || -Math.abs(q.negative_marks || 0),
       };
     });
-
   } catch (error) {
     console.error("Analytics model error:", error);
     throw error;
   }
+};
+
+// ==================== HELPER FUNCTIONS ====================
+
+/**
+ * Clean and normalize answer for comparison
+ */
+const cleanAnswer = (answer) => {
+  if (answer === null || answer === undefined) return "";
+  
+  return String(answer)
+    .replace(/\\"/g, '"')
+    .replace(/^["'\s]+|["'\s]+$/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
 };

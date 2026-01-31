@@ -1,138 +1,114 @@
-// server.js
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { createServer } from "http";
-import { Server } from "socket.io";
 import { connectDB } from "./DB/db.js";
-import { init as initAssessmentModel } from "./models/assessmentModel.js";
-import { init as initResourceModel } from "./models/resourceModel.js";
+
 import authRoutes from "./routes/authRoutes.js";
 import assessmentRoutes from "./routes/assessmentRoutes.js";
 import resourceRoutes from "./routes/resourceRoutes.js";
-import dashboardRoutes from "./routes/dashboardRoutes.js";
 import studentAnalyticsRoutes from "./routes/studentAnalyticsRoutes.js";
-import takingRoutes from "./routes/takingRoutes.js";
+import studentAssessmentRoutes from "./routes/studentAssessmentRoutes.js";
 import instructorAssessmentAnalyticsRoutes from "./routes/instructorAssessmentAnalyticsRoutes.js";
+
 import { errorHandler, notFound } from "./middleware/errorMiddleware.js";
 
-// === GLOBALS FOR LOGGING (MochaHost Debug) ===
-global.startupLogs = [];
-global.recentErrors = [];
-global.dbConnected = false;
-
-// FIXED: .env loading
+// Load environment variables
 dotenv.config();
 
+/* =========================
+   LOGGER
+========================= */
+class Logger {
+  constructor() {
+    this.startupLogs = [];
+    this.recentErrors = [];
+    this.maxErrors = 10;
+  }
 
-console.log("GEMINI_CREATION_API_KEY_1 loaded:", process.env.GEMINI_CREATION_API_KEY_1 ? "Yes" : "No");
-console.log("GEMINI_CREATION_API_KEY_2 loaded:", process.env.GEMINI_CREATION_API_KEY_2 ? "Yes" : "No");
-console.log("GROQ_API_KEY loaded:", process.env.GROQ_API_KEY ? "Yes" : "No");
-console.log("CHECKING_API_KEY loaded:", process.env.GEMINI_CHECKING_API_KEY ? "Yes" : "No");
+  log(message) {
+    const logEntry = `[${new Date().toISOString()}] ${message}`;
+    console.log(logEntry);
+    this.startupLogs.push(logEntry);
+  }
 
-
-const app = express();
-app.disable("x-powered-by");
-const PORT = process.env.PORT || 5000;
-
-// HTTP + Socket.IO Server
-const httpServer = createServer(app);
-const io = new Server(httpServer, {
-  cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
-    credentials: true,
-  },
-});
-
-app.set("io", io);
-
-// Map to track upload sockets
-const uploadSockets = new Map();
-
-
-// Socket.IO connection
-io.on("connection", (socket) => {
-  console.log(`WebSocket connected: ${socket.id}`);
-
-  socket.on("register-upload", (userId) => {
-    uploadSockets.set(socket.id, userId);
-    console.log(`Upload socket registered: ${socket.id} → user ${userId}`);
-  });
-
-  socket.on("disconnect", () => {
-    uploadSockets.delete(socket.id);
-    console.log(`WebSocket disconnected: ${socket.id}`);
-  });
-});
-
-// === START SERVER WITH LOGGING ===
-const startServer = async () => {
-  try {
-    global.startupLogs.push(`[INIT] Starting server on port ${PORT}...`);
-    global.startupLogs.push(`[ENV] NODE_ENV = ${process.env.NODE_ENV || "development"}`);
-    global.startupLogs.push(`[ENV] FRONTEND_URL = ${process.env.FRONTEND_URL || "http://localhost:5173"}`);
-
-    global.startupLogs.push("[DB] Connecting to database...");
-    await connectDB();
-    global.dbConnected = true;
-    global.startupLogs.push("[DB] Connected successfully!");
-
-    global.startupLogs.push("[MODEL] Initializing Resource Model...");
-    await initResourceModel();
-    global.startupLogs.push("[MODEL] Resource Model initialized!");
-
-    global.startupLogs.push("[MODEL] Initializing Assessment Model...");
-    await initAssessmentModel();
-    global.startupLogs.push("[MODEL] Assessment Model initialized!");
-
-    global.startupLogs.push(`[SERVER] Listening on 0.0.0.0:${PORT}...`);
-
-    httpServer.listen(PORT, "0.0.0.0", () => {
-      global.startupLogs.push(`[LIVE] Server is LIVE at http://0.0.0.0:${PORT}`);
-      console.log(`Server running on port ${PORT}`);
-      console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
-      console.log(`Frontend URL: ${process.env.FRONTEND_URL || "http://localhost:5173"}`);
-      console.log(`Health: http://localhost:${PORT}/api/health`);
-    });
-  } catch (error) {
-    const msg = `[FATAL] STARTUP FAILED: ${error.message}`;
-    console.error(msg);
-    global.startupLogs.push(msg);
-    global.recentErrors.push({
-      error: error.message,
-      stack: error.stack,
+  error(message, error) {
+    console.error(message, error);
+    this.recentErrors.push({
+      message,
+      error: error?.message || String(error),
+      stack: error?.stack,
       time: new Date().toISOString(),
     });
-    process.exit(1);
+
+    if (this.recentErrors.length > this.maxErrors) {
+      this.recentErrors = this.recentErrors.slice(-this.maxErrors);
+    }
   }
+}
+
+const logger = new Logger();
+
+/* =========================
+   ENV VALIDATION
+========================= */
+const validateEnv = () => {
+  const required = [
+    "GEMINI_CREATION_API_KEY_1",
+    "GEMINI_CHECKING_API_KEY",
+  ];
+
+  const missing = required.filter((key) => !process.env[key]);
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Missing required environment variables: ${missing.join(", ")}`
+    );
+  }
+
+  logger.log("✓ Environment variables validated");
 };
 
-// === MIDDLEWARE ===
+/* =========================
+   APP SETUP
+========================= */
+const app = express();
+app.disable("x-powered-by");
+
+const PORT = process.env.PORT || 5000;
+let dbConnected = false;
+
+/* =========================
+   MIDDLEWARE
+========================= */
 app.use(
   cors({
     origin: process.env.FRONTEND_URL || "http://localhost:5173",
     credentials: true,
   })
 );
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Request logging
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.originalUrl} - ${new Date().toISOString()}`);
+  logger.log(`${req.method} ${req.originalUrl}`);
   next();
 });
 
-// === ROUTES ===
+/* =========================
+   ROUTES
+========================= */
 app.use("/api/auth", authRoutes);
 app.use("/api/assessments", assessmentRoutes);
 app.use("/api/resources", resourceRoutes);
-app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/student-analytics", studentAnalyticsRoutes);
-app.use("/api/taking", takingRoutes);
+app.use("/api/taking", studentAssessmentRoutes);
 app.use("/api/instructor-analytics", instructorAssessmentAnalyticsRoutes);
 
-// Health check
+/* =========================
+   HEALTH CHECK
+========================= */
 app.get("/api/health", (req, res) => {
   res.status(200).json({
     success: true,
@@ -140,10 +116,13 @@ app.get("/api/health", (req, res) => {
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || "development",
     version: "1.0.0",
+    database: dbConnected ? "connected" : "disconnected",
   });
 });
 
-// === DEBUG LOGS ENDPOINT (MochaHost) ===
+/* =========================
+   DEBUG LOGS (DEV ONLY)
+========================= */
 app.get("/api/logs", (req, res) => {
   res.json({
     success: true,
@@ -151,55 +130,75 @@ app.get("/api/logs", (req, res) => {
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || "development",
       port: PORT,
-      frontendUrl: process.env.FRONTEND_URL || "http://localhost:5173",
-      geminiKeyLoaded: !!process.env.GEMINI_CREATION_API_KEY,
-      dbConnected: global.dbConnected,
+      dbConnected,
       uptime: `${process.uptime().toFixed(2)} seconds`,
-      startupLogs: global.startupLogs,
-      recentErrors: global.recentErrors.slice(-10), // Last 10 errors
+      startupLogs: logger.startupLogs,
+      recentErrors: logger.recentErrors,
     },
   });
 });
 
-// Root welcome
+/* =========================
+   ROOT
+========================= */
 app.get("/", (req, res) => {
   res.json({
     success: true,
     message: "Welcome to Gradewise AI Backend",
     health: "/api/health",
-    logs: "/api/logs",
     docs: "Use /api/* for all endpoints",
   });
 });
 
-// === ERROR HANDLING MIDDLEWARE ===  
+/* =========================
+   ERROR HANDLING
+========================= */
 app.use(notFound);
 app.use(errorHandler);
 
-// === ENHANCED ERROR LOGGING ===
+/* =========================
+   PROCESS SAFETY
+========================= */
 process.on("unhandledRejection", (err) => {
-  console.error("UNHANDLED REJECTION:", err?.message || err);
-  global.recentErrors.push({
-    error: err?.message || String(err),
-    stack: err?.stack,
-    time: new Date().toISOString(),
-  });
+  logger.error("UNHANDLED REJECTION:", err);
+  if (process.env.NODE_ENV === "production") {
+    setTimeout(() => process.exit(1), 1000);
+  }
 });
 
-// Catch uncaught exceptions
 process.on("uncaughtException", (err) => {
-  console.error("UNCAUGHT EXCEPTION:", err.message);
-  global.recentErrors.push({
-    error: err.message,
-    stack: err.stack,
-    time: new Date().toISOString(),
-  });
+  logger.error("UNCAUGHT EXCEPTION:", err);
+  process.exit(1);
 });
 
+/* =========================
+   SERVER START
+========================= */
+const startServer = async () => {
+  try {
+    logger.log(`Starting server on port ${PORT}...`);
+    logger.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+    logger.log(
+      `Frontend URL: ${process.env.FRONTEND_URL || "http://localhost:5173"}`
+    );
 
+    validateEnv();
 
+    logger.log("Connecting to database...");
+    await connectDB();
+    dbConnected = true;
+    logger.log("✓ Database connected successfully");
 
-// === START ===
+    app.listen(PORT, "0.0.0.0", () => {
+      logger.log(`✓ Server is LIVE at http://0.0.0.0:${PORT}`);
+      logger.log(`Health check: http://localhost:${PORT}/api/health`);
+    });
+  } catch (error) {
+    logger.error("FATAL: Startup failed", error);
+    process.exit(1);
+  }
+};
+
 startServer();
 
 export default app;

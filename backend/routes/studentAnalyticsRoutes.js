@@ -1,6 +1,5 @@
-// routes/studentAnalyticsRoutes.js
 import express from "express";
-import { protect } from "../middleware/authMiddleware.js";
+import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
 import {
   getStudentOverview,
   getStudentPerformance,
@@ -8,13 +7,12 @@ import {
   getStudentAssessments,
   getAssessmentDetails,
   getAssessmentQuestions,
-  getStudentReport
+  getStudentReport,
+  getStudentAssessmentsList,
 } from "../controllers/studentAnalyticsController.js";
-
 const router = express.Router();
 
 router.use(protect);
-
 router.get("/overview", getStudentOverview);
 router.get("/performance", getStudentPerformance);
 router.get("/recommendations", getStudentRecommendations);
@@ -22,5 +20,6 @@ router.get("/assessments", getStudentAssessments);
 router.get("/assessment/:id", getAssessmentDetails);
 router.get("/assessment/:id/questions", getAssessmentQuestions);
 router.get("/report", getStudentReport);
+router.get("/assessments", protect, authorizeRoles(["student"]), getStudentAssessmentsList);
 
 export default router;

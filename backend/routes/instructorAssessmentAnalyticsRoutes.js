@@ -2,9 +2,10 @@ import express from "express";
 import {
   getInstructorExecutedAssessments,
   getAssessmentStudents,
-  getStudentAttemptQuestions
+  getStudentAttemptQuestions,
+  getInstructorOverview,
 } from "../controllers/InstructorAssessmentAnalyticsController.js";
-import { protect } from "../middleware/authMiddleware.js";
+import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
@@ -28,5 +29,18 @@ router.get("/assessment/:id/students", protect, getAssessmentStudents);
  * @access Private (Instructor)
  */
 router.get("/assessment/:id/student/:studentId/questions", protect, getStudentAttemptQuestions);
+
+/**
+ * @route   GET /api/instructor-analytics
+ * @desc    Get instructor dashboard overview
+ * @access  Private (Instructor, Admin, Super Admin)
+ */
+
+router.get(
+  "/",
+  protect,
+  authorizeRoles(["instructor", "admin", "super_admin"]),
+  getInstructorOverview
+);
 
 export default router;

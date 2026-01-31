@@ -12,7 +12,7 @@ import {
   changePassword,
 } from "../controllers/authController.js";
 import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
-import verifyCaptcha from "../middleware/verifyCaptcha.js";
+import verifyCaptcha from "../validator/verifyCaptcha.js";
 
 const router = express.Router();
 

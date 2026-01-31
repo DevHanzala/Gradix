@@ -1,6 +1,5 @@
 // routes/resourceRoutes.js
 import express from "express";
-import multer from "multer";
 import {
   uploadResource,
   getInstructorResources,
@@ -13,61 +12,18 @@ import {
   unlinkResourceFromAssessmentController,
 } from "../controllers/resourceController.js";
 import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
+import { uploadFiles } from "../middleware/uploadMiddleware.js";
 
 const router = express.Router();
 
-// IN-MEMORY ONLY → NO DISK, NO FOLDER
-const upload = multer({
-  storage: multer.memoryStorage(),
-  fileFilter: (req, file, cb) => {
-    const allowed = [
-      // PDFs
-      'application/pdf',
-
-      // Word Documents
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-
-      // PowerPoint
-      'application/vnd.ms-powerpoint',
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-
-      // Text
-      'text/plain',
-
-      // Images (for OCR)
-      'image/jpeg',
-      'image/jpg',
-      'image/png',
-      'image/webp',
-    ];
-
-    if (allowed.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error(`Unsupported file type: ${file.mimetype}`), false);
-    }
-  },
-  limits: { fileSize: 20 * 1024 * 1024 }, // Increased to 20MB
-});
-
-/**
- * @route   POST /api/resources
- * @desc    Upload a new resource (in-memory)
- * @access  Private
- */
 router.post(
   "/",
   protect,
   authorizeRoles(["instructor", "admin", "super_admin"]),
-  upload.array("files", 10),
+  uploadFiles.array("files", 10),
   uploadResource
 );
 
-/**
- * @route   GET /api/resources
- * @desc    Get instructor's resources
- */
 router.get(
   "/",
   protect,
@@ -75,10 +31,6 @@ router.get(
   getInstructorResources
 );
 
-/**
- * @route   GET /api/resources/all
- * @desc    Get all file-based resources
- */
 router.get(
   "/all",
   protect,
@@ -86,9 +38,6 @@ router.get(
   getAllResources
 );
 
-/**
- * @route   GET /api/resources/:resourceId
- */
 router.get(
   "/:resourceId",
   protect,
@@ -96,9 +45,6 @@ router.get(
   getResourceById
 );
 
-/**
- * @route   PUT /api/resources/:resourceId
- */
 router.put(
   "/:resourceId",
   protect,
@@ -106,9 +52,6 @@ router.put(
   updateResourceController
 );
 
-/**
- * @route   DELETE /api/resources/:resourceId
- */
 router.delete(
   "/:resourceId",
   protect,
@@ -116,9 +59,6 @@ router.delete(
   deleteResourceController
 );
 
-/**
- * @route   POST /api/resources/:resourceId/assessments/:assessmentId
- */
 router.post(
   "/:resourceId/assessments/:assessmentId",
   protect,
@@ -126,9 +66,6 @@ router.post(
   linkResourceToAssessmentController
 );
 
-/**
- * @route   GET /api/resources/assessments/:assessmentId
- */
 router.get(
   "/assessments/:assessmentId",
   protect,
@@ -136,9 +73,6 @@ router.get(
   getAssessmentResourcesController
 );
 
-/**
- * @route   DELETE /api/resources/:resourceId/assessments/:assessmentId
- */
 router.delete(
   "/:resourceId/assessments/:assessmentId",
   protect,

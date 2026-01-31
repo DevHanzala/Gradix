@@ -1,445 +1,282 @@
+// STUDENT ANALYTICS CONTROLLER - Request/Response Handler Layer
 import {
-  getStudentAnalytics,
-  getPerformanceOverTime,
-  getLearningRecommendations,
-  getStudentAssessmentsList,
-  getAssessmentAnalytics,
-  getAssessmentQuestions as modelGetAssessmentQuestions
-} from "../models/studentAnalyticsModel.js";
-import { redis } from "../services/redis.js";
-import { getCheckingModel } from "../services/ai/aiProviders.js";
+  getStudentOverviewService,
+  getStudentPerformanceService,
+  getStudentRecommendationsService,
+  getStudentAssessmentsService,
+  getAssessmentDetailsService,
+  getAssessmentQuestionsService,
+  getStudentReportService,
+  getStudentAssessmentsListService,
+} from "../services/studentAnalytics.service.js";
 
-// get student overview analytics
+// ==================== CONTROLLER FUNCTIONS ====================
+
+// 1. GET STUDENT OVERVIEW ANALYTICS
 export const getStudentOverview = async (req, res) => {
   try {
     const studentId = req.user.id;
 
-    if (req.user.role !== "student") {
-      return res.status(403).json({
-        success: false,
-        message: "Only students can access their analytics"
-      });
-    }
-
-    console.log(`📊 Getting analytics overview for student ${studentId}`);
-
-    const analytics = await getStudentAnalytics(studentId);
+    const analytics = await getStudentOverviewService(studentId, req.user.role);
 
     res.status(200).json({
       success: true,
       message: "Student analytics retrieved successfully",
-      data: analytics
+      data: analytics,
     });
   } catch (error) {
     console.error("❌ Get student overview error:", error.stack || error.message);
+
+    if (error.message === "UNAUTHORIZED_ROLE") {
+      return res.status(403).json({
+        success: false,
+        message: "Only students can access their analytics",
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Failed to retrieve student analytics",
-      error: error.message
+      error: error.message,
     });
   }
 };
 
-// Get student performance over time
+// 2. GET STUDENT PERFORMANCE OVER TIME
 export const getStudentPerformance = async (req, res) => {
   try {
     const studentId = req.user.id;
-    const { timeRange = 'month' } = req.query;
+    const { timeRange = "month" } = req.query;
 
-    if (req.user.role !== "student") {
-      return res.status(403).json({
-        success: false,
-        message: "Only students can access their performance data"
-      });
-    }
-
-    console.log(`📈 Getting performance data for student ${studentId} (${timeRange})`);
-
-    const performance = await getPerformanceOverTime(studentId, timeRange);
+    const performance = await getStudentPerformanceService(
+      studentId,
+      req.user.role,
+      timeRange
+    );
 
     res.status(200).json({
       success: true,
       message: "Performance data retrieved successfully",
-      data: {
-        time_range: timeRange,
-        performance_data: performance
-      }
+      data: performance,
     });
   } catch (error) {
     console.error("❌ Get student performance error:", error.stack || error.message);
+
+    if (error.message === "UNAUTHORIZED_ROLE") {
+      return res.status(403).json({
+        success: false,
+        message: "Only students can access their performance data",
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Failed to retrieve performance data",
-      error: error.message
+      error: error.message,
     });
   }
 };
 
-// Get student learning recommendations
+// 3. GET STUDENT LEARNING RECOMMENDATIONS
 export const getStudentRecommendations = async (req, res) => {
   try {
     const studentId = req.user.id;
-    if (req.user.role !== "student") {
-      return res.status(403).json({
-        success: false,
-        message: "Only students can access their recommendations"
-      });
-    }
+
+    const recommendations = await getStudentRecommendationsService(
+      studentId,
+      req.user.role
+    );
+
     res.status(200).json({
       success: true,
       message: "Recommendations available only in report",
-      data: {
-        weak_areas: [],
-        study_plan: { daily_practice: [], weekly_review: [] },
-        next_assessments: []
-      }
+      data: recommendations,
     });
   } catch (error) {
     console.error("Get student recommendations error:", error);
+
+    if (error.message === "UNAUTHORIZED_ROLE") {
+      return res.status(403).json({
+        success: false,
+        message: "Only students can access their recommendations",
+      });
+    }
+
     res.status(500).json({
       success: false,
-      message: "Failed to retrieve recommendations"
+      message: "Failed to retrieve recommendations",
     });
   }
 };
 
-// Get student learning recommendations
+// 4. GET STUDENT ASSESSMENTS
 export const getStudentAssessments = async (req, res) => {
   try {
     const studentId = req.user.id;
 
-    if (req.user.role !== "student") {
-      return res.status(403).json({
-        success: false,
-        message: "Only students can access their assessments"
-      });
-    }
-
-    // REDIS CACHE KEY
-    const cacheKey = `student:assessments:list:${studentId}`;
-
-    // CHECK REDIS FIRST — INSTANT LOAD
-    const cached = await redis.get(cacheKey);
-    if (cached) {
-      console.log(`Student assessments from Redis for student ${studentId}`);
-      return res.status(200).json({
-        success: true,
-        message: "Student assessments retrieved successfully",
-        data: cached
-      });
-    }
-
-    console.log(`Fetching assessments from DB for student ${studentId}`);
-    const assessments = await getStudentAssessmentsList(studentId);
-
-    // CACHE FOR 10 MINUTES
-    await redis.set(cacheKey, assessments, { ex: 600 });
+    const { data } = await getStudentAssessmentsService(studentId, req.user.role);
 
     res.status(200).json({
       success: true,
       message: "Student assessments retrieved successfully",
-      data: assessments
+      data,
     });
   } catch (error) {
     console.error("Get student assessments error:", error);
+
+    if (error.message === "UNAUTHORIZED_ROLE") {
+      return res.status(403).json({
+        success: false,
+        message: "Only students can access their assessments",
+      });
+    }
+
     res.status(500).json({
       success: false,
-      message: "Failed to retrieve assessments"
+      message: "Failed to retrieve assessments",
     });
   }
 };
 
-// Get detailed assessment analytics for a student
+// 5. GET DETAILED ASSESSMENT ANALYTICS
 export const getAssessmentDetails = async (req, res) => {
   try {
     const studentId = req.user.id;
     const assessmentId = parseInt(req.params.id);
-    if (req.user.role !== "student") {
-      return res.status(403).json({
-        success: false,
-        message: "Only students can access their assessment details"
-      });
-    }
-    const details = await getAssessmentAnalytics(studentId, assessmentId);
+
+    const details = await getAssessmentDetailsService(
+      studentId,
+      assessmentId,
+      req.user.role
+    );
+
     res.status(200).json({
       success: true,
       message: "Assessment details retrieved successfully",
-      data: details
+      data: details,
     });
   } catch (error) {
     console.error("❌ Get assessment details error:", error.stack || error.message);
-    if (error.message === 'No completed attempt found for this assessment') {
-      res.status(404).json({
+
+    if (error.message === "UNAUTHORIZED_ROLE") {
+      return res.status(403).json({
         success: false,
-        message: "No completed attempt found for this assessment"
-      });
-    } else {
-      res.status(500).json({
-        success: false,
-        message: "Failed to retrieve assessment details",
-        error: error.message
+        message: "Only students can access their assessment details",
       });
     }
+
+    if (error.message === "No completed attempt found for this assessment") {
+      return res.status(404).json({
+        success: false,
+        message: "No completed attempt found for this assessment",
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to retrieve assessment details",
+      error: error.message,
+    });
   }
 };
-  
 
-// Get assessment questions and answers for a student
+// 6. GET ASSESSMENT QUESTIONS AND ANSWERS
 export const getAssessmentQuestions = async (req, res) => {
   try {
     const studentId = req.user.id;
     const assessmentId = parseInt(req.params.id);
 
-    if (req.user.role !== "student") {
-      return res.status(403).json({
-        success: false,
-        message: "Only students can access their assessment details"
-      });
-    }
-
-    const questions = await modelGetAssessmentQuestions(studentId, assessmentId);
+    const questions = await getAssessmentQuestionsService(
+      studentId,
+      assessmentId,
+      req.user.role
+    );
 
     res.status(200).json({
       success: true,
       message: "Assessment questions and answers retrieved successfully",
-      data: questions
+      data: questions,
     });
   } catch (error) {
     console.error("❌ Get assessment questions error:", error.stack || error.message);
+
+    if (error.message === "UNAUTHORIZED_ROLE") {
+      return res.status(403).json({
+        success: false,
+        message: "Only students can access their assessment details",
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Failed to retrieve assessment questions",
-      error: error.message
+      error: error.message,
     });
   }
 };
 
-// Generate detailed student report with AI recommendations
+// 7. GENERATE DETAILED STUDENT REPORT WITH AI RECOMMENDATIONS
 export const getStudentReport = async (req, res) => {
   try {
     const studentId = req.user.id;
-    const { format = 'json', assessmentId } = req.query;
+    const { format = "json", assessmentId } = req.query;
 
-    if (req.user.role !== "student") {
-      return res.status(403).json({
-        success: false,
-        message: "Only students can access their reports"
-      });
-    }
-
-    console.log(
-      `📋 Generating detailed report for student ${studentId}${
-        assessmentId ? ` (assessment ${assessmentId})` : ''
-      }`
+    const result = await getStudentReportService(
+      studentId,
+      req.user.role,
+      format,
+      assessmentId
     );
 
-    let report;
-
-    if (assessmentId) {
-      // Fetch assessment analytics
-      const details = await getAssessmentAnalytics(
-        studentId,
-        parseInt(assessmentId)
-      );
-
-      /* =========================
-         AI RECOMMENDATIONS (CHECKING MODEL ONLY)
-      ========================= */
-
-      const checkingClient = await getCheckingModel();
-      const weakQuestionsJson = JSON.stringify(details.weak_questions || []);
-
-      const prompt = `
-You are an educational AI assistant.
-
-Generate learning recommendations for the assessment "${details.assessment_title}"
-with score ${details.score || 0}%.
-
-Weak questions:
-${weakQuestionsJson}
-
-If no weak questions exist, provide general improvement recommendations.
-
-STRICT RULES:
-- Respond ONLY with valid JSON
-- No markdown
-- No explanations
-- No extra text
-
-Expected JSON format:
-{
-  "weak_areas": [
-    { "topic": "string", "performance": number, "suggestion": "string" }
-  ],
-  "study_plan": {
-    "daily_practice": [
-      { "topic": "string", "focus": "string", "time_allocation": "string" }
-    ],
-    "weekly_review": [
-      { "topic": "string", "activity": "string", "goal": "string" }
-    ]
-  }
-}
-`;
-
-      const response = await checkingClient.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          maxOutputTokens: 1000,
-          temperature: 0.4 // deterministic for recommendations
-        }
-      });
-
-      let responseText =
-        response.text ||
-        response?.candidates?.[0]?.content?.parts?.[0]?.text ||
-        "";
-
-      responseText = responseText
-        .replace(/^```json\s*/i, '')
-        .replace(/\s*```$/i, '')
-        .trim();
-
-      let recommendations = {
-        weak_areas: [],
-        study_plan: { daily_practice: [], weekly_review: [] }
-      };
-
-      try {
-        recommendations = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error("AI recommendation parse error:", parseError);
-
-        // SAFE FALLBACK
-        recommendations = {
-          weak_areas:
-            details.weak_questions?.map(area => ({
-              topic: area.question_type || "General",
-              performance: Math.round((area.performance || 0) * 100),
-              suggestion: "Practice more in this area."
-            })) || [],
-          study_plan: {
-            daily_practice: [
-              { topic: "General", focus: "Review basics", time_allocation: "30 minutes" }
-            ],
-            weekly_review: [
-              { topic: "All", activity: "Mock test", goal: "Improve by 10%" }
-            ]
-          }
-        };
-      }
-
-      /* =========================
-         FINAL REPORT OBJECT
-      ========================= */
-
-      report = {
-        student_id: studentId,
-        assessment_id: assessmentId,
-        assessment_title: details.assessment_title,
-        generated_at: new Date().toISOString(),
-        score: details.score,
-        total_marks: details.total_marks,
-        student_score: details.student_score,
-        time_taken: details.time_taken,
-        total_questions: details.total_questions,
-        correct_answers: details.correct_answers,
-        incorrect_answers: details.incorrect_answers,
-        negative_marks_applied: details.negative_marks_applied || 0,
-        student_answers: details.student_answers || [],
-        recommendations
-      };
-
-    } else {
-      // General report (unchanged)
-      const [analytics, performance, recommendations] = await Promise.all([
-        getStudentAnalytics(studentId),
-        getPerformanceOverTime(studentId, 'month'),
-        getLearningRecommendations(studentId)
-      ]);
-
-      report = {
-        student_id: studentId,
-        generated_at: new Date().toISOString(),
-        overview: analytics,
-        performance_trend: performance,
-        recommendations,
-        summary: {
-          total_assessments_completed: analytics.completed_assessments,
-          average_performance: analytics.average_score,
-          improvement_areas: recommendations.weak_areas.length,
-          strengths_count: analytics.strengths.length
-        }
-      };
-    }
-
-    if (format === 'csv') {
-      const csvData = convertToCSV(report, !!assessmentId);
-      res.setHeader('Content-Type', 'text/csv');
+    if (result.format === "csv") {
+      res.setHeader("Content-Type", "text/csv");
       res.setHeader(
-        'Content-Disposition',
-        `attachment; filename="student-report${assessmentId ? `-${assessmentId}` : ''}.csv"`
+        "Content-Disposition",
+        `attachment; filename="student-report${result.assessmentId ? `-${result.assessmentId}` : ""}.csv"`
       );
-      return res.send(csvData);
+      return res.send(result.data);
     }
 
     res.status(200).json({
       success: true,
       message: "Student report generated successfully",
-      data: report
+      data: result.data,
     });
-
   } catch (error) {
     console.error("❌ Get student report error:", error.stack || error.message);
+
+    if (error.message === "UNAUTHORIZED_ROLE") {
+      return res.status(403).json({
+        success: false,
+        message: "Only students can access their reports",
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Failed to generate student report",
-      error: error.message
+      error: error.message,
     });
   }
 };
 
 
-/**
- * Convert report data to CSV format
- */
-const convertToCSV = (report, isSpecificAssessment = false) => {
-  const headers = [
-    'Metric',
-    'Value',
-    'Description'
-  ];
+//8. GET STUDENT ASSESSMENTS LIST
+export const getStudentAssessmentsList = async (req, res) => {
+  try {
+    const studentId = req.user.id;
 
-  const rows = [];
+    const data = await getStudentAssessmentsListService(studentId);
 
-  if (!isSpecificAssessment) {
-    rows.push(['Total Assessments', report.overview.total_assessments, 'Number of completed assessments']);
-    rows.push(['Average Score', `${report.overview.average_score}%`, 'Average performance across all assessments']);
-    rows.push(['Total Time Spent', `${Math.round(report.overview.total_time_spent / 60)} minutes`, 'Total time spent on assessments']);
-    rows.push(['Strengths', report.overview.strengths.length, 'Number of identified strengths']);
-    rows.push(['Weaknesses', report.overview.weaknesses.length, 'Number of areas needing improvement']);
-  } else {
-    rows.push(['Score', `${report.score}%`, 'Performance score for this assessment']);
-    rows.push(['Total Marks', `${report.total_marks}`, 'Maximum possible score for this assessment']);
-    rows.push(['Student Score', `${report.student_score}`, 'Actual score achieved']);
-  }
-
-  rows.push(['Improvement Areas', report.summary.improvement_areas, 'Number of areas with recommendations']);
-
-  // Add weak areas as additional rows if they exist
-  if (report.weak_areas && report.weak_areas.length > 0) {
-    report.weak_areas.forEach((area, index) => {
-      rows.push([
-        `Weak Area ${index + 1}`,
-        area.topic,
-        `Performance: ${area.performance}%, Suggestion: ${area.suggestion}`
-      ]);
+    res.status(200).json({
+      success: true,
+      data,
+    });
+  } catch (error) {
+    console.error("❌ getStudentAssessmentsList error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to load student assessments",
     });
   }
-
-  return [
-    headers.join(','),
-    ...rows.map(row => row.map(field => `"${field}"`).join(','))
-  ].join('\n');
 };

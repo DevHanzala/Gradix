@@ -1,156 +1,147 @@
+// INSTRUCTOR ANALYTICS CONTROLLER - Request/Response Handler Layer
 import {
-  getInstructorExecutedAssessmentsModel,
-  getAssessmentStudentsModel,
-  getStudentAttemptQuestionsModel
-} from "../models/InstructorAssessmentAnalyticsModel.js";
+  getInstructorExecutedAssessmentsService,
+  getAssessmentStudentsService,
+  getStudentAttemptQuestionsService,
+  getInstructorOverviewService,
+} from "../services/instructorAssessmentAnalytics.service.js";
 
-// Redis Service
-import { redis } from "../services/redis.js";
+// ==================== CONTROLLER FUNCTIONS ====================
 
-/**
- * Instructor Assessment Analytics Controller
- */
-
-/**
- * Retrieve instructor's executed assessments
- * @route GET /api/instructor-analytics/assessments
- */
+// 1. GET INSTRUCTOR EXECUTED ASSESSMENTS
 export const getInstructorExecutedAssessments = async (req, res) => {
   try {
     const instructorId = req.user?.id;
-    if (!instructorId || req.user.role !== "instructor") {
-      return res.status(403).json({
-        success: false,
-        message: "Only instructors can access their assessments"
-      });
-    }
 
-    console.log(`📋 Getting executed assessments for instructor ${instructorId}`);
-    const assessments = await getInstructorExecutedAssessmentsModel(instructorId);
+    const assessments = await getInstructorExecutedAssessmentsService(
+      instructorId,
+      req.user.role
+    );
 
-    if (!assessments || assessments.length === 0) {
-      console.log(`ℹ️ No executed assessments found for instructor ${instructorId}`);
-      return res.status(200).json({
-        success: true,
-        message: "No executed assessments found",
-        data: []
-      });
-    }
-
-    console.log(`✅ Retrieved ${assessments.length} executed assessments`);
     res.status(200).json({
       success: true,
-      message: "Executed assessments retrieved successfully",
-      data: assessments
+      message: assessments.length > 0 
+        ? "Executed assessments retrieved successfully" 
+        : "No executed assessments found",
+      data: assessments,
     });
   } catch (error) {
     console.error("❌ Error fetching executed assessments:", error);
+
+    if (error.message === "UNAUTHORIZED_ROLE") {
+      return res.status(403).json({
+        success: false,
+        message: "Only instructors can access their assessments",
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Failed to fetch executed assessments",
-      error: error.message
+      error: error.message,
     });
   }
 };
 
-/**
- * Get students who completed a specific assessment
- * @route GET /api/instructor-analytics/assessment/:id/students
- */
+// 2. GET ASSESSMENT STUDENTS
 export const getAssessmentStudents = async (req, res) => {
   try {
     const assessmentId = parseInt(req.params.id);
     const instructorId = req.user?.id;
 
-    if (!instructorId || req.user.role !== "instructor" || isNaN(assessmentId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid request"
-      });
-    }
-
-    // REDIS CACHE KEY
-    const cacheKey = `analytics:students:${assessmentId}`;
-
-    // CHECK REDIS FIRST — INSTANT
-    const cached = await redis.get(cacheKey);
-    if (cached) {
-      console.log(`Students list from Redis for assessment ${assessmentId}`);
-      return res.status(200).json({
-        success: true,
-        message: "Students retrieved successfully",
-        data: cached
-      });
-    }
-
-    console.log(`Fetching students from DB for assessment ${assessmentId}`);
-    const students = await getAssessmentStudentsModel(assessmentId, instructorId);
-
-    // CACHE FOR 5 MINUTES
-    await redis.set(cacheKey, students || [], { ex: 300 });
+    const { data } = await getAssessmentStudentsService(
+      assessmentId,
+      instructorId,
+      req.user.role
+    );
 
     res.status(200).json({
       success: true,
       message: "Students retrieved successfully",
-      data: students || []
+      data,
     });
   } catch (error) {
     console.error("Error fetching assessment students:", error);
+
+    if (error.message === "INVALID_REQUEST") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid request",
+      });
+    }
+
     res.status(500).json({
       success: false,
-      message: "Failed to fetch assessment students"
+      message: "Failed to fetch assessment students",
     });
   }
 };
 
-/**
- * Get a student's questions and answers for a specific assessment
- * @route GET /api/instructor-analytics/assessment/:id/student/:studentId/questions
- */
+// 3. GET STUDENT ATTEMPT QUESTIONS
 export const getStudentAttemptQuestions = async (req, res) => {
   try {
     const assessmentId = parseInt(req.params.id);
     const studentId = parseInt(req.params.studentId);
     const instructorId = req.user?.id;
 
-    if (!instructorId || req.user.role !== "instructor") {
-      return res.status(403).json({
-        success: false,
-        message: "Only instructors can access student data"
-      });
-    }
+    const questions = await getStudentAttemptQuestionsService(
+      assessmentId,
+      studentId,
+      instructorId,
+      req.user.role
+    );
 
-    if (isNaN(assessmentId) || isNaN(studentId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid assessment ID or student ID"
-      });
-    }
-
-    console.log(`📋 Getting questions for student ${studentId} in assessment ${assessmentId}`);
-    const questions = await getStudentAttemptQuestionsModel(assessmentId, studentId, instructorId);
-
-    if (!questions || questions.length === 0) {
-      console.log(`ℹ️ No questions found for student ${studentId} in assessment ${assessmentId}`);
-      return res.status(200).json({
-        success: true,
-        message: "No questions found for this student in the assessment",
-        data: []
-      });
-    }
-
-    console.log(`✅ Retrieved ${questions.length} questions for student ${studentId} in assessment ${assessmentId}`);
     res.status(200).json({
       success: true,
-      message: "Student questions retrieved successfully",
-      data: questions
+      message: questions.length > 0
+        ? "Student questions retrieved successfully"
+        : "No questions found for this student in the assessment",
+      data: questions,
     });
   } catch (error) {
     console.error("❌ Error fetching student attempt questions:", error);
+
+    if (error.message === "UNAUTHORIZED_ROLE") {
+      return res.status(403).json({
+        success: false,
+        message: "Only instructors can access student data",
+      });
+    }
+
+    if (error.message === "INVALID_IDS") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid assessment ID or student ID",
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: "Failed to fetch student questions",
-      error: error.message
+      error: error.message,
+    });
+  }
+};
+
+
+// 4. GET INSTRUCTOR DASHBOARD OVERVIEW
+export const getInstructorOverview = async (req, res) => {
+  try {
+    const instructorId = req.user.id;
+
+    const overview = await getInstructorOverviewService(instructorId);
+
+    res.status(200).json({
+      success: true,
+      message: "Overview retrieved successfully",
+      data: overview,
+    });
+  } catch (error) {
+    console.error("❌ Error fetching instructor overview:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch overview",
+      error: error.message,
     });
   }
 };

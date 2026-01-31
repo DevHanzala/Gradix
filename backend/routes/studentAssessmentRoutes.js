@@ -5,13 +5,9 @@ import {
   submitAssessmentForStudent,
   getSubmissionDetailsForStudent,
   getAssessmentForInstructorPrint,
-} from "../controllers/takingController.js";
-import { getStudentAssessmentsList } from "../controllers/takingListController.js";
+} from "../controllers/studentAssessmentController.js";
 
 const router = express.Router();
-
-// Student taking routes
-router.get("/assessments", protect, authorizeRoles(["student"]), getStudentAssessmentsList);
 router.post("/assessments/:assessmentId/start", protect, authorizeRoles(["student"]), startAssessmentForStudent);
 router.post("/assessments/:assessmentId/submit", protect, authorizeRoles(["student"]), submitAssessmentForStudent);
 router.get("/submissions/:submissionId", protect, authorizeRoles(["student", "instructor", "admin", "super_admin"]), getSubmissionDetailsForStudent);
