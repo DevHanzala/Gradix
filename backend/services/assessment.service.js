@@ -410,54 +410,85 @@ export const generatePhysicalPaperService = async (assessmentId, instructorId, u
     notes = '',
   } = paperData;
 
-  console.log(`[PRINT] Generating paper for assessment ${assessmentId} in language: ${language}`);
+  console.log(`
+═══════════════════════════════════════════════════════
+[PAPER SERVICE] Starting Physical Paper Generation
+═══════════════════════════════════════════════════════
+Assessment ID: ${assessmentId}
+Selected Language: ${language}
+Instructor ID: ${instructorId}
+User Role: ${userRole}
+═══════════════════════════════════════════════════════
+  `);
 
+  // STEP 1: Fetch Assessment
+  console.log(`[PAPER SERVICE] Step 1: Fetching assessment...`);
   const assessment = await getAssessmentById(assessmentId, instructorId, userRole);
   if (!assessment) {
+    console.error(`[PAPER SERVICE] ❌ Assessment not found`);
     throw new Error('Assessment not found');
   }
+  console.log(`[PAPER SERVICE] ✅ Assessment found: "${assessment.title}"`);
 
-  // Generate questions in selected language
+  // STEP 2: Generate Questions in Selected Language
+  console.log(`[PAPER SERVICE] Step 2: Generating questions in ${language}...`);
   const { questions } = await generateAssessmentQuestions(assessmentId, null, language, assessment);
 
   if (!questions || questions.length === 0) {
+    console.error(`[PAPER SERVICE] ❌ No questions generated`);
     throw new Error('No questions generated');
   }
+  console.log(`[PAPER SERVICE] ✅ Generated ${questions.length} questions`);
 
-  // Full language name map for AI
+  // STEP 3: Prepare Language Mapping
   const langMap = {
     en: 'English',
     ar: 'Arabic',
     ur: 'Urdu',
-    hi: 'Hindi',
-    bn: 'Bengali',
-    es: 'Spanish',
-    fr: 'French',
+    fa: 'Persian',
   };
   const langName = langMap[language] || 'English';
+  console.log(`[PAPER SERVICE] Language name: ${langName}`);
 
-  // Labels in target language
+  // STEP 4: Define Field Labels in Target Language
   const labels = {
-    en: { institute: 'Institute Name', teacher: 'Teacher Name', subject: 'Subject Name', date: 'Paper Date', time: 'Paper Time', notes: 'Notes' },
-    ar: { institute: 'اسم المعهد', teacher: 'اسم المعلم', subject: 'اسم المادة', date: 'تاريخ الامتحان', time: 'وقت الامتحان', notes: 'ملاحظات' },
-    ur: { institute: 'ادارے کا نام', teacher: 'استاد کا نام', subject: 'مضمون کا نام', date: 'امتحان کی تاریخ', time: 'امتحان کا وقت', notes: 'نوٹس' },
-    hi: { institute: 'संस्थान का नाम', teacher: 'शिक्षक का नाम', subject: 'विषय का नाम', date: 'परीक्षा तिथि', time: 'परीक्षा समय', notes: 'नोट्स' },
-    bn: { institute: 'প্রতিষ্ঠানের নাম', teacher: 'শিক্ষকের নাম', subject: 'বিষয়ের নাম', date: 'পরীক্ষার তারিখ', time: 'পরীক্ষার সময়', notes: 'নোট' },
-    es: { institute: 'Nombre del instituto', teacher: 'Nombre del profesor', subject: 'Nombre de la asignatura', date: 'Fecha del examen', time: 'Hora del examen', notes: 'Notas' },
-    fr: { institute: "Nom de l'institut", teacher: "Nom de l'enseignant", subject: 'Nom de la matière', date: "Date de l'examen", time: "Heure de l'examen", notes: 'Notes' },
+    en: { 
+      institute: 'Institute Name', 
+      teacher: 'Teacher Name', 
+      subject: 'Subject Name', 
+      date: 'Paper Date', 
+      time: 'Paper Time', 
+      notes: 'Notes' 
+    },
+    ar: { 
+      institute: 'اسم المعهد', 
+      teacher: 'اسم المعلم', 
+      subject: 'اسم المادة', 
+      date: 'تاريخ الامتحان', 
+      time: 'وقت الامتحان', 
+      notes: 'ملاحظات' 
+    },
+    ur: { 
+      institute: 'ادارے کا نام', 
+      teacher: 'استاد کا نام', 
+      subject: 'مضمون کا نام', 
+      date: 'امتحان کی تاریخ', 
+      time: 'امتحان کا وقت', 
+      notes: 'نوٹس' 
+    },
+    fa: { 
+      institute: 'نام موسسه', 
+      teacher: 'نام معلم', 
+      subject: 'نام درس', 
+      date: 'تاریخ امتحان', 
+      time: 'زمان امتحان', 
+      notes: 'یادداشت ها' 
+    },
   }[language] || labels.en;
 
-  // Build header text with target language labels
-  const headerText = `
-${labels.institute}: ${instituteName || 'Not provided'}
-${labels.teacher}: ${teacherName || 'Not provided'}
-${labels.subject}: ${subjectName || 'Not provided'}
-${labels.date}: ${paperDate || 'Not provided'}
-${labels.time}: ${paperTime || 'Not provided'}
-${labels.notes}:
-${notes || 'No additional notes'}
-`.trim();
+  console.log(`[PAPER SERVICE] Using labels for ${language}:`, labels);
 
+  // STEP 5: Initialize with Original Values
   let translatedHeaders = {
     instituteName,
     teacherName,
@@ -467,18 +498,51 @@ ${notes || 'No additional notes'}
     notes,
   };
 
-  // Only translate if not English
-  if (language !== 'en') {
-    const translationPrompt = `Translate the following exam paper header into natural ${langName}. 
-Keep the exact labels as they are, but translate only the values after the colon naturally.
+  console.log(`[PAPER SERVICE] Original header values:`, translatedHeaders);
 
-Text:
+  // STEP 6: Translate Headers (Only if not English)
+  if (language !== 'en') {
+    console.log(`[PAPER SERVICE] Step 3: Translating headers to ${langName}...`);
+    
+    const headerText = `
+${labels.institute}: ${instituteName || 'Not provided'}
+${labels.teacher}: ${teacherName || 'Not provided'}
+${labels.subject}: ${subjectName || 'Not provided'}
+${labels.date}: ${paperDate || 'Not provided'}
+${labels.time}: ${paperTime || 'Not provided'}
+${labels.notes}:
+${notes || 'No additional notes'}
+`.trim();
+
+    console.log(`[PAPER SERVICE] Header text to translate:`);
+    console.log(headerText);
+
+    const translationPrompt = `You are a professional translator. Translate the following exam paper header information into natural, fluent ${langName}.
+
+IMPORTANT RULES:
+1. Keep the labels (before colons) in ${langName} as they are
+2. Translate ONLY the values (after colons) into natural ${langName}
+3. Maintain the exact same format with labels and colons
+4. If a value is "Not provided", translate it appropriately
+5. For dates, keep the format but translate "Not provided" if needed
+6. For times, keep the format but translate "Not provided" if needed
+7. Preserve line breaks and structure
+
+Text to translate:
 ${headerText}
 
-Output only the translated text in the same format. No extra text.`;
+Output ONLY the translated text in the same format. No explanations, no extra text.`;
 
     try {
-      const translatedAI = await generateContent(translationPrompt, { maxOutputTokens: 1000 });
+      console.log(`[PAPER SERVICE] Calling AI for translation...`);
+      const translatedAI = await generateContent(translationPrompt, { 
+        maxOutputTokens: 1000,
+        temperature: 0.3 
+      });
+      
+      console.log(`[PAPER SERVICE] ✅ AI translation received:`);
+      console.log(translatedAI);
+
       const lines = translatedAI.split('\n').map(l => l.trim()).filter(Boolean);
 
       translatedHeaders = {
@@ -489,12 +553,30 @@ Output only the translated text in the same format. No extra text.`;
         paperTime: extractValue(lines, labels.time) || paperTime,
         notes: extractNotes(lines, labels.notes) || notes,
       };
+
+      console.log(`[PAPER SERVICE] ✅ Translated headers:`, translatedHeaders);
     } catch (err) {
-      console.warn('Header translation failed, using original text', err);
+      console.error(`[PAPER SERVICE] ⚠️ Translation failed, using original text:`, err.message);
+      console.error(err);
     }
+  } else {
+    console.log(`[PAPER SERVICE] Language is English, skipping translation`);
   }
 
-  const isRTL = ['ar', 'ur', 'he'].includes(language);
+  // STEP 7: Determine RTL
+  const isRTL = ['ar', 'ur', 'he', 'fa'].includes(language);
+  console.log(`[PAPER SERVICE] RTL mode: ${isRTL}`);
+
+  console.log(`
+═══════════════════════════════════════════════════════
+[PAPER SERVICE] ✅ Paper Generation Complete
+═══════════════════════════════════════════════════════
+Questions: ${questions.length}
+Language: ${language}
+RTL: ${isRTL}
+Headers translated: ${language !== 'en'}
+═══════════════════════════════════════════════════════
+  `);
 
   return {
     questions,
@@ -564,17 +646,21 @@ const clearAssessmentCache = async (assessmentId, instructorId) => {
 };
 
 const extractValue = (lines, label) => {
-  const line = lines.find(l => l.startsWith(label + ':'));
-  if (line) {
-    return line.split(':').slice(1).join(':').trim();
-  }
-  return null;
+  const line = lines.find(l => l.includes(label));
+  if (!line) return null;
+  
+  const parts = line.split(':');
+  if (parts.length < 2) return null;
+  
+  return parts.slice(1).join(':').trim();
 };
 
-const extractNotes = (lines, label) => {
-  const index = lines.findIndex(l => l.startsWith(label + ':'));
-  if (index !== -1 && index + 1 < lines.length) {
-    return lines.slice(index + 1).join('\n').trim();
-  }
-  return null;
+
+const extractNotes = (lines, notesLabel) => {
+  const notesIndex = lines.findIndex(l => l.includes(notesLabel));
+  if (notesIndex === -1) return null;
+  
+  // Get everything after the notes label
+  const notesLines = lines.slice(notesIndex + 1);
+  return notesLines.join('\n').trim();
 };

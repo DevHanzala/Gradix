@@ -273,116 +273,140 @@ export const clearLinksForAssessment = async (assessmentId) => {
 
 // ==================== AI QUESTION GENERATION ====================
 
-export const generateAssessmentQuestions = async (
-  assessmentId,
-  attemptId,
-  language,
-  assessment
-) => {
-  /* STEP 1: FETCH INSTRUCTOR BLOCKS */
+export const generateAssessmentQuestions = async (assessmentId, attemptId, language, assessment) => {
+  const langName = mapLanguageCode(language);
+  
+  console.log(`
+═══════════════════════════════════════════════════════
+[QUESTION GEN] Starting Question Generation
+═══════════════════════════════════════════════════════
+Assessment ID: ${assessmentId}
+Language: ${language} (${langName})
+Attempt ID: ${attemptId || 'N/A (Physical Paper)'}
+═══════════════════════════════════════════════════════
+  `);
+
+  // STEP 1: Fetch blocks
   const blockRows = await assessmentRepo.findQuestionBlocksByAssessmentQuery(assessmentId);
 
   if (blockRows.length === 0) {
-    throw new Error(`No question blocks defined for assessment ${assessmentId}`);
+    throw new Error(`No question blocks for assessment ${assessmentId}`);
   }
+
+  console.log(`[QUESTION GEN] Question blocks:`, JSON.stringify(blockRows, null, 2));
 
   const questionTypes = [...new Set(blockRows.map((b) => b.question_type))];
   const typeCountsStr = blockRows
     .map((b) => {
       if (b.question_type === "multiple_choice") {
-        return `${b.question_count} multiple_choice (${b.num_options} options per question)`;
+        return `${b.question_count} multiple_choice (${b.num_options} options)`;
       }
       return `${b.question_count} ${b.question_type}`;
     })
     .join(", ");
 
-  const langName = mapLanguageCode(language);
-
-  /* STEP 2: FETCH RESOURCE CONTENT */
+  // STEP 2: Fetch resources
   const chunkRows = await assessmentRepo.findResourceChunksByAssessmentQuery(assessmentId);
+  const resourcesContent = chunkRows
+    .filter((row) => row.chunk_text)
+    .map((row) => `Resource "${row.name}":\n${row.chunk_text}`)
+    .join("\n\n---\n\n")
+    .substring(0, 5000) || "No resource content available";
 
-  const resourcesContent =
-    chunkRows
-      .filter((row) => row.chunk_text)
-      .map((row) => `Resource "${row.name}":\n${row.chunk_text}`)
-      .join("\n\n---\n\n")
-      .substring(0, 5000) || "No resource content available";
+  // LOG AI PROMPT INPUT
+  console.log(`
+═══════════════════════════════════════════════════════
+[AI PROMPT INPUT] Content Being Sent to AI
+═══════════════════════════════════════════════════════
+Assessment Title: "${assessment.title}"
+Instructor Prompt: "${assessment.prompt || "No prompt provided"}"
+External Links: ${JSON.stringify(assessment.external_links || [])}
+Resource Content Length: ${resourcesContent.length} chars
+Resource Content Preview:
+${resourcesContent.substring(0, 500)}...
+═══════════════════════════════════════════════════════
+  `);
 
-  /* STEP 3: FINAL PROMPT */
   const questionPrompt = `
-Generate questions in ${langName} language only. All text MUST be in ${langName}.
+CRITICAL: Generate ALL questions EXCLUSIVELY in ${langName} language. 
+Every word MUST be in ${langName}.
 
 CONTENT TO BASE QUESTIONS ON:
 Title: "${assessment.title}"
 Instructor Prompt: "${assessment.prompt || "No prompt provided"}"
 External Links: ${(assessment.external_links || []).join(", ") || "None"}
 
-Uploaded Resource Content:
+Resource Content:
 ${resourcesContent}
 
-Generate questions STRICTLY based on the above content.
+STRICT REQUIREMENTS:
+1. Question types: ${questionTypes.join(", ")}
+2. Counts: ${typeCountsStr}
+3. Language: ALL text in ${langName}
+4. Output ONLY JSON array
 
-Generate ONLY a valid JSON array of questions. NO extra text.
+Example format:
+[
+  {
+    "question_type": "${questionTypes[0]}",
+    "question_text": "[Question in ${langName}]",
+    "options": ${questionTypes[0] === 'multiple_choice' ? '["A. [Option]", "B. [Option]"]' : questionTypes[0] === 'true_false' ? '["true", "false"]' : 'null'},
+    "correct_answer": ${questionTypes[0] === 'true_false' ? 'true' : '"A. [Option]"'},
+    "positive_marks": ${blockRows[0].positive_marks},
+    "negative_marks": ${blockRows[0].negative_marks},
+    "duration_per_question": ${blockRows[0].duration_per_question}
+  }
+]
 
-STRICT RULES:
-1. Question types exactly: ${questionTypes.join(", ")}
-2. Exact counts: ${typeCountsStr}
-3. EVERY question MUST have:
-   - question_type
-   - question_text
-   - options (array for MCQ, ["true","false"] for true_false, null for short_answer)
-   - correct_answer
-   - positive_marks
-   - negative_marks
-   - duration_per_question
-4. short_answer correct_answer MUST be object:
-   {
-     "grading_type": "keyword_match",
-     "required_keywords": [lowercase strings],
-     "optional_keywords": [],
-     "min_required_match": number
-   }
-5. MCQ correct_answer MUST be the FULL OPTION TEXT like "B. Oxygen"
-6. true_false correct_answer MUST be boolean true/false
-7. Use instructor marks & time exactly
-8. No missing fields
-9. Output ONLY JSON array [ ... ]
-10. For multiple_choice questions, the options array MUST contain EXACTLY the instructor-defined number of options for that question block (num_options).
-`;
+Generate ${blockRows.reduce((sum, b) => sum + b.question_count, 0)} questions NOW in ${langName}.`;
 
+  console.log(`[QUESTION GEN] Calling AI with prompt (${questionPrompt.length} chars)...`);
+
+  // STEP 3: Call AI
   let questions = [];
-
-  /* STEP 4: AI CALL */
   try {
     const aiText = await generateContent(questionPrompt, {
-      maxOutputTokens: 3000,
+      maxOutputTokens: 4000,
       temperature: 0.7,
       responseMimeType: "application/json",
     });
 
-    const cleaned = aiText
-      .trim()
-      .replace(/^```json\s*/i, "")
-      .replace(/\s*```$/i, "");
+    console.log(`
+═══════════════════════════════════════════════════════
+[AI RESPONSE] Raw AI Output
+═══════════════════════════════════════════════════════
+Length: ${aiText.length} chars
+First 1000 chars:
+${aiText.substring(0, 1000)}
+═══════════════════════════════════════════════════════
+    `);
 
+    const cleaned = aiText.trim().replace(/^```json\s*/i, "").replace(/\s*```$/i, "");
     const start = cleaned.indexOf("[");
     const end = cleaned.lastIndexOf("]") + 1;
 
     if (start === -1 || end === 0) {
-      throw new Error("No JSON array found in AI response");
+      throw new Error("No JSON array in AI response");
     }
 
     questions = JSON.parse(cleaned.substring(start, end));
 
-    if (!Array.isArray(questions) || questions.length === 0) {
-      throw new Error("Empty questions array returned by AI");
-    }
+    console.log(`
+═══════════════════════════════════════════════════════
+[PARSED QUESTIONS] AI Generated Questions
+═══════════════════════════════════════════════════════
+Count: ${questions.length}
+All Questions:
+${JSON.stringify(questions, null, 2)}
+═══════════════════════════════════════════════════════
+    `);
+    
   } catch (error) {
-    console.error("❌ Question generation failed:", error.message);
+    console.error('[QUESTION GEN] ❌ AI call failed:', error.message);
     throw error;
   }
 
-  /* STEP 5: SAVE TO DB ONLY IF REAL ATTEMPT */
+  // STEP 4: Save to DB (only if attemptId exists)
   let totalDuration = 0;
   let questionIndex = 0;
 
@@ -394,7 +418,6 @@ STRICT RULES:
     for (let i = 0; i < block.question_count && questionIndex < questions.length; i++) {
       let q = questions[questionIndex];
 
-      // Force instructor-defined values
       q.question_type = block.question_type;
       q.positive_marks = block.positive_marks;
       q.negative_marks = block.negative_marks;
@@ -405,7 +428,6 @@ STRICT RULES:
         continue;
       }
 
-      // Fix MCQ correct answer to full text
       if (q.question_type === "multiple_choice" && q.options && q.correct_answer) {
         const letter = String(q.correct_answer).trim().toUpperCase();
         const key = Object.keys(q.options).find((k) =>
@@ -418,7 +440,6 @@ STRICT RULES:
 
       totalDuration += q.duration_per_question;
 
-      // ONLY INSERT INTO DB IF THIS IS A REAL STUDENT ATTEMPT
       if (attemptId) {
         await assessmentRepo.createGeneratedQuestionQuery({
           attemptId,
@@ -436,6 +457,16 @@ STRICT RULES:
       questionIndex++;
     }
   }
+
+  console.log(`
+═══════════════════════════════════════════════════════
+[QUESTION GEN] ✅ Complete
+═══════════════════════════════════════════════════════
+Questions: ${questions.length}
+Language: ${langName}
+Saved to DB: ${attemptId ? 'Yes' : 'No'}
+═══════════════════════════════════════════════════════
+  `);
 
   return { questions, duration: totalDuration };
 };

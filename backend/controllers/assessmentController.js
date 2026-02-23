@@ -11,6 +11,8 @@ import {
   previewQuestionsService,
   generatePhysicalPaperService,
 } from '../services/assessment.service.js';
+import { generatePhysicalPaperPDF } from '../helper/Pdfkitgenerator.js';
+
 
 // ==================== CONTROLLER FUNCTIONS ====================
 
@@ -319,6 +321,7 @@ export const previewQuestions = async (req, res) => {
 };
 
 // 11. GENERATE PHYSICAL PAPER FOR ASSESSMENT
+// UPDATED CONTROLLER - Generate PDF on Backend
 export const generatePhysicalPaper = async (req, res) => {
   try {
     const assessmentId = parseInt(req.params.id);
@@ -334,6 +337,15 @@ export const generatePhysicalPaper = async (req, res) => {
       notes: req.body.notes || '',
     };
 
+    const formOptions = {
+      pageSize: req.body.pageSize || 'A4',
+      headerFontSize: req.body.headerFontSize || 18,
+      questionFontSize: req.body.questionFontSize || 10,
+      optionFontSize: req.body.optionFontSize || 9,
+    };
+
+    console.log(`[CONTROLLER] Generating paper data...`);
+
     const result = await generatePhysicalPaperService(
       assessmentId,
       instructorId,
@@ -341,23 +353,37 @@ export const generatePhysicalPaper = async (req, res) => {
       paperData
     );
 
-    res.json({
-      success: true,
-      data: result,
-    });
+    const { questions, headers, isRTL } = result;
+
+    console.log(`[CONTROLLER] Generating PDF on backend...`);
+
+    const pdfBuffer = await generatePhysicalPaperPDF(
+      questions,
+      headers,
+      formOptions,
+      isRTL,
+      paperData.language
+    );
+
+    console.log(`[CONTROLLER] ✅ PDF generated (${pdfBuffer.length} bytes)`);
+
+
+    // Send PDF
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Paper_${paperData.language.toUpperCase()}.pdf"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+
+    res.end(pdfBuffer);
+
+    console.log(`[CONTROLLER] ✅ PDF sent to client`);
+    
   } catch (error) {
-    console.error('[PRINT] ERROR:', error);
-    
-    if (error.message === 'Assessment not found') {
-      return res.status(404).json({ success: false, message: error.message });
-    }
-    if (error.message === 'No questions generated') {
-      return res.status(400).json({ success: false, message: error.message });
-    }
-    
+    console.error('[CONTROLLER] ERROR:', error);
+
     res.status(500).json({ 
       success: false, 
-      message: 'Failed to prepare paper data' 
+      message: 'Failed to generate paper PDF',
+      error: error.message 
     });
   }
 };
