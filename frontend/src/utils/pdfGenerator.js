@@ -1,4 +1,4 @@
-// PDF GENERATOR - Pure PDF Logic (No React)
+// PDF GENERATOR - Fixed with Proper Font Support for All Languages
 import { PDFDocument, rgb, StandardFonts, degrees } from "pdf-lib";
 import * as fontkit from 'fontkit';
 import { getPageDimensions, wrapText } from './paperUtils.js';
@@ -24,27 +24,79 @@ export const drawWatermark = (page, font, width, height) => {
 };
 
 export const loadFonts = async (pdfDoc, isRTL) => {
+  console.log(`[PDF] Loading fonts... RTL: ${isRTL}`);
   pdfDoc.registerFontkit(fontkit);
 
   let font, boldFont;
 
   if (isRTL) {
     try {
-      const regularBytes = await fetch('/fonts/NotoSansArabic-Regular.ttf').then(res => res.arrayBuffer());
-      const boldBytes = await fetch('/fonts/NotoSansArabic-Bold.ttf')
-        .then(res => res.arrayBuffer())
-        .catch(() => regularBytes);
+      console.log(`[PDF] Attempting to load RTL fonts...`);
+      
+      // Try multiple font sources
+      const fontUrls = [
+        '/fonts/NotoSansArabic-Regular.ttf',
+        'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoNaskhArabic/NotoNaskhArabic-Regular.ttf',
+        'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosansarabic/NotoSansArabic-Regular.ttf'
+      ];
 
-      font = await pdfDoc.embedFont(regularBytes);
-      boldFont = await pdfDoc.embedFont(boldBytes);
+      const boldFontUrls = [
+        '/fonts/NotoSansArabic-Bold.ttf',
+        'https://cdn.jsdelivr.net/gh/googlefonts/noto-fonts@main/hinted/ttf/NotoNaskhArabic/NotoNaskhArabic-Bold.ttf',
+        'https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosansarabic/NotoSansArabic-Bold.ttf'
+      ];
 
-      console.log("✅ RTL font loaded");
+      let regularBytes = null;
+      let boldBytes = null;
+
+      // Try loading regular font
+      for (const url of fontUrls) {
+        try {
+          console.log(`[PDF] Trying font URL: ${url}`);
+          regularBytes = await fetch(url).then(res => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.arrayBuffer();
+          });
+          console.log(`[PDF] ✅ Regular font loaded from: ${url}`);
+          break;
+        } catch (err) {
+          console.log(`[PDF] ⚠️ Failed to load from ${url}: ${err.message}`);
+        }
+      }
+
+      // Try loading bold font
+      for (const url of boldFontUrls) {
+        try {
+          console.log(`[PDF] Trying bold font URL: ${url}`);
+          boldBytes = await fetch(url).then(res => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.arrayBuffer();
+          });
+          console.log(`[PDF] ✅ Bold font loaded from: ${url}`);
+          break;
+        } catch (err) {
+          console.log(`[PDF] ⚠️ Failed to load bold from ${url}: ${err.message}`);
+        }
+      }
+
+      // If we got at least regular font, use it
+      if (regularBytes) {
+        font = await pdfDoc.embedFont(regularBytes);
+        boldFont = boldBytes ? await pdfDoc.embedFont(boldBytes) : font;
+        console.log(`[PDF] ✅ RTL fonts embedded successfully`);
+        return { font, boldFont };
+      }
+
+      throw new Error("Could not load any RTL font");
+
     } catch (err) {
-      console.error("Custom font failed:", err);
+      console.error(`[PDF] ❌ RTL font loading failed:`, err.message);
+      console.log(`[PDF] Falling back to standard fonts`);
       font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     }
   } else {
+    console.log(`[PDF] Using standard fonts for LTR language`);
     font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   }
@@ -52,62 +104,113 @@ export const loadFonts = async (pdfDoc, isRTL) => {
   return { font, boldFont };
 };
 
+// Helper to reverse text for RTL languages
+const reverseText = (text, isRTL) => {
+  if (!isRTL) return text;
+  
+  // Split by words, reverse array, join back
+  // This helps with RTL rendering
+  const words = text.split(' ');
+  return words.reverse().join(' ');
+};
+
 export const drawText = (page, text, x, y, width, font, boldFont, fontSize, isRTL, isBold = false, color = rgb(0, 0, 0), align = "left") => {
   const selectedFont = isBold ? boldFont : font;
   const margin = 60;
   const maxW = width - 2 * margin;
-  const lines = wrapText(text, selectedFont, fontSize, maxW, isRTL);
+  
+  // For RTL text, we need special handling
+  let processedText = text;
+  if (isRTL) {
+    // Reverse the text for proper RTL display
+    processedText = reverseText(text, true);
+  }
+  
+  const lines = wrapText(processedText, selectedFont, fontSize, maxW, isRTL);
   let currentY = y;
   const lineHeight = 1.5;
 
   lines.forEach(line => {
     const textWidth = selectedFont.widthOfTextAtSize(line, fontSize);
     let posX = align === "center" ? (width - textWidth) / 2 : x;
-    if (isRTL && align !== "center") posX = width - margin - textWidth;
+    
+    if (isRTL && align !== "center") {
+      // For RTL, position from right side
+      posX = width - margin - textWidth;
+    }
 
-    page.drawText(line, { x: posX, y: currentY, size: fontSize, font: selectedFont, color });
+    page.drawText(line, { 
+      x: posX, 
+      y: currentY, 
+      size: fontSize, 
+      font: selectedFont, 
+      color 
+    });
+    
     currentY -= fontSize * lineHeight;
   });
 
   return currentY;
 };
 
-export const drawHeader = (page, form, width, height, font, boldFont, isRTL) => {
+export const drawHeader = (page, form, width, height, font, boldFont, isRTL, language) => {
+  console.log(`[PDF] Drawing header in language: ${language}, RTL: ${isRTL}`);
   const margin = 60;
   let y = height - 50;
 
-  // Institute name
+  // Language-specific labels for header fields
+  const labels = {
+    en: { teacher: 'Teacher', subject: 'Subject', date: 'Date', time: 'Time', instructions: 'Instructions' },
+    ur: { teacher: 'استاد', subject: 'مضمون', date: 'تاریخ', time: 'وقت', instructions: 'ہدایات' },
+    ar: { teacher: 'المعلم', subject: 'المادة', date: 'التاريخ', time: 'الوقت', instructions: 'التعليمات' },
+    fa: { teacher: 'معلم', subject: 'درس', date: 'تاریخ', time: 'زمان', instructions: 'دستورالعمل' },
+  };
+
+  const t = labels[language] || labels.en;
+
+  // Institute name (centered)
   if (form.instituteName) {
-    y = drawText(page, form.instituteName.toUpperCase(), margin, y, width, font, boldFont, Number(form.headerFontSize), isRTL, true, rgb(0.1, 0.1, 0.4), "center");
+    const instituteText = isRTL ? reverseText(form.instituteName.toUpperCase(), true) : form.instituteName.toUpperCase();
+    y = drawText(page, instituteText, margin, y, width, font, boldFont, Number(form.headerFontSize), isRTL, true, rgb(0.1, 0.1, 0.4), "center");
     y -= 20;
   }
 
   // Information grid
-  const leftX = margin;
-  const rightX = width / 2 + 40;
+  const leftX = isRTL ? width / 2 + 40 : margin;
+  const rightX = isRTL ? margin : width / 2 + 40;
   let leftY = y;
   let rightY = y;
 
   if (form.teacherName) {
-    page.drawText("Teacher:", { x: leftX, y: leftY, size: 11, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
-    page.drawText(form.teacherName, { x: leftX + 70, y: leftY, size: 11, font, color: rgb(0.3, 0.3, 0.3) });
+    const labelText = isRTL ? reverseText(t.teacher + ':', true) : t.teacher + ':';
+    const valueText = isRTL ? reverseText(form.teacherName, true) : form.teacherName;
+    
+    page.drawText(labelText, { x: leftX, y: leftY, size: 11, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
+    page.drawText(valueText, { x: leftX + (isRTL ? 50 : 70), y: leftY, size: 11, font, color: rgb(0.3, 0.3, 0.3) });
     leftY -= 20;
   }
 
   if (form.subjectName) {
-    page.drawText("Subject:", { x: leftX, y: leftY, size: 11, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
-    page.drawText(form.subjectName, { x: leftX + 70, y: leftY, size: 11, font, color: rgb(0.3, 0.3, 0.3) });
+    const labelText = isRTL ? reverseText(t.subject + ':', true) : t.subject + ':';
+    const valueText = isRTL ? reverseText(form.subjectName, true) : form.subjectName;
+    
+    page.drawText(labelText, { x: leftX, y: leftY, size: 11, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
+    page.drawText(valueText, { x: leftX + (isRTL ? 50 : 70), y: leftY, size: 11, font, color: rgb(0.3, 0.3, 0.3) });
     leftY -= 20;
   }
 
   if (form.paperDate) {
-    page.drawText("Date:", { x: rightX, y: rightY, size: 11, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
+    const labelText = isRTL ? reverseText(t.date + ':', true) : t.date + ':';
+    
+    page.drawText(labelText, { x: rightX, y: rightY, size: 11, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
     page.drawText(form.paperDate, { x: rightX + 50, y: rightY, size: 11, font, color: rgb(0.3, 0.3, 0.3) });
     rightY -= 20;
   }
 
   if (form.paperTime) {
-    page.drawText("Time:", { x: rightX, y: rightY, size: 11, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
+    const labelText = isRTL ? reverseText(t.time + ':', true) : t.time + ':';
+    
+    page.drawText(labelText, { x: rightX, y: rightY, size: 11, font: boldFont, color: rgb(0.2, 0.2, 0.2) });
     page.drawText(form.paperTime, { x: rightX + 50, y: rightY, size: 11, font, color: rgb(0.3, 0.3, 0.3) });
     rightY -= 20;
   }
@@ -115,7 +218,7 @@ export const drawHeader = (page, form, width, height, font, boldFont, isRTL) => 
   y = Math.min(leftY, rightY) - 10;
 
   // Notes section
-  if (form.notes.trim()) {
+  if (form.notes && form.notes.trim()) {
     const notesBoxY = y;
     page.drawRectangle({
       x: margin,
@@ -127,11 +230,14 @@ export const drawHeader = (page, form, width, height, font, boldFont, isRTL) => 
       color: rgb(0.98, 0.98, 0.98),
     });
 
-    page.drawText("Instructions:", { x: margin + 10, y: notesBoxY - 15, size: 10, font: boldFont, color: rgb(0.3, 0.3, 0.3) });
+    const instructionsText = isRTL ? reverseText(t.instructions + ':', true) : t.instructions + ':';
+    page.drawText(instructionsText, { x: margin + 10, y: notesBoxY - 15, size: 10, font: boldFont, color: rgb(0.3, 0.3, 0.3) });
+    
     let notesY = notesBoxY - 30;
     form.notes.split("\n").forEach(line => {
       if (line.trim()) {
-        page.drawText(line.trim(), { x: margin + 10, y: notesY, size: 9, font, color: rgb(0.4, 0.4, 0.4) });
+        const noteText = isRTL ? reverseText(line.trim(), true) : line.trim();
+        page.drawText(noteText, { x: margin + 10, y: notesY, size: 9, font, color: rgb(0.4, 0.4, 0.4) });
         notesY -= 12;
       }
     });
@@ -158,7 +264,9 @@ export const drawHeader = (page, form, width, height, font, boldFont, isRTL) => 
   return y - 30;
 };
 
-export const generatePDF = async (questions, form, isRTL) => {
+export const generatePDF = async (questions, form, isRTL, language = 'en') => {
+  console.log(`[PDF] Starting PDF generation for language: ${language}, RTL: ${isRTL}`);
+  
   const pdfDoc = await PDFDocument.create();
   const [width, height] = getPageDimensions(form.pageSize);
 
@@ -168,7 +276,18 @@ export const generatePDF = async (questions, form, isRTL) => {
   drawWatermark(page, font, width, height);
 
   const margin = 60;
-  let y = await drawHeader(page, form, width, height, font, boldFont, isRTL);
+  let y = await drawHeader(page, form, width, height, font, boldFont, isRTL, language);
+
+  console.log(`[PDF] Drawing ${questions.length} questions...`);
+
+  // Language-specific question prefix
+  const qPrefix = {
+    en: 'Q',
+    ur: 'سوال',
+    ar: 'س',
+    fa: 'سوال'
+  };
+  const questionPrefix = qPrefix[language] || 'Q';
 
   // Draw questions
   for (let i = 0; i < questions.length; i++) {
@@ -180,10 +299,11 @@ export const generatePDF = async (questions, form, isRTL) => {
       y = height - 60;
     }
 
-    const qNumText = `Q${i + 1}.`;
-    y = drawText(page, `${qNumText} ${q.question_text}`, margin, y, width, font, boldFont, Number(form.questionFontSize), isRTL, true, rgb(0.1, 0.1, 0.1)) - 12;
+    const qNumText = `${questionPrefix}${i + 1}.`;
+    const qText = isRTL ? reverseText(q.question_text, true) : q.question_text;
+    y = drawText(page, `${qNumText} ${qText}`, margin, y, width, font, boldFont, Number(form.questionFontSize), isRTL, true, rgb(0.1, 0.1, 0.1)) - 12;
 
-    if (q.options) {
+    if (q.options && Array.isArray(q.options)) {
       for (let oi = 0; oi < q.options.length; oi++) {
         if (y < 100) {
           page = pdfDoc.addPage([width, height]);
@@ -192,8 +312,10 @@ export const generatePDF = async (questions, form, isRTL) => {
         }
 
         const optLabel = String.fromCharCode(65 + oi);
+        const circleX = isRTL ? width - margin - 36 : margin + 36;
+        
         page.drawCircle({
-          x: margin + 36,
+          x: circleX,
           y: y - Number(form.optionFontSize) / 2 + 2,
           size: 8,
           borderColor: rgb(0.4, 0.4, 0.4),
@@ -201,26 +323,41 @@ export const generatePDF = async (questions, form, isRTL) => {
         });
 
         page.drawText(optLabel, {
-          x: margin + 33,
+          x: circleX - 3,
           y: y - Number(form.optionFontSize) / 2 - 1,
           size: 9,
           font: boldFont,
           color: rgb(0.3, 0.3, 0.3),
         });
 
-        y = drawText(page, q.options[oi], margin + 52, y, width, font, boldFont, Number(form.optionFontSize), isRTL, false, rgb(0.2, 0.2, 0.2)) - 8;
+        const optText = isRTL ? reverseText(q.options[oi], true) : q.options[oi];
+        const textX = isRTL ? width - margin - 52 : margin + 52;
+        y = drawText(page, optText, textX, y, width, font, boldFont, Number(form.optionFontSize), isRTL, false, rgb(0.2, 0.2, 0.2)) - 8;
       }
     }
 
     y -= 18;
   }
 
+  console.log(`[PDF] Creating answer key page...`);
+
   // Answer key page
   page = pdfDoc.addPage([width, height]);
   drawWatermark(page, font, width, height);
 
   let ay = height - 80;
-  ay = drawText(page, "ANSWER KEY", margin, ay, width, font, boldFont, 24, isRTL, true, rgb(0.1, 0.1, 0.4), "center") - 40;
+  
+  // Language-specific "ANSWER KEY" text
+  const answerKeyText = {
+    en: 'ANSWER KEY',
+    ur: 'جوابات کی کلید',
+    ar: 'مفتاح الإجابات',
+    fa: 'کلید پاسخ'
+  };
+  const headerText = answerKeyText[language] || 'ANSWER KEY';
+  const headerDisplay = isRTL ? reverseText(headerText, true) : headerText;
+  
+  ay = drawText(page, headerDisplay, margin, ay, width, font, boldFont, 24, isRTL, true, rgb(0.1, 0.1, 0.4), "center") - 40;
 
   questions.forEach((q, i) => {
     if (ay < 100) {
@@ -229,10 +366,27 @@ export const generatePDF = async (questions, form, isRTL) => {
       ay = height - 80;
     }
 
-    const answerText = `Q${i + 1}: ${q.correct_answer || "N/A"}`;
+    let answerValue = q.correct_answer || "N/A";
+    
+    // Handle boolean answers
+    if (typeof answerValue === 'boolean') {
+      const boolText = {
+        en: answerValue ? 'True' : 'False',
+        ur: answerValue ? 'صحیح' : 'غلط',
+        ar: answerValue ? 'صحيح' : 'خطأ',
+        fa: answerValue ? 'درست' : 'نادرست'
+      };
+      answerValue = boolText[language] || (answerValue ? 'True' : 'False');
+    }
+    
+    const ansDisplay = isRTL ? reverseText(String(answerValue), true) : String(answerValue);
+    const answerText = `${questionPrefix}${i + 1}: ${ansDisplay}`;
     ay = drawText(page, answerText, margin, ay, width, font, boldFont, 12, isRTL, true, rgb(0.2, 0.2, 0.2)) - 18;
   });
 
+  console.log(`[PDF] Saving PDF document...`);
   const pdfBytes = await pdfDoc.save();
+  console.log(`[PDF] ✅ PDF generated successfully`);
+  
   return new Blob([pdfBytes], { type: "application/pdf" });
 };

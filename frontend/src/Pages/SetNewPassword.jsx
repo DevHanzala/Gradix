@@ -5,7 +5,7 @@ import { Card, CardContent } from "../components/ui/Card.jsx";
 import LoadingSpinner from "../components/ui/LoadingSpinner.jsx";
 import Modal from "../components/ui/Modal.jsx";
 import { FaLock, FaCheckCircle, FaArrowLeft, FaKey } from "react-icons/fa";
-import { setNewPasswordSchema } from "../validation/passwordSchemas.js";
+import { setNewPasswordSchema } from "../scheema/passwordSchemas.js";
 
 function SetNewPassword() {
   const navigate = useNavigate();

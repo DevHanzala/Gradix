@@ -1,4 +1,3 @@
-// PAPER FORM FIELDS - Reusable Form Input Component
 import {
   FaUniversity,
   FaChalkboardTeacher,
@@ -7,15 +6,17 @@ import {
   FaClock,
   FaStickyNote,
 } from "react-icons/fa";
-import { LANGUAGE_OPTIONS } from "../utils/paperUtils";
+import { getTranslation } from "../utils/translations";
 
-const PaperFormFields = ({ form, onChange }) => {
+const PaperFormFields = ({ form, onChange, language = "en" }) => {
+  const t = (key) => getTranslation(language, key);
+
   return (
     <div className="space-y-3 sm:space-y-4">
       {/* Institute Name */}
       <div className="group">
         <label className="block text-sm font-semibold text-gray-700 mb-2">
-          Institute Name
+          {t("instituteName")}
         </label>
         <div className="flex items-center gap-3 sm:gap-4 bg-gradient-to-r from-blue-50 to-indigo-50 p-3 sm:p-4 rounded-xl border-2 border-blue-200 hover:border-blue-400 transition-all duration-200 focus-within:border-blue-500 focus-within:shadow-lg">
           <div className="bg-blue-600 text-white p-2 rounded-lg">
@@ -24,7 +25,7 @@ const PaperFormFields = ({ form, onChange }) => {
           <input
             type="text"
             name="instituteName"
-            placeholder="Enter institute name"
+            placeholder={t("instituteNamePlaceholder")}
             value={form.instituteName}
             onChange={onChange}
             className="w-full bg-transparent outline-none text-sm sm:text-base placeholder-gray-400 font-medium"
@@ -35,7 +36,7 @@ const PaperFormFields = ({ form, onChange }) => {
       {/* Teacher Name */}
       <div className="group">
         <label className="block text-sm font-semibold text-gray-700 mb-2">
-          Teacher Name
+          {t("teacherName")}
         </label>
         <div className="flex items-center gap-3 sm:gap-4 bg-gradient-to-r from-green-50 to-emerald-50 p-3 sm:p-4 rounded-xl border-2 border-green-200 hover:border-green-400 transition-all duration-200 focus-within:border-green-500 focus-within:shadow-lg">
           <div className="bg-green-600 text-white p-2 rounded-lg">
@@ -44,7 +45,7 @@ const PaperFormFields = ({ form, onChange }) => {
           <input
             type="text"
             name="teacherName"
-            placeholder="Enter teacher name"
+            placeholder={t("teacherNamePlaceholder")}
             value={form.teacherName}
             onChange={onChange}
             className="w-full bg-transparent outline-none text-sm sm:text-base placeholder-gray-400 font-medium"
@@ -55,7 +56,7 @@ const PaperFormFields = ({ form, onChange }) => {
       {/* Subject Name */}
       <div className="group">
         <label className="block text-sm font-semibold text-gray-700 mb-2">
-          Subject Name
+          {t("subjectName")}
         </label>
         <div className="flex items-center gap-3 sm:gap-4 bg-gradient-to-r from-purple-50 to-pink-50 p-3 sm:p-4 rounded-xl border-2 border-purple-200 hover:border-purple-400 transition-all duration-200 focus-within:border-purple-500 focus-within:shadow-lg">
           <div className="bg-purple-600 text-white p-2 rounded-lg">
@@ -64,7 +65,7 @@ const PaperFormFields = ({ form, onChange }) => {
           <input
             type="text"
             name="subjectName"
-            placeholder="Enter subject name"
+            placeholder={t("subjectNamePlaceholder")}
             value={form.subjectName}
             onChange={onChange}
             className="w-full bg-transparent outline-none text-sm sm:text-base placeholder-gray-400 font-medium"
@@ -76,7 +77,7 @@ const PaperFormFields = ({ form, onChange }) => {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div className="group">
           <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Paper Date
+            {t("paperDate")}
           </label>
           <div className="flex items-center gap-3 bg-gradient-to-r from-orange-50 to-amber-50 p-3 sm:p-4 rounded-xl border-2 border-orange-200 hover:border-orange-400 transition-all duration-200 focus-within:border-orange-500 focus-within:shadow-lg">
             <div className="bg-orange-600 text-white p-2 rounded-lg">
@@ -94,7 +95,7 @@ const PaperFormFields = ({ form, onChange }) => {
 
         <div className="group">
           <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Paper Time
+            {t("paperTime")}
           </label>
           <div className="flex items-center gap-3 bg-gradient-to-r from-red-50 to-pink-50 p-3 sm:p-4 rounded-xl border-2 border-red-200 hover:border-red-400 transition-all duration-200 focus-within:border-red-500 focus-within:shadow-lg">
             <div className="bg-red-600 text-white p-2 rounded-lg">
@@ -114,7 +115,7 @@ const PaperFormFields = ({ form, onChange }) => {
       {/* Notes */}
       <div className="group">
         <label className="block text-sm font-semibold text-gray-700 mb-2">
-          Additional Notes (Optional)
+          {t("notes")}
         </label>
         <div className="flex items-start gap-3 sm:gap-4 bg-gradient-to-r from-yellow-50 to-amber-50 p-3 sm:p-4 rounded-xl border-2 border-yellow-200 hover:border-yellow-400 transition-all duration-200 focus-within:border-yellow-500 focus-within:shadow-lg">
           <div className="bg-yellow-600 text-white p-2 rounded-lg mt-1">
@@ -125,33 +126,9 @@ const PaperFormFields = ({ form, onChange }) => {
             rows={3}
             value={form.notes}
             onChange={onChange}
-            placeholder="Enter any additional instructions or notes..."
+            placeholder={t("notesPlaceholder")}
             className="w-full bg-transparent outline-none text-sm sm:text-base resize-none placeholder-gray-400 font-medium"
           />
-        </div>
-      </div>
-
-      {/* Language Selection */}
-      <div className="group">
-        <label className="block text-sm font-semibold text-gray-700 mb-2">
-          Paper Language
-        </label>
-        <div className="flex items-center gap-3 sm:gap-4 bg-gradient-to-r from-teal-50 to-cyan-50 p-3 sm:p-4 rounded-xl border-2 border-teal-200 hover:border-teal-400 transition-all duration-200 focus-within:border-teal-500 focus-within:shadow-lg">
-          <div className="bg-teal-600 text-white p-2 rounded-lg">
-            <FaBook className="text-lg sm:text-xl" />
-          </div>
-          <select
-            name="language"
-            value={form.language}
-            onChange={onChange}
-            className="w-full bg-transparent outline-none text-sm sm:text-base font-medium"
-          >
-            {LANGUAGE_OPTIONS.map((lang) => (
-              <option key={lang.value} value={lang.value}>
-                {lang.label}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
     </div>

@@ -1,21 +1,23 @@
-// FORMATTING OPTIONS - Reusable Formatting Component
 import { FaWrench } from "react-icons/fa";
+import { getTranslation } from "../utils/translations";
 
-const FormattingOptions = ({ form, onChange }) => {
+const FormattingOptions = ({ form, onChange, language = "en" }) => {
+  const t = (key) => getTranslation(language, key);
+
   return (
     <div className="bg-gradient-to-br from-gray-50 to-blue-50 p-4 sm:p-5 border-2 border-gray-200 rounded-2xl shadow-inner">
       <h3 className="text-base sm:text-lg font-bold flex items-center gap-2 mb-4 text-gray-800">
         <div className="bg-indigo-600 text-white p-2 rounded-lg">
           <FaWrench className="text-base sm:text-lg" />
         </div>
-        Formatting Options
+        {t("formattingTitle")}
       </h3>
       
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         {/* Page Size */}
         <div>
           <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
-            Page Size
+            {t("pageSize")}
           </label>
           <select
             name="pageSize"
@@ -32,7 +34,7 @@ const FormattingOptions = ({ form, onChange }) => {
         {/* Header Font Size */}
         <div>
           <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
-            Header Size
+            {t("headerSize")}
           </label>
           <input
             type="number"
@@ -48,7 +50,7 @@ const FormattingOptions = ({ form, onChange }) => {
         {/* Question Font Size */}
         <div>
           <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
-            Question Size
+            {t("questionSize")}
           </label>
           <input
             type="number"
@@ -64,7 +66,7 @@ const FormattingOptions = ({ form, onChange }) => {
         {/* Option Font Size */}
         <div>
           <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-2">
-            Option Size
+            {t("optionSize")}
           </label>
           <input
             type="number"
