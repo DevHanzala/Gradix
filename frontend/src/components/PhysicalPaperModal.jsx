@@ -48,9 +48,7 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
       return;
     }
 
-    console.log(`[MODAL] Starting paper generation...`);
-    console.log(`[MODAL] Language: ${selectedLanguage}`);
-    console.log(`[MODAL] Form data:`, form);
+
 
     setLoading(true);
 
