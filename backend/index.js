@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { connectDB } from "./DB/db.js";
-
 import authRoutes from "./routes/authRoutes.js";
 import assessmentRoutes from "./routes/assessmentRoutes.js";
 import resourceRoutes from "./routes/resourceRoutes.js";
@@ -74,7 +73,7 @@ const validateEnv = () => {
 const app = express();
 app.disable("x-powered-by");
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 let dbConnected = false;
 
 /* =========================
@@ -82,7 +81,7 @@ let dbConnected = false;
 ========================= */
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: process.env.FRONTEND_URL || "https://gradewiseai.techmiresolutions.com",
     credentials: true,
   })
 );
@@ -147,6 +146,7 @@ app.get("/", (req, res) => {
     message: "Welcome to Gradewise AI Backend",
     health: "/api/health",
     docs: "Use /api/* for all endpoints",
+    developer: "Hanzala Ghani",
   });
 });
 
@@ -179,7 +179,7 @@ const startServer = async () => {
     logger.log(`Starting server on port ${PORT}...`);
     logger.log(`Environment: ${process.env.NODE_ENV || "development"}`);
     logger.log(
-      `Frontend URL: ${process.env.FRONTEND_URL || "http://localhost:5173"}`
+      `Frontend URL: ${process.env.FRONTEND_URL || "https://gradewiseai.techmiresolutions.com"}`
     );
 
     validateEnv();
@@ -190,8 +190,8 @@ const startServer = async () => {
     logger.log("✓ Database connected successfully");
 
     app.listen(PORT, "0.0.0.0", () => {
-      logger.log(`✓ Server is LIVE at http://0.0.0.0:${PORT}`);
-      logger.log(`Health check: http://localhost:${PORT}/api/health`);
+      logger.log(`✓ Server is LIVE at https://gradeback.techmiresolutions.com`);
+      logger.log(`Health check: https://gradeback.techmiresolutions.com/api/health`);
     });
   } catch (error) {
     logger.error("FATAL: Startup failed", error);
