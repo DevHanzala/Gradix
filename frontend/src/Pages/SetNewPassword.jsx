@@ -50,7 +50,6 @@ try {
     setLoading(true);
 
     try {
-      console.log("Submitting new password for resetId:", resetId);
       await changePassword({ newPassword: formData.newPassword, resetId });
       showModal(
         "success",

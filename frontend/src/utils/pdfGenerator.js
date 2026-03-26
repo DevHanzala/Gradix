@@ -24,15 +24,12 @@ export const drawWatermark = (page, font, width, height) => {
 };
 
 export const loadFonts = async (pdfDoc, isRTL) => {
-  console.log(`[PDF] Loading fonts... RTL: ${isRTL}`);
   pdfDoc.registerFontkit(fontkit);
 
   let font, boldFont;
 
   if (isRTL) {
     try {
-      console.log(`[PDF] Attempting to load RTL fonts...`);
-      
       // Try multiple font sources
       const fontUrls = [
         '/fonts/NotoSansArabic-Regular.ttf',
@@ -57,7 +54,6 @@ export const loadFonts = async (pdfDoc, isRTL) => {
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.arrayBuffer();
           });
-          console.log(`[PDF] ✅ Regular font loaded from: ${url}`);
           break;
         } catch (err) {
           console.log(`[PDF] ⚠️ Failed to load from ${url}: ${err.message}`);
@@ -67,12 +63,10 @@ export const loadFonts = async (pdfDoc, isRTL) => {
       // Try loading bold font
       for (const url of boldFontUrls) {
         try {
-          console.log(`[PDF] Trying bold font URL: ${url}`);
           boldBytes = await fetch(url).then(res => {
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             return res.arrayBuffer();
           });
-          console.log(`[PDF] ✅ Bold font loaded from: ${url}`);
           break;
         } catch (err) {
           console.log(`[PDF] ⚠️ Failed to load bold from ${url}: ${err.message}`);
@@ -83,7 +77,6 @@ export const loadFonts = async (pdfDoc, isRTL) => {
       if (regularBytes) {
         font = await pdfDoc.embedFont(regularBytes);
         boldFont = boldBytes ? await pdfDoc.embedFont(boldBytes) : font;
-        console.log(`[PDF] ✅ RTL fonts embedded successfully`);
         return { font, boldFont };
       }
 
@@ -91,12 +84,10 @@ export const loadFonts = async (pdfDoc, isRTL) => {
 
     } catch (err) {
       console.error(`[PDF] ❌ RTL font loading failed:`, err.message);
-      console.log(`[PDF] Falling back to standard fonts`);
       font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     }
   } else {
-    console.log(`[PDF] Using standard fonts for LTR language`);
     font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   }
@@ -154,7 +145,6 @@ export const drawText = (page, text, x, y, width, font, boldFont, fontSize, isRT
 };
 
 export const drawHeader = (page, form, width, height, font, boldFont, isRTL, language) => {
-  console.log(`[PDF] Drawing header in language: ${language}, RTL: ${isRTL}`);
   const margin = 60;
   let y = height - 50;
 
@@ -265,7 +255,6 @@ export const drawHeader = (page, form, width, height, font, boldFont, isRTL, lan
 };
 
 export const generatePDF = async (questions, form, isRTL, language = 'en') => {
-  console.log(`[PDF] Starting PDF generation for language: ${language}, RTL: ${isRTL}`);
   
   const pdfDoc = await PDFDocument.create();
   const [width, height] = getPageDimensions(form.pageSize);
@@ -277,8 +266,6 @@ export const generatePDF = async (questions, form, isRTL, language = 'en') => {
 
   const margin = 60;
   let y = await drawHeader(page, form, width, height, font, boldFont, isRTL, language);
-
-  console.log(`[PDF] Drawing ${questions.length} questions...`);
 
   // Language-specific question prefix
   const qPrefix = {
@@ -339,8 +326,6 @@ export const generatePDF = async (questions, form, isRTL, language = 'en') => {
     y -= 18;
   }
 
-  console.log(`[PDF] Creating answer key page...`);
-
   // Answer key page
   page = pdfDoc.addPage([width, height]);
   drawWatermark(page, font, width, height);
@@ -384,9 +369,6 @@ export const generatePDF = async (questions, form, isRTL, language = 'en') => {
     ay = drawText(page, answerText, margin, ay, width, font, boldFont, 12, isRTL, true, rgb(0.2, 0.2, 0.2)) - 18;
   });
 
-  console.log(`[PDF] Saving PDF document...`);
   const pdfBytes = await pdfDoc.save();
-  console.log(`[PDF] ✅ PDF generated successfully`);
-  
   return new Blob([pdfBytes], { type: "application/pdf" });
 };

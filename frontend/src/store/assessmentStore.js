@@ -147,19 +147,26 @@ const useAssessmentStore = create((set) => ({
    Physical Paper
 ========================= */
 
+/* =========================
+   assessmentStore.js  — Physical Paper action (replace existing block)
+========================= */
+
 generatePhysicalPaper: async (assessmentId, payload) => {
   set({ loading: true, error: null });
   try {
-    const response = await generatePhysicalPaperApi(
-      assessmentId,
-      payload
-    );
+    const response = await generatePhysicalPaperApi(assessmentId, payload, {
+      responseType: "blob",           //  tell axios to treat response as binary
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/pdf",
+      },
+    });
     set({ loading: false });
-    return response.data;
+    // Return a proper Blob so the modal can hand it straight to file-saver
+    return new Blob([response.data], { type: "application/pdf" });
   } catch (error) {
     const message =
-      error.response?.data?.message ||
-      "Failed to generate physical paper";
+      error.response?.data?.message || "Failed to generate physical paper";
     set({ error: message, loading: false });
     throw error;
   }
@@ -199,7 +206,6 @@ generatePhysicalPaper: async (assessmentId, payload) => {
         enrolledStudents: [...state.enrolledStudents, response.data.data],
         loading: false,
       }));
-      console.log(response.data)
       return response.data.data;
     } catch (error) {
       const message =

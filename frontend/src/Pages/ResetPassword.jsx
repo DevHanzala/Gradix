@@ -48,10 +48,7 @@ try {
     setLoading(true);
 
     try {
-      console.log("Sending forgot password request for:", formData.email);
-
       await forgotPassword({ email: formData.email });
-
       showModal(
         "success",
         "Reset Link Sent",

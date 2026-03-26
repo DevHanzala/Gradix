@@ -116,7 +116,6 @@ useEffect(() => {
     setSelectedResources((prev) =>
       prev.includes(resourceId) ? prev.filter((id) => id !== resourceId) : [...prev, resourceId]
     );
-    console.log(selectedResources);
   };
 
 

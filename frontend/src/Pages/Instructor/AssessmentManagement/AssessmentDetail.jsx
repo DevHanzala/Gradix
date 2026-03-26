@@ -58,13 +58,6 @@ function AssessmentDetail() {
   }, [id, getAssessmentById, navigate]);
 
 
-  useEffect(() => {
-  if (currentAssessment) {
-    console.log("🧪 Assessment fetched:", currentAssessment);
-    console.log("📦 Resources count:", currentAssessment.resources?.length);
-    console.table(currentAssessment.resources);
-  }
-}, [currentAssessment]);
 
 
   // THIS OPENS THE PHYSICAL PAPER MODAL

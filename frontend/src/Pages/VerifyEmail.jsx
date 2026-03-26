@@ -27,7 +27,6 @@ function VerifyEmail() {
       try {
         const response = await verifyEmail(token);
         setResult(response);
-        console.log("Verification response:", response);
       } catch (error) {
         console.error("Verification error:", error);
         if (error.response && error.response.data) {

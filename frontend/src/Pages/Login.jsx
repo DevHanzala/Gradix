@@ -50,7 +50,6 @@ function Login() {
       const token = useAuthStore.getState().token;
       localStorage.setItem("token", token);
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-      console.log("Login successful, token set:", token.slice(0, 10) + "...");
       showModal("success", "Login Successful!", `Welcome back, ${response.name}!`);
 
       setTimeout(() => {
@@ -79,7 +78,6 @@ function Login() {
       const token = useAuthStore.getState().token;
       localStorage.setItem("token", token);
       axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-      console.log("Google login successful, token set:", token.slice(0, 10) + "...");
       showModal("success", "Welcome!", `Successfully signed in with Google! Welcome back, ${response.name}!`);
 
       setTimeout(() => {

@@ -24,12 +24,9 @@ export const deleteAssessmentApi = (assessmentId) =>
 /* =========================
    Physical Paper
 ========================= */
+export const generatePhysicalPaperApi = (assessmentId, payload, config = {}) =>
+  apiClient.post(`/assessments/${assessmentId}/print`, payload, config);
 
-export const generatePhysicalPaperApi = (assessmentId, payload) =>
-  apiClient.post(
-    `/assessments/${assessmentId}/print`,
-    payload
-  );
 
 
 /* =========================

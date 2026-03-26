@@ -2,10 +2,8 @@
 import { Document, Packer, Paragraph, TextRun, PageBreak, AlignmentType } from "docx";
 
 export const generateDOCX = async (questions, form, isRTL = false, language = 'en') => {
-  console.log(`[DOCX] Generating document for language: ${language}, RTL: ${isRTL}`);
   
   const children = [];
-  const alignment = isRTL ? AlignmentType.RIGHT : AlignmentType.LEFT;
 
   // Language-specific labels
   const labels = {
@@ -219,6 +217,5 @@ export const generateDOCX = async (questions, form, isRTL = false, language = 'e
   
   const doc = new Document({ sections: [{ children }] });
   
-  console.log(`[DOCX] ✅ Document created successfully`);
   return await Packer.toBlob(doc);
 };

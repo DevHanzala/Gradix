@@ -45,7 +45,6 @@ function InstructorDashboard() {
     assessmentId: null,
     title: "",
   });
-  console.log("assessments:", assessments);
 
   useEffect(() => {
     const fetchData = async () => {
