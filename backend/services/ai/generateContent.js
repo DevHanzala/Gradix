@@ -52,7 +52,6 @@ export const generateContent = async (prompt, options = {}) => {
 
   try {
     const result = await attempt(primary);
-    console.log(`✅ AI used: ${result.provider}`);
     return result.text;
   } catch (primaryError) {
     console.warn(
@@ -67,7 +66,6 @@ export const generateContent = async (prompt, options = {}) => {
 
   try {
     const result = await attempt(secondary);
-    console.log(`✅ Fallback AI used: ${result.provider}`);
     return result.text;
   } catch (secondaryError) {
     console.error("❌ Both AI providers failed");

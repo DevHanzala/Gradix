@@ -15,7 +15,7 @@ const runOCR = async (buffer, langs = ["eng"]) => {
     throw new Error("OCR languages must be an array");
   }
 
-  const worker = await createWorker(); // ✅ NO CONFIG OBJECT
+  const worker = await createWorker(); //  NO CONFIG OBJECT
 
   try {
     await worker.loadLanguage(langs);

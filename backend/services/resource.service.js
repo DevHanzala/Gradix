@@ -112,10 +112,6 @@ export const getInstructorResourcesService = async (
 ) => {
   const dbVisibility = visibility === "all" ? null : visibility;
 
-  console.log("[DB FETCH - NO CACHE]", {
-    instructorId,
-    dbVisibility,
-  });
 
   const resources = await findResourcesByUploader(
     instructorId,

@@ -15,7 +15,6 @@ export const createAssessment = async (assessmentData) => {
     }
 
     const assessment = await assessmentRepo.createAssessmentQuery(assessmentData);
-    console.log(`✅ Created assessment: ID=${assessment.id}`);
     return assessment;
 
   } catch (error) {
@@ -73,9 +72,6 @@ export const getAssessmentById = async (assessment_id, user_id, user_role) => {
 
 export const updateAssessment = async (assessmentId, updateData) => {
   try {
-    console.log("MODEL RECEIVED updateData:", updateData);
-    console.log("DEBUG: Model updateAssessment - Input updateData:", updateData);
-    console.log("DEBUG: Model updateAssessment - Title:", updateData.title, "Prompt:", updateData.prompt);
     
     // VALIDATE DATA BEFORE UPDATING
     const validationErrors = validateAssessmentData(updateData);
@@ -89,7 +85,6 @@ export const updateAssessment = async (assessmentId, updateData) => {
       throw new Error("Assessment not found");
     }
     
-    console.log(`DEBUG: Model updateAssessment - Updated row:`, assessment);
     return assessment;
   } catch (error) {
     console.error("DEBUG: Model updateAssessment - Error:", error);
@@ -103,7 +98,6 @@ export const deleteAssessment = async (assessmentId) => {
     if (!assessment) {
       throw new Error("Assessment not found");
     }
-    console.log(`✅ Deleted assessment: ID=${assessmentId}`);
   } catch (error) {
     console.error("❌ Error deleting assessment:", error);
     throw error;
@@ -163,7 +157,6 @@ export const storeQuestionBlocks = async (assessmentId, questionBlocks, instruct
       });
     }
 
-    console.log(`✅ Stored ${questionBlocks.length} question blocks for assessment ${assessmentId}`);
   } catch (error) {
     console.error("❌ Error storing question blocks:", error);
     throw error;
@@ -188,7 +181,6 @@ export const enrollStudent = async (assessmentId, email) => {
     }
 
     const enrollment = await assessmentRepo.createEnrollmentQuery(assessmentId, student.id);
-    console.log(`✅ Enrolled student ${student.id} in assessment ${assessmentId}`);
     return enrollment;
   } catch (error) {
     console.error("❌ Error enrolling student:", error);
@@ -202,7 +194,6 @@ export const unenrollStudent = async (assessmentId, studentId) => {
     if (!enrollment) {
       throw new Error("Enrollment not found");
     }
-    console.log(`✅ Unenrolled student ${studentId} from assessment ${assessmentId}`);
     return enrollment;
   } catch (error) {
     console.error("❌ Error unenrolling student:", error);
@@ -213,7 +204,6 @@ export const unenrollStudent = async (assessmentId, studentId) => {
 export const getEnrolledStudents = async (assessmentId) => {
   try {
     const students = await assessmentRepo.findEnrolledStudentsQuery(assessmentId);
-    console.log(`✅ Retrieved ${students.length} enrolled students for assessment ${assessmentId}`);
     return students;
   } catch (error) {
     console.error("❌ Error fetching enrolled students:", error);
@@ -231,7 +221,6 @@ export const storeResourceChunk = async (resourceId, chunkText, embedding, metad
       embedding,
       chunkIndex: metadata.chunk_index,
     });
-    console.log(`✅ Stored chunk for resource ${resourceId}, index ${metadata.chunk_index}`);
     return chunk;
   } catch (error) {
     console.error("❌ Error storing resource chunk:", error);
@@ -249,7 +238,6 @@ export const linkResourceToAssessment = async (assessmentId, resourceId) => {
     }
 
     const link = await assessmentRepo.linkResourceToAssessmentQuery(assessmentId, resourceId);
-    console.log(`✅ Linked resource ${resourceId} to assessment ${assessmentId}`);
     return link;
   } catch (error) {
     console.error("❌ Error linking resource to assessment:", error);
@@ -263,7 +251,6 @@ export const clearLinksForAssessment = async (assessmentId) => {
     if (!success) {
       throw new Error("Assessment not found");
     }
-    console.log(`✅ Cleared external links for assessment ${assessmentId}`);
     return true;
   } catch (error) {
     console.error("❌ Error clearing links for assessment:", error);
@@ -276,15 +263,6 @@ export const clearLinksForAssessment = async (assessmentId) => {
 export const generateAssessmentQuestions = async (assessmentId, attemptId, language, assessment) => {
   const langName = mapLanguageCode(language);
   
-  console.log(`
-═══════════════════════════════════════════════════════
-[QUESTION GEN] Starting Question Generation
-═══════════════════════════════════════════════════════
-Assessment ID: ${assessmentId}
-Language: ${language} (${langName})
-Attempt ID: ${attemptId || 'N/A (Physical Paper)'}
-═══════════════════════════════════════════════════════
-  `);
 
   // STEP 1: Fetch blocks
   const blockRows = await assessmentRepo.findQuestionBlocksByAssessmentQuery(assessmentId);
@@ -293,7 +271,6 @@ Attempt ID: ${attemptId || 'N/A (Physical Paper)'}
     throw new Error(`No question blocks for assessment ${assessmentId}`);
   }
 
-  console.log(`[QUESTION GEN] Question blocks:`, JSON.stringify(blockRows, null, 2));
 
   const questionTypes = [...new Set(blockRows.map((b) => b.question_type))];
   const typeCountsStr = blockRows
@@ -313,19 +290,7 @@ Attempt ID: ${attemptId || 'N/A (Physical Paper)'}
     .join("\n\n---\n\n")
     .substring(0, 5000) || "No resource content available";
 
-  // LOG AI PROMPT INPUT
-  console.log(`
-═══════════════════════════════════════════════════════
-[AI PROMPT INPUT] Content Being Sent to AI
-═══════════════════════════════════════════════════════
-Assessment Title: "${assessment.title}"
-Instructor Prompt: "${assessment.prompt || "No prompt provided"}"
-External Links: ${JSON.stringify(assessment.external_links || [])}
-Resource Content Length: ${resourcesContent.length} chars
-Resource Content Preview:
-${resourcesContent.substring(0, 500)}...
-═══════════════════════════════════════════════════════
-  `);
+  
 
   const questionPrompt = `
 CRITICAL: Generate ALL questions EXCLUSIVELY in ${langName} language. 
@@ -360,7 +325,6 @@ Example format:
 
 Generate ${blockRows.reduce((sum, b) => sum + b.question_count, 0)} questions NOW in ${langName}.`;
 
-  console.log(`[QUESTION GEN] Calling AI with prompt (${questionPrompt.length} chars)...`);
 
   // STEP 3: Call AI
   let questions = [];
@@ -371,15 +335,6 @@ Generate ${blockRows.reduce((sum, b) => sum + b.question_count, 0)} questions NO
       responseMimeType: "application/json",
     });
 
-    console.log(`
-═══════════════════════════════════════════════════════
-[AI RESPONSE] Raw AI Output
-═══════════════════════════════════════════════════════
-Length: ${aiText.length} chars
-First 1000 chars:
-${aiText.substring(0, 1000)}
-═══════════════════════════════════════════════════════
-    `);
 
     const cleaned = aiText.trim().replace(/^```json\s*/i, "").replace(/\s*```$/i, "");
     const start = cleaned.indexOf("[");
@@ -391,15 +346,6 @@ ${aiText.substring(0, 1000)}
 
     questions = JSON.parse(cleaned.substring(start, end));
 
-    console.log(`
-═══════════════════════════════════════════════════════
-[PARSED QUESTIONS] AI Generated Questions
-═══════════════════════════════════════════════════════
-Count: ${questions.length}
-All Questions:
-${JSON.stringify(questions, null, 2)}
-═══════════════════════════════════════════════════════
-    `);
     
   } catch (error) {
     console.error('[QUESTION GEN] ❌ AI call failed:', error.message);
@@ -458,15 +404,6 @@ ${JSON.stringify(questions, null, 2)}
     }
   }
 
-  console.log(`
-═══════════════════════════════════════════════════════
-[QUESTION GEN] ✅ Complete
-═══════════════════════════════════════════════════════
-Questions: ${questions.length}
-Language: ${langName}
-Saved to DB: ${attemptId ? 'Yes' : 'No'}
-═══════════════════════════════════════════════════════
-  `);
 
   return { questions, duration: totalDuration };
 };

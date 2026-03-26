@@ -11,7 +11,6 @@ export const redis = new Redis({
   try {
     await redis.set('test', 'Gradewise-AI Redis Connected!');
     const test = await redis.get('test');
-    console.log('Redis Connected & Working!');
   } catch (err) {
     console.error('Redis Connection Failed:', err.message);
   }

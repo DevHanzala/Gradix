@@ -38,7 +38,6 @@ export const getCheckingModel = async () => {
       apiKey: process.env.GEMINI_CHECKING_API_KEY,
     });
 
-    console.log("✅ Gemini checking model initialized");
   }
 
   return checkingClient;

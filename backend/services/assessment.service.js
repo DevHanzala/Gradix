@@ -26,7 +26,6 @@ import pool from '../DB/db.js';
 // 1. CREATE ASSESSMENT BASIC SERVICE
 export const createAssessmentBasicService = async (payload, userId, files) => {
   const normalizedPayload = payload;
-  console.log('Normalized Payload:', normalizedPayload);
   const assessment = await createAssessmentRecord(normalizedPayload, userId);
 
   await processQuestionBlocks(
@@ -35,7 +34,7 @@ export const createAssessmentBasicService = async (payload, userId, files) => {
     userId
   );
 
-  // ✅ LINK SELECTED RESOURCES (THIS WAS MISSING)
+  //  LINK SELECTED RESOURCES (THIS WAS MISSING)
   if (Array.isArray(normalizedPayload.selected_resources)) {
     for (const resourceId of normalizedPayload.selected_resources) {
       await linkResourceToAssessment(
@@ -103,8 +102,6 @@ export const createNewAssessmentService = async (data, userId, files) => {
     instructor_id: userId,
     is_executed: false,
   };
-
-  console.log('Creating assessment:', assessmentData);
 
   const newAssessment = await createAssessment(assessmentData);
 
@@ -276,16 +273,12 @@ export const deleteAssessmentService = async (assessmentId, userId, userRole) =>
     throw new Error('Invalid assessment ID');
   }
 
-  console.log(`🔄 Deleting assessment ${assessmentId} for user ${userId} (${userRole})`);
-
   const assessment = await getAssessmentById(parseInt(assessmentId), userId, userRole);
   if (!assessment) {
     throw new Error('Assessment not found or access denied');
   }
 
   await deleteAssessment(parseInt(assessmentId));
-
-  console.log(`✅ Assessment deleted: ID=${assessmentId}`);
 
   // Clear cache
   await clearAssessmentCache(assessmentId, userId);
@@ -295,7 +288,6 @@ export const deleteAssessmentService = async (assessmentId, userId, userRole) =>
 
 // 7. ENROLL STUDENT SERVICE
 export const enrollStudentService = async (assessmentId, email, userId, userRole) => {
-  console.log(`🔍 Validating enrollment for assessment ${assessmentId}, email: ${email}, user: ${userId} (${userRole})`);
 
   if (!assessmentId || isNaN(parseInt(assessmentId))) {
     throw new Error('Invalid assessment ID');
@@ -304,14 +296,11 @@ export const enrollStudentService = async (assessmentId, email, userId, userRole
   if (!email || typeof email !== 'string' || !email.trim()) {
     throw new Error('Student email is required and must be a valid string');
   }
-
-  console.log(`🔄 Checking assessment ${assessmentId} for user ${userId} (${userRole})`);
   const assessment = await getAssessmentById(parseInt(assessmentId), userId, userRole);
   if (!assessment) {
     throw new Error('Assessment not found or access denied');
   }
 
-  console.log(`🔍 Looking up student by email: ${email}`);
   const student = await findUserByEmail(email);
   if (!student) {
     throw new Error('Student not found');
@@ -321,13 +310,9 @@ export const enrollStudentService = async (assessmentId, email, userId, userRole
     throw new Error(`User is not a student (role: ${student.role})`);
   }
 
-  console.log(`🔄 Enrolling student ${student.id} to assessment ${assessmentId}`);
   const enrollment = await enrollStudent(parseInt(assessmentId), email);
 
-  console.log(`🔄 Sending enrollment email to ${email} for assessment ${assessmentId}`);
   await sendAssessmentEnrollmentEmail(email, assessment.title, assessmentId);
-
-  console.log(`✅ Student enrolled successfully for assessment ${assessmentId}`);
 
   // Clear student's assessment list cache
   await redis.del(`student:assessments:list:${student.id}`);
@@ -344,8 +329,6 @@ export const unenrollStudentService = async (assessmentId, studentId, userId, us
   if (!studentId || isNaN(parseInt(studentId))) {
     throw new Error('Invalid student ID');
   }
-
-  console.log(`🔄 Unenrolling student ${studentId} from assessment ${assessmentId} by user ${userId} (${userRole})`);
 
   const assessment = await getAssessmentById(parseInt(assessmentId), userId, userRole);
   if (!assessment) {
@@ -366,8 +349,6 @@ export const getEnrolledStudentsService = async (assessmentId, userId, userRole)
     throw new Error('Invalid assessment ID');
   }
 
-  console.log(`🔄 Fetching enrolled students for assessment ${assessmentId} by user ${userId} (${userRole})`);
-
   const assessment = await getAssessmentById(parseInt(assessmentId), userId, userRole);
   if (!assessment) {
     throw new Error('Assessment not found or access denied');
@@ -381,19 +362,12 @@ export const getEnrolledStudentsService = async (assessmentId, userId, userRole)
 
 // 10. PREVIEW QUESTIONS SERVICE
 export const previewQuestionsService = async (assessmentId, instructorId, userRole) => {
-  console.log(`[PREVIEW] Request from instructor ${instructorId} for assessment ${assessmentId}`);
-
   const assessment = await getAssessmentById(assessmentId, instructorId, userRole);
   if (!assessment) {
-    console.log(`[PREVIEW] Assessment ${assessmentId} not found or access denied`);
     throw new Error('Assessment not found');
   }
 
-  console.log(`[PREVIEW] Generating sample questions for assessment ${assessmentId}`);
-
   const { questions } = await generateAssessmentQuestions(assessmentId, null, 'en', assessment);
-
-  console.log(`[PREVIEW] Successfully generated ${questions.length} sample questions`);
 
   return questions;
 };
@@ -410,35 +384,22 @@ export const generatePhysicalPaperService = async (assessmentId, instructorId, u
     notes = '',
   } = paperData;
 
-  console.log(`
-═══════════════════════════════════════════════════════
-[PAPER SERVICE] Starting Physical Paper Generation
-═══════════════════════════════════════════════════════
-Assessment ID: ${assessmentId}
-Selected Language: ${language}
-Instructor ID: ${instructorId}
-User Role: ${userRole}
-═══════════════════════════════════════════════════════
-  `);
+
 
   // STEP 1: Fetch Assessment
-  console.log(`[PAPER SERVICE] Step 1: Fetching assessment...`);
   const assessment = await getAssessmentById(assessmentId, instructorId, userRole);
   if (!assessment) {
     console.error(`[PAPER SERVICE] ❌ Assessment not found`);
     throw new Error('Assessment not found');
   }
-  console.log(`[PAPER SERVICE] ✅ Assessment found: "${assessment.title}"`);
 
   // STEP 2: Generate Questions in Selected Language
-  console.log(`[PAPER SERVICE] Step 2: Generating questions in ${language}...`);
   const { questions } = await generateAssessmentQuestions(assessmentId, null, language, assessment);
 
   if (!questions || questions.length === 0) {
     console.error(`[PAPER SERVICE] ❌ No questions generated`);
     throw new Error('No questions generated');
   }
-  console.log(`[PAPER SERVICE] ✅ Generated ${questions.length} questions`);
 
   // STEP 3: Prepare Language Mapping
   const langMap = {
@@ -448,7 +409,6 @@ User Role: ${userRole}
     fa: 'Persian',
   };
   const langName = langMap[language] || 'English';
-  console.log(`[PAPER SERVICE] Language name: ${langName}`);
 
   // STEP 4: Define Field Labels in Target Language
   const labels = {
@@ -486,8 +446,6 @@ User Role: ${userRole}
     },
   }[language] || labels.en;
 
-  console.log(`[PAPER SERVICE] Using labels for ${language}:`, labels);
-
   // STEP 5: Initialize with Original Values
   let translatedHeaders = {
     instituteName,
@@ -498,12 +456,8 @@ User Role: ${userRole}
     notes,
   };
 
-  console.log(`[PAPER SERVICE] Original header values:`, translatedHeaders);
-
   // STEP 6: Translate Headers (Only if not English)
   if (language !== 'en') {
-    console.log(`[PAPER SERVICE] Step 3: Translating headers to ${langName}...`);
-    
     const headerText = `
 ${labels.institute}: ${instituteName || 'Not provided'}
 ${labels.teacher}: ${teacherName || 'Not provided'}
@@ -514,8 +468,6 @@ ${labels.notes}:
 ${notes || 'No additional notes'}
 `.trim();
 
-    console.log(`[PAPER SERVICE] Header text to translate:`);
-    console.log(headerText);
 
     const translationPrompt = `You are a professional translator. Translate the following exam paper header information into natural, fluent ${langName}.
 
@@ -534,14 +486,11 @@ ${headerText}
 Output ONLY the translated text in the same format. No explanations, no extra text.`;
 
     try {
-      console.log(`[PAPER SERVICE] Calling AI for translation...`);
       const translatedAI = await generateContent(translationPrompt, { 
         maxOutputTokens: 1000,
         temperature: 0.3 
       });
       
-      console.log(`[PAPER SERVICE] ✅ AI translation received:`);
-      console.log(translatedAI);
 
       const lines = translatedAI.split('\n').map(l => l.trim()).filter(Boolean);
 
@@ -554,7 +503,6 @@ Output ONLY the translated text in the same format. No explanations, no extra te
         notes: extractNotes(lines, labels.notes) || notes,
       };
 
-      console.log(`[PAPER SERVICE] ✅ Translated headers:`, translatedHeaders);
     } catch (err) {
       console.error(`[PAPER SERVICE] ⚠️ Translation failed, using original text:`, err.message);
       console.error(err);
@@ -565,18 +513,7 @@ Output ONLY the translated text in the same format. No explanations, no extra te
 
   // STEP 7: Determine RTL
   const isRTL = ['ar', 'ur', 'he', 'fa'].includes(language);
-  console.log(`[PAPER SERVICE] RTL mode: ${isRTL}`);
-
-  console.log(`
-═══════════════════════════════════════════════════════
-[PAPER SERVICE] ✅ Paper Generation Complete
-═══════════════════════════════════════════════════════
-Questions: ${questions.length}
-Language: ${language}
-RTL: ${isRTL}
-Headers translated: ${language !== 'en'}
-═══════════════════════════════════════════════════════
-  `);
+  
 
   return {
     questions,
@@ -642,7 +579,6 @@ const clearAssessmentCache = async (assessmentId, instructorId) => {
   if (keys.length > 0) {
     await redis.del(...keys);
   }
-  console.log(`🧹 Cache cleared for assessment ${assessmentId}`);
 };
 
 const extractValue = (lines, label) => {

@@ -12,7 +12,6 @@ export const createResource = async (resourceData) => {
     }
 
     const resource = await resourceRepo.createResourceQuery(resourceData);
-    console.log(`Created resource: ID=${resource.id}`);
     return resource;
   } catch (error) {
     console.error("Error creating resource:", error);
@@ -63,7 +62,6 @@ export const updateResource = async (resourceId, updateData) => {
       throw new Error("Resource not found");
     }
     
-    console.log(`Updated resource: ID=${resourceId}`);
     return resource;
   } catch (error) {
     console.error("Error updating resource:", error);
@@ -78,7 +76,6 @@ export const deleteResource = async (resourceId) => {
       throw new Error("Resource not found");
     }
     
-    console.log(`Deleted resource: ID=${resourceId}`);
     return resource;
   } catch (error) {
     console.error("Error deleting resource:", error);
@@ -90,7 +87,6 @@ export const deleteResource = async (resourceId) => {
 
 export const linkResourceToAssessment = async (assessmentId, resourceId) => {
   try {
-    console.log(`Linking resource ${resourceId} to assessment ${assessmentId}`);
     // VALIDATE LINK DATA
     const validationErrors = validateResourceLink(parseInt(assessmentId), parseInt(resourceId));
     if (validationErrors.length > 0) {
@@ -107,7 +103,6 @@ export const linkResourceToAssessment = async (assessmentId, resourceId) => {
     }
     
     const link = await resourceRepo.linkResourceToAssessmentQuery(assessmentId, resourceId);
-    console.log(`Linked resource ${resourceId} to assessment ${assessmentId}`);
     return link;
   } catch (error) {
     console.error("Error linking resource to assessment:", error);
@@ -118,7 +113,6 @@ export const linkResourceToAssessment = async (assessmentId, resourceId) => {
 export const getAssessmentResources = async (assessmentId) => {
   try {
     const resources = await resourceRepo.findAssessmentResourcesQuery(assessmentId);
-    console.log(`Fetched ${resources.length} resources for assessment ${assessmentId}`);
     return resources;
   } catch (error) {
     console.error("Error fetching assessment resources:", error);
@@ -133,7 +127,6 @@ export const unlinkResourceFromAssessment = async (assessmentId, resourceId) => 
       return null;
     }
     
-    console.log(`Unlinked resource ${resourceId} from assessment ${assessmentId}`);
     return result;
   } catch (error) {
     console.error("Error unlinking resource from assessment:", error);

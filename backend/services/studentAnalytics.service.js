@@ -18,8 +18,6 @@ export const getStudentOverviewService = async (studentId, userRole) => {
     throw new Error("UNAUTHORIZED_ROLE");
   }
 
-  console.log(`📊 Getting analytics overview for student ${studentId}`);
-
   const analytics = await getStudentAnalytics(studentId);
   return analytics;
 };
@@ -29,8 +27,6 @@ export const getStudentPerformanceService = async (studentId, userRole, timeRang
   if (userRole !== "student") {
     throw new Error("UNAUTHORIZED_ROLE");
   }
-
-  console.log(`📈 Getting performance data for student ${studentId} (${timeRange})`);
 
   const performance = await getPerformanceOverTime(studentId, timeRange);
 
@@ -68,7 +64,6 @@ export const getStudentAssessmentsService = async (studentId, userRole) => {
     return { data: cached, fromCache: true };
   }
 
-  console.log(`Fetching assessments from DB for student ${studentId}`);
   const assessments = await getStudentAssessmentsList(studentId);
 
   // Cache for 10 minutes
@@ -103,11 +98,6 @@ export const getStudentReportService = async (studentId, userRole, format = "jso
     throw new Error("UNAUTHORIZED_ROLE");
   }
 
-  console.log(
-    `📋 Generating detailed report for student ${studentId}${
-      assessmentId ? ` (assessment ${assessmentId})` : ""
-    }`
-  );
 
   let report;
 

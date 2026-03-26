@@ -19,7 +19,7 @@ import { generatePhysicalPaperPDF } from '../helper/Pdfkitgenerator.js';
 // 1. CREATE ASSESSMENT BASIC
 export const createAssessmentBasic = async (req, res) => {
   try {
-    // ✅ NORMALIZE FormData JSON fields FIRST
+    //  NORMALIZE FormData JSON fields FIRST
     const parseIfString = (v) => {
       if (typeof v === "string") {
         try { return JSON.parse(v); } catch { return v; }
@@ -38,7 +38,6 @@ export const createAssessmentBasic = async (req, res) => {
     )
 
     res.status(201).json({ success: true, data: assessment });
-    console.log('Assessment created successfully');
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -183,7 +182,6 @@ export const enrollStudentController = async (req, res) => {
   try {
     const assessmentId = req.params.id;
     const { email } = req.body;
-    console.log("Assessment ID enroll calling", assessmentId)
 
     const { enrollment } = await enrollStudentService(
       assessmentId,
@@ -344,8 +342,6 @@ export const generatePhysicalPaper = async (req, res) => {
       optionFontSize: req.body.optionFontSize || 9,
     };
 
-    console.log(`[CONTROLLER] Generating paper data...`);
-
     const result = await generatePhysicalPaperService(
       assessmentId,
       instructorId,
@@ -355,8 +351,6 @@ export const generatePhysicalPaper = async (req, res) => {
 
     const { questions, headers, isRTL } = result;
 
-    console.log(`[CONTROLLER] Generating PDF on backend...`);
-
     const pdfBuffer = await generatePhysicalPaperPDF(
       questions,
       headers,
@@ -364,8 +358,6 @@ export const generatePhysicalPaper = async (req, res) => {
       isRTL,
       paperData.language
     );
-
-    console.log(`[CONTROLLER] ✅ PDF generated (${pdfBuffer.length} bytes)`);
 
 
     // Send PDF
@@ -375,8 +367,6 @@ export const generatePhysicalPaper = async (req, res) => {
 
     res.end(pdfBuffer);
 
-    console.log(`[CONTROLLER] ✅ PDF sent to client`);
-    
   } catch (error) {
     console.error('[CONTROLLER] ERROR:', error);
 

@@ -73,7 +73,7 @@ const validateEnv = () => {
 const app = express();
 app.disable("x-powered-by");
 
-const PORT = process.env.PORT || 5001;
+const PORT = process.env.PORT;
 let dbConnected = false;
 
 /* =========================
@@ -81,7 +81,7 @@ let dbConnected = false;
 ========================= */
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "https://gradewiseai.techmiresolutions.com",
+    origin: process.env.FRONTEND_URL,
     credentials: true,
   })
 );
@@ -177,21 +177,19 @@ process.on("uncaughtException", (err) => {
 const startServer = async () => {
   try {
     logger.log(`Starting server on port ${PORT}...`);
-    logger.log(`Environment: ${process.env.NODE_ENV || "development"}`);
     logger.log(
-      `Frontend URL: ${process.env.FRONTEND_URL || "https://gradewiseai.techmiresolutions.com"}`
+      `Frontend URL: ${process.env.FRONTEND_URL}`
     );
 
     validateEnv();
 
-    logger.log("Connecting to database...");
     await connectDB();
     dbConnected = true;
     logger.log("✓ Database connected successfully");
 
     app.listen(PORT, "0.0.0.0", () => {
-      logger.log(`✓ Server is LIVE at https://gradeback.techmiresolutions.com`);
-      logger.log(`Health check: https://gradeback.techmiresolutions.com/api/health`);
+      logger.log(`✓ Server is LIVE at http://localhost:5000`);
+      logger.log(`Health check: http://localhost:5173/api/health`);
     });
   } catch (error) {
     logger.error("FATAL: Startup failed", error);

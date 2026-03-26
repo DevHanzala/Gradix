@@ -5,7 +5,6 @@ let model = null;
 const loadModel = async () => {
   if (!model) {
     model = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
-    console.log("Loaded Xenova sentence-transformers model: all-MiniLM-L6-v2");
   }
   return model;
 };
@@ -22,7 +21,7 @@ export const generateEmbedding = async (text, options = {}) => {
     totalFiles = 1,
   } = options;
 
-  // 🔴 HARD GUARD — prevents bad embeddings
+  //  HARD GUARD — prevents bad embeddings
   if (!text || text.length < 120) {
     throw new Error("Text chunk too small or noisy for embedding");
   }

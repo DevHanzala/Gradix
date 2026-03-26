@@ -14,16 +14,12 @@ export const getInstructorExecutedAssessmentsService = async (instructorId, user
     throw new Error("UNAUTHORIZED_ROLE");
   }
 
-  console.log(`📋 Getting executed assessments for instructor ${instructorId}`);
-  
   const assessments = await getInstructorExecutedAssessmentsModel(instructorId);
 
   if (!assessments || assessments.length === 0) {
-    console.log(`ℹ️ No executed assessments found for instructor ${instructorId}`);
     return [];
   }
 
-  console.log(`✅ Retrieved ${assessments.length} executed assessments`);
   return assessments;
 };
 
@@ -42,7 +38,6 @@ export const getAssessmentStudentsService = async (assessmentId, instructorId, u
     return { data: cached, fromCache: true };
   }
 
-  console.log(`Fetching students from DB for assessment ${assessmentId}`);
   const students = await getAssessmentStudentsModel(assessmentId, instructorId);
 
   // Cache for 5 minutes
@@ -66,8 +61,6 @@ export const getStudentAttemptQuestionsService = async (
     throw new Error("INVALID_IDS");
   }
 
-  console.log(`📋 Getting questions for student ${studentId} in assessment ${assessmentId}`);
-  
   const questions = await getStudentAttemptQuestionsModel(
     assessmentId,
     studentId,
@@ -75,18 +68,14 @@ export const getStudentAttemptQuestionsService = async (
   );
 
   if (!questions || questions.length === 0) {
-    console.log(`ℹ️ No questions found for student ${studentId} in assessment ${assessmentId}`);
     return [];
   }
 
-  console.log(`✅ Retrieved ${questions.length} questions for student ${studentId} in assessment ${assessmentId}`);
   return questions;
 };
 
 // 4. GET INSTRUCTOR OVERVIEW SERVICE
 export const getInstructorOverviewService = async (instructorId) => {
-  console.log(`🔄 Fetching dashboard overview for instructor ${instructorId}`);
-
   // Get assessment count
   const assessmentQuery = `
     SELECT COUNT(*) as assessment_count
@@ -117,7 +106,6 @@ export const getInstructorOverviewService = async (instructorId) => {
     resources: parseInt(resourceResult.rows[0].resource_count, 10),
   };
 
-  console.log(`✅ Fetched overview: ${JSON.stringify(overview)}`);
   
   return overview;
 };

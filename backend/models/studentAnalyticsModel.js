@@ -17,8 +17,6 @@ export const getStudentAnalytics = async (studentId) => {
       throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
     }
 
-    console.log(`📊 Getting analytics for student ${studentId}`);
-
     const enrolled = await analyticsRepo.findEnrolledAssessmentsQuery(studentId);
     const assessments = await analyticsRepo.findCompletedAssessmentsQuery(studentId);
 

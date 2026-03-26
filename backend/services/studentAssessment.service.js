@@ -5,8 +5,6 @@ import { generateAssessmentQuestions } from "../models/assessmentModel.js";
 
 // 1. START ASSESSMENT FOR STUDENT SERVICE
 export const startAssessmentForStudentService = async (studentId, assessmentId, language = "en") => {
-  console.log(`📝 Starting assessment ${assessmentId} for student ${studentId} in language ${language}`);
-
   // Check if assessment exists
   const { rows: assessRows } = await db.query(
     `SELECT id, title, prompt, external_links, is_executed
@@ -45,8 +43,6 @@ export const startAssessmentForStudentService = async (studentId, assessmentId, 
     (sum, b) => sum + b.question_count * (b.duration_per_question || 120),
     0
   );
-
-  console.log(`📊 Using instructor-defined questions: ${typeCountsStr} (total ${numQuestions}, duration ${totalDuration} seconds)`);
 
   // Set is_executed to true if not already
   if (!assessment.is_executed) {
@@ -89,8 +85,6 @@ export const startAssessmentForStudentService = async (studentId, assessmentId, 
   );
   
   const attemptId = attemptRows[0].id;
-  console.log(`✅ Created attempt ${attemptId} for assessment ${assessmentId}`);
-
   // Generate questions using the assessmentModel
   await generateAssessmentQuestions(assessmentId, attemptId, language, assessment);
 
@@ -115,7 +109,6 @@ export const submitAssessmentForStudentService = async (
   attemptId,
   answers
 ) => {
-  console.log(`Submitting assessment ${assessmentId} for student ${studentId}, attempt ${attemptId}`);
 
   // Validate attempt
   const { rows: attemptRows } = await db.query(
@@ -208,8 +201,6 @@ export const submitAssessmentForStudentService = async (
     [totalScore, attemptId]
   );
 
-  console.log(`Assessment submitted successfully. Final score: ${totalScore}`);
-
   return {
     attemptId,
     score: totalScore,
@@ -219,8 +210,6 @@ export const submitAssessmentForStudentService = async (
 
 // 3. GET SUBMISSION DETAILS FOR STUDENT SERVICE
 export const getSubmissionDetailsForStudentService = async (studentId, submissionId) => {
-  console.log(`📋 Fetching submission ${submissionId} for student ${studentId}`);
-
   const { rows: attemptRows } = await db.query(
     `SELECT aa.*, a.title AS assessment_title
      FROM assessment_attempts aa
@@ -253,7 +242,6 @@ export const getAssessmentForInstructorPrintService = async (assessmentId, userI
   let attemptId;
 
   try {
-    console.log(`Generating data for physical paper: assessment ${assessmentId}, instructor ${userId}`);
 
     // Fetch assessment + question blocks
     const { rows: assessmentRows } = await db.query(
@@ -290,7 +278,6 @@ export const getAssessmentForInstructorPrintService = async (assessmentId, userI
     );
     
     attemptId = attemptRows[0].id;
-    console.log(`Temp attempt created: ${attemptId}`);
 
     // Generate questions
     const { questions, duration } = await generateAssessmentQuestions(
