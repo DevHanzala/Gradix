@@ -3,7 +3,6 @@ import {
   getAssessmentStudentsModel,
   getStudentAttemptQuestionsModel,
 } from "../models/InstructorAssessmentAnalyticsModel.js";
-import { redis } from "../DB/redis.js";
 import pool from "../DB/db.js";
 
 // ==================== SERVICE FUNCTIONS ====================
@@ -15,34 +14,16 @@ export const getInstructorExecutedAssessmentsService = async (instructorId, user
   }
 
   const assessments = await getInstructorExecutedAssessmentsModel(instructorId);
-
-  if (!assessments || assessments.length === 0) {
-    return [];
-  }
-
-  return assessments;
+  return assessments || [];
 };
 
-// 2. GET ASSESSMENT STUDENTS SERVICE
+// 2. GET ASSESSMENT STUDENTS SERVICE — Redis removed, always hits DB
 export const getAssessmentStudentsService = async (assessmentId, instructorId, userRole) => {
   if (!instructorId || userRole !== "instructor" || isNaN(assessmentId)) {
     throw new Error("INVALID_REQUEST");
   }
 
-  const cacheKey = `analytics:students:${assessmentId}`;
-
-  // Check Redis cache first
-  const cached = await redis.get(cacheKey);
-  if (cached) {
-    console.log(`Students list from Redis for assessment ${assessmentId}`);
-    return { data: cached, fromCache: true };
-  }
-
   const students = await getAssessmentStudentsModel(assessmentId, instructorId);
-
-  // Cache for 5 minutes
-  await redis.set(cacheKey, students || [], { ex: 300 });
-
   return { data: students || [], fromCache: false };
 };
 
@@ -67,45 +48,29 @@ export const getStudentAttemptQuestionsService = async (
     instructorId
   );
 
-  if (!questions || questions.length === 0) {
-    return [];
-  }
-
-  return questions;
+  return questions || [];
 };
 
-// 4. GET INSTRUCTOR OVERVIEW SERVICE
+// 4. GET INSTRUCTOR OVERVIEW SERVICE — direct DB queries, no Redis
 export const getInstructorOverviewService = async (instructorId) => {
-  // Get assessment count
-  const assessmentQuery = `
-    SELECT COUNT(*) as assessment_count
-    FROM assessments
-    WHERE instructor_id = $1
-  `;
-  const assessmentResult = await pool.query(assessmentQuery, [instructorId]);
+  const assessmentResult = await pool.query(
+    `SELECT COUNT(*) as assessment_count FROM assessments WHERE instructor_id = $1`,
+    [instructorId]
+  );
 
-  // Get executed assessment count
-  const executedAssessmentQuery = `
-    SELECT COUNT(*) as executed_count
-    FROM assessments
-    WHERE instructor_id = $1 AND is_executed = TRUE
-  `;
-  const executedResult = await pool.query(executedAssessmentQuery, [instructorId]);
+  const executedResult = await pool.query(
+    `SELECT COUNT(*) as executed_count FROM assessments WHERE instructor_id = $1 AND is_executed = TRUE`,
+    [instructorId]
+  );
 
-  // Get resource count
-  const resourceQuery = `
-    SELECT COUNT(*) as resource_count
-    FROM resources
-    WHERE uploaded_by = $1
-  `;
-  const resourceResult = await pool.query(resourceQuery, [instructorId]);
+  const resourceResult = await pool.query(
+    `SELECT COUNT(*) as resource_count FROM resources WHERE uploaded_by = $1`,
+    [instructorId]
+  );
 
-  const overview = {
+  return {
     assessments: parseInt(assessmentResult.rows[0].assessment_count, 10),
     executedAssessments: parseInt(executedResult.rows[0].executed_count, 10),
     resources: parseInt(resourceResult.rows[0].resource_count, 10),
   };
-
-  
-  return overview;
 };

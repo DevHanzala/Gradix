@@ -39,7 +39,7 @@ router.get("/assessment/:id/student/:studentId/questions", protect, getStudentAt
 router.get(
   "/",
   protect,
-  authorizeRoles(["instructor", "admin", "super_admin"]),
+authorizeRoles('instructor', 'admin', 'super_admin'),  // ← SPREAD ARGS,
   getInstructorOverview
 );
 

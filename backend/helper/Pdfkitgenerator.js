@@ -1,6 +1,11 @@
 import puppeteer from "puppeteer";
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from "url";
+
+// Works correctly in both ESM and CJS, dev and production
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export const generatePhysicalPaperPDF = async (
   questions,
@@ -12,20 +17,33 @@ export const generatePhysicalPaperPDF = async (
   let browser;
 
   try {
+    // ── Font — resolve relative to THIS file, not process.cwd() ─────────────
+    // This is the fix: __dirname always points to the helper/ folder regardless
+    // of where the Node process was started (dev vs production)
+    const fontPath = path.join(__dirname, "../fonts/NotoSansArabic-Regular.ttf");
+
+    if (!fs.existsSync(fontPath)) {
+      throw new Error(`Font file not found at: ${fontPath}`);
+    }
+
+    const fontData = fs.readFileSync(fontPath).toString("base64");
+
+    // ── Puppeteer launch — production-safe args ───────────────────────────────
     browser = await puppeteer.launch({
       headless: "new",
+      // If PUPPETEER_EXECUTABLE_PATH is set in .env (e.g. on Railway/Render/VPS),
+      // use it. Otherwise let Puppeteer use its bundled Chromium (dev).
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",   // prevents crashes on Docker / low-memory VMs
+        "--disable-gpu",             // not needed in headless, avoids GPU errors
         "--font-render-hinting=medium",
       ],
     });
 
     const page = await browser.newPage();
-
-    // ── Font ──────────────────────────────────────────────────────────────────
-    const fontPath = path.join(process.cwd(), "fonts/NotoSansArabic-Regular.ttf");
-    const fontData = fs.readFileSync(fontPath).toString("base64");
 
     // ── Labels per language ───────────────────────────────────────────────────
     const labelMap = {
@@ -37,7 +55,7 @@ export const generatePhysicalPaperPDF = async (
     const lbl = labelMap[language] || labelMap.en;
 
     // ── Helper: letter label for option index ─────────────────────────────────
-    const optionLetter = (index) => String.fromCharCode(65 + index); // A, B, C …
+    const optionLetter = (index) => String.fromCharCode(65 + index);
 
     // ── Build question rows ───────────────────────────────────────────────────
     const questionsHTML = questions
@@ -97,13 +115,11 @@ export const generatePhysicalPaperPDF = async (
     <head>
       <meta charset="UTF-8" />
       <style>
-        /* ── Font ── */
         @font-face {
           font-family: 'NotoSansArabic';
           src: url(data:font/ttf;base64,${fontData}) format('truetype');
         }
 
-        /* ── Base ── */
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
@@ -115,7 +131,6 @@ export const generatePhysicalPaperPDF = async (
           position: relative;
         }
 
-        /* ── Watermark ── */
         body::after {
           content: "Gradewise-AI";
           position: fixed;
@@ -131,7 +146,6 @@ export const generatePhysicalPaperPDF = async (
           letter-spacing: 4px;
         }
 
-        /* ── Institute heading ── */
         .institute-name {
           text-align: center;
           font-size: ${form.headerFontSize || 18}pt;
@@ -142,7 +156,6 @@ export const generatePhysicalPaperPDF = async (
           text-transform: uppercase;
         }
 
-        /* ── Info table ── */
         .info-wrapper {
           display: flex;
           justify-content: space-between;
@@ -164,18 +177,14 @@ export const generatePhysicalPaperPDF = async (
           color: #1a1a2e;
           padding-${isRTL ? "left" : "right"}: 10px !important;
         }
-        .info-value {
-          color: #333;
-        }
+        .info-value { color: #333; }
 
-        /* ── Divider ── */
         .divider {
           border: none;
           border-top: 2px solid #1a1a2e;
           margin: 14px 0 22px;
         }
 
-        /* ── Notes ── */
         .notes-text {
           font-size: ${form.optionFontSize || 9}pt;
           color: #555;
@@ -183,7 +192,6 @@ export const generatePhysicalPaperPDF = async (
           font-style: italic;
         }
 
-        /* ── Questions ── */
         .question-block {
           margin-bottom: 20px;
           position: relative;
@@ -224,7 +232,6 @@ export const generatePhysicalPaperPDF = async (
           color: #222;
         }
 
-        /* ── Answer Key page ── */
         .answer-key-page {
           page-break-before: always;
           padding-top: 10px;
@@ -252,32 +259,24 @@ export const generatePhysicalPaperPDF = async (
       </style>
     </head>
     <body>
-
-      <!-- Institute Name -->
       <h1 class="institute-name">${headers.instituteName || ""}</h1>
 
-      <!-- Info rows -->
       ${infoLeft || infoRight ? `
       <div class="info-wrapper">
         <table class="info-table"><tbody>${infoLeft}</tbody></table>
         <table class="info-table"><tbody>${infoRight}</tbody></table>
       </div>` : ""}
 
-      <!-- Divider -->
       <hr class="divider" />
 
-      <!-- Notes (optional) -->
       ${notesHTML}
 
-      <!-- Questions -->
       ${questionsHTML}
 
-      <!-- Answer Key — new page -->
       <div class="answer-key-page">
         <h2 class="answer-key-title">${lbl.answerKey}</h2>
         ${answerKeyHTML}
       </div>
-
     </body>
     </html>`;
 
