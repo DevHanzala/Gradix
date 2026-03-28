@@ -1,5 +1,4 @@
 import { create } from "zustand";
-
 import {
   fetchInstructorAssessments,
   fetchAssessmentById,
@@ -11,7 +10,7 @@ import {
   unenrollStudentApi,
   fetchStudentAssessmentsApi,
   fetchPreviewQuestionsApi,
-  generatePhysicalPaperApi
+  generatePhysicalPaperApi,
 } from "../api/assessment.api";
 
 const useAssessmentStore = create((set) => ({
@@ -30,13 +29,9 @@ const useAssessmentStore = create((set) => ({
     set({ loading: true, error: null });
     try {
       const response = await fetchStudentAssessmentsApi();
-      set({
-        studentAssessments: response.data.data || [],
-        loading: false,
-      });
+      set({ studentAssessments: response.data.data || [], loading: false });
     } catch (error) {
-      const message =
-        error.response?.data?.message || "Failed to fetch assessments";
+      const message = error.response?.data?.message || "Failed to fetch assessments";
       set({ error: message, loading: false });
       throw error;
     }
@@ -58,8 +53,7 @@ const useAssessmentStore = create((set) => ({
         loading: false,
       });
     } catch (error) {
-      const message =
-        error.response?.data?.message || "Failed to fetch assessments";
+      const message = error.response?.data?.message || "Failed to fetch assessments";
       set({ error: message, loading: false });
       throw error;
     }
@@ -69,15 +63,10 @@ const useAssessmentStore = create((set) => ({
     set({ loading: true, error: null });
     try {
       const response = await fetchAssessmentById(assessmentId);
-      set({
-        currentAssessment: response.data.data,
-        loading: false,
-      });
-      console.log("Fetched Assessment:", response.data.data.resources);
+      set({ currentAssessment: response.data.data, loading: false });
       return response.data.data;
     } catch (error) {
-      const message =
-        error.response?.data?.message || "Failed to fetch assessment";
+      const message = error.response?.data?.message || "Failed to fetch assessment";
       set({ error: message, loading: false });
       throw error;
     }
@@ -93,8 +82,7 @@ const useAssessmentStore = create((set) => ({
       }));
       return response.data.data;
     } catch (error) {
-      const message =
-        error.response?.data?.message || "Failed to create assessment";
+      const message = error.response?.data?.message || "Failed to create assessment";
       set({ error: message, loading: false });
       throw error;
     }
@@ -103,10 +91,7 @@ const useAssessmentStore = create((set) => ({
   updateAssessment: async (assessmentId, formData) => {
     set({ loading: true, error: null });
     try {
-      const response = await updateAssessmentApi(
-        assessmentId,
-        formData
-      );
+      const response = await updateAssessmentApi(assessmentId, formData);
       set((state) => ({
         assessments: state.assessments.map((a) =>
           a.id === assessmentId
@@ -118,8 +103,7 @@ const useAssessmentStore = create((set) => ({
       }));
       return response.data.data;
     } catch (error) {
-      const message =
-        error.response?.data?.message || "Failed to update assessment";
+      const message = error.response?.data?.message || "Failed to update assessment";
       set({ error: message, loading: false });
       throw error;
     }
@@ -130,48 +114,54 @@ const useAssessmentStore = create((set) => ({
     try {
       await deleteAssessmentApi(assessmentId);
       set((state) => ({
-        assessments: state.assessments.filter(
-          (a) => a.id !== assessmentId
-        ),
+        assessments: state.assessments.filter((a) => a.id !== assessmentId),
         loading: false,
       }));
     } catch (error) {
-      const message =
-        error.response?.data?.message || "Failed to delete assessment";
+      const message = error.response?.data?.message || "Failed to delete assessment";
       set({ error: message, loading: false });
       throw error;
     }
   },
 
   /* =========================
-   Physical Paper
-========================= */
+     Physical Paper
+  ========================= */
 
-/* =========================
-   assessmentStore.js  — Physical Paper action (replace existing block)
-========================= */
+  generatePhysicalPaper: async (assessmentId, payload) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await generatePhysicalPaperApi(assessmentId, payload, {
+        responseType: "blob",
+        // Do NOT pass a custom headers object here — the axios interceptor
+        // already attaches Authorization: Bearer <token> automatically.
+        // Passing headers: {} would wipe the Authorization header in production.
+      });
 
-generatePhysicalPaper: async (assessmentId, payload) => {
-  set({ loading: true, error: null });
-  try {
-    const response = await generatePhysicalPaperApi(assessmentId, payload, {
-      responseType: "blob",           //  tell axios to treat response as binary
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/pdf",
-      },
-    });
-    set({ loading: false });
-    // Return a proper Blob so the modal can hand it straight to file-saver
-    return new Blob([response.data], { type: "application/pdf" });
-  } catch (error) {
-    const message =
-      error.response?.data?.message || "Failed to generate physical paper";
-    set({ error: message, loading: false });
-    throw error;
-  }
-},
+      set({ loading: false });
+      return new Blob([response.data], { type: "application/pdf" });
 
+    } catch (error) {
+      // When responseType is "blob" and the server returns a JSON error,
+      // axios gives us a Blob instead of a plain object — we must read it as text first.
+      let message = "Failed to generate physical paper";
+
+      if (error.response?.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text();
+          const parsed = JSON.parse(text);
+          message = parsed?.message || message;
+        } catch {
+          // blob wasn't JSON — keep default message
+        }
+      } else {
+        message = error.response?.data?.message || error.message || message;
+      }
+
+      set({ error: message, loading: false });
+      throw new Error(message);
+    }
+  },
 
   /* =========================
      Enrollment
@@ -181,15 +171,10 @@ generatePhysicalPaper: async (assessmentId, payload) => {
     set({ loading: true, error: null });
     try {
       const response = await fetchEnrolledStudentsApi(assessmentId);
-      set({
-        enrolledStudents: response.data.data,
-        loading: false,
-      });
+      set({ enrolledStudents: response.data.data, loading: false });
       return response.data.data;
     } catch (error) {
-      const message =
-        error.response?.data?.message ||
-        "Failed to fetch enrolled students";
+      const message = error.response?.data?.message || "Failed to fetch enrolled students";
       set({ error: message, loading: false });
       throw error;
     }
@@ -198,18 +183,14 @@ generatePhysicalPaper: async (assessmentId, payload) => {
   enrollStudent: async (assessmentId, email) => {
     set({ loading: true, error: null });
     try {
-      const response = await enrollStudentApi(
-        assessmentId,
-        email
-      );
+      const response = await enrollStudentApi(assessmentId, email);
       set((state) => ({
         enrolledStudents: [...state.enrolledStudents, response.data.data],
         loading: false,
       }));
       return response.data.data;
     } catch (error) {
-      const message =
-        error.response?.data?.message || "Failed to enroll student";
+      const message = error.response?.data?.message || "Failed to enroll student";
       set({ error: message, loading: false });
       throw error;
     }
@@ -220,15 +201,11 @@ generatePhysicalPaper: async (assessmentId, payload) => {
     try {
       await unenrollStudentApi(assessmentId, studentId);
       set((state) => ({
-        enrolledStudents: state.enrolledStudents.filter(
-          (s) => s.id !== studentId
-        ),
+        enrolledStudents: state.enrolledStudents.filter((s) => s.id !== studentId),
         loading: false,
       }));
     } catch (error) {
-      const message =
-        error.response?.data?.message ||
-        "Failed to unenroll student";
+      const message = error.response?.data?.message || "Failed to unenroll student";
       set({ error: message, loading: false });
       throw error;
     }
@@ -245,9 +222,7 @@ generatePhysicalPaper: async (assessmentId, payload) => {
       set({ loading: false });
       return response.data.questions;
     } catch (error) {
-      const message =
-        error.response?.data?.message ||
-        "Failed to generate preview questions";
+      const message = error.response?.data?.message || "Failed to generate preview questions";
       set({ error: message, loading: false });
       throw error;
     }
