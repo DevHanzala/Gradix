@@ -4,7 +4,7 @@ import {
   getStudentOverview,
   getStudentPerformance,
   getStudentRecommendations,
-  getStudentAssessments,
+  // getStudentAssessments,
   getAssessmentDetails,
   getAssessmentQuestions,
   getStudentReport,
@@ -16,7 +16,7 @@ router.use(protect);
 router.get("/overview", getStudentOverview);
 router.get("/performance", getStudentPerformance);
 router.get("/recommendations", getStudentRecommendations);
-router.get("/assessments", getStudentAssessments);
+// router.get("/assessments", getStudentAssessments);
 router.get("/assessment/:id", getAssessmentDetails);
 router.get("/assessment/:id/questions", getAssessmentQuestions);
 router.get("/report", getStudentReport);
