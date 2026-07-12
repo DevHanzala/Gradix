@@ -102,7 +102,7 @@ function Login() {
                 <FaUserCircle className="text-3xl sm:text-4xl" />
               </div>
               <h2 className="text-2xl sm:text-3xl font-bold mb-2">Welcome Back</h2>
-              <p className="text-blue-100 text-sm sm:text-base">Sign in to your Gradewise AI account</p>
+              <p className="text-blue-100 text-sm sm:text-base">Sign in to your Gradix account</p>
             </div>
           </CardHeader>
 

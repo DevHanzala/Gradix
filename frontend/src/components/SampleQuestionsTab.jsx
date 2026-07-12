@@ -1,4 +1,4 @@
-import LoadingSpinner from "../ui/LoadingSpinner";
+import LoadingSpinner from "../components/ui/LoadingSpinner";
 import QuestionCard from "./QuestionCard";
 
 function SampleQuestionsTab({ questions, questionError, loading }) {

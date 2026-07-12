@@ -107,7 +107,7 @@ const isActiveLink = (href) => {
                 📚
               </div>
               <span className="text-lg sm:text-xl lg:text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent whitespace-nowrap">
-                Gradewise AI
+                Gradix
               </span>
             </Link>
           </div>

@@ -97,7 +97,7 @@ function Home() {
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-extrabold text-gray-900 mb-4 sm:mb-6 leading-tight px-2">
               Welcome to{" "}
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 animate-gradient">
-                Gradewise AI
+                Gradix
               </span>
             </h1>
             

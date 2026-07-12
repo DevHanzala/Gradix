@@ -9,6 +9,7 @@ import { FaUser, FaEnvelope, FaLock, FaUserPlus, FaGoogle, FaGraduationCap } fro
 import { redirectByRole } from "../utils/redirectByRole.js";
 import useRecaptchaInit from "../hooks/useRecaptchaInit.js";
 import { signupSchema } from "../scheema/authSchemas.js";
+import { z } from "zod";
 
 function Signup() {
   const navigate = useNavigate();
@@ -101,7 +102,7 @@ function Signup() {
                 <FaGraduationCap className="text-3xl sm:text-4xl" />
               </div>
               <h2 className="text-2xl sm:text-3xl font-bold mb-2">Create Account</h2>
-              <p className="text-green-100 text-sm sm:text-base">Join Gradewise AI as a student</p>
+              <p className="text-green-100 text-sm sm:text-base">Join Gradix as a student</p>
             </div>
           </CardHeader>
 
