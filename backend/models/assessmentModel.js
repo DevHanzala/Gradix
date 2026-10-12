@@ -1,8 +1,6 @@
-import { findResourceById } from "./resourceModel.js";
 import { mapLanguageCode } from "../services/ai/aiService.js";
 import { generateContent } from "../services/ai/generateContent.js";
 import * as assessmentRepo from "../repositories/assessmentRepository.js";
-import { validateAssessmentData, validateQuestionBlockData } from "../validator/assessment.validator.js";
 import {
   normalizeOptions,
   normalizeText,
@@ -12,24 +10,6 @@ import {
 } from "../utils/grading.js";
 
 // ==================== ASSESSMENT CRUD ====================
-
-export const createAssessment = async (assessmentData) => {
-  try {
-  
-    const validationErrors = validateAssessmentData(assessmentData);
-    if (validationErrors.length > 0) {
-      throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
-    }
-
-    const assessment = await assessmentRepo.createAssessmentQuery(assessmentData);
-    return assessment;
-
-  } catch (error) {
-    console.error("❌ Error creating assessment:", error);
-    throw error;
-  }
-};
-
 
 export const getAssessmentsByInstructor = async (instructorId) => {
   try {
@@ -77,136 +57,8 @@ export const getAssessmentById = async (assessment_id, user_id, user_role) => {
   }
 };
 
-export const updateAssessment = async (assessmentId, updateData) => {
-  try {
-    
-    // VALIDATE DATA BEFORE UPDATING
-    const validationErrors = validateAssessmentData(updateData);
-    if (validationErrors.length > 0) {
-      throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
-    }
-
-    const assessment = await assessmentRepo.updateAssessmentQuery(assessmentId, updateData);
-    
-    if (!assessment) {
-      throw new Error("Assessment not found");
-    }
-    
-    return assessment;
-  } catch (error) {
-    console.error("DEBUG: Model updateAssessment - Error:", error);
-    throw error;
-  }
-};
-
-export const deleteAssessment = async (assessmentId) => {
-  try {
-    const assessment = await assessmentRepo.deleteAssessmentQuery(assessmentId);
-    if (!assessment) {
-      throw new Error("Assessment not found");
-    }
-  } catch (error) {
-    console.error("❌ Error deleting assessment:", error);
-    throw error;
-  }
-};
-
-// ==================== QUESTION BLOCKS ====================
-
-export const storeQuestionBlocks = async (assessmentId, questionBlocks, instructorId) => {
-  try {
-    // 🔹 Parse if it's a string
-    if (typeof questionBlocks === "string") {
-      try {
-        questionBlocks = JSON.parse(questionBlocks);
-      } catch (err) {
-        throw new Error("Invalid question blocks format");
-      }
-    }
-
-    // 🔹 Now normalize and validate each block
-    for (const block of questionBlocks) {
-      const typeMap = {
-        multipleChoice: "multiple_choice",
-        trueFalse: "true_false",
-        shortAnswer: "short_answer",
-      };
-      if (typeMap[block.question_type]) {
-        block.question_type = typeMap[block.question_type];
-      }
-
-      block.question_count = parseInt(block.question_count, 10);
-      block.duration_per_question = parseInt(block.duration_per_question, 10);
-      if (block.num_options !== null && block.num_options !== undefined) {
-        block.num_options = parseInt(block.num_options, 10);
-      }
-
-      const validationErrors = validateQuestionBlockData(block);
-      if (validationErrors.length > 0) {
-        throw new Error(
-          `Question block validation failed: ${validationErrors.join(', ')}`
-        );
-      }
-    }
-
-    await assessmentRepo.deleteQuestionBlocksByAssessmentQuery(assessmentId);
-
-    for (const block of questionBlocks) {
-      await assessmentRepo.createQuestionBlockQuery({
-        assessmentId,
-        question_type: block.question_type,
-        question_count: block.question_count,
-        duration_per_question: block.duration_per_question,
-        num_options: block.num_options,
-        positive_marks: block.positive_marks,
-        negative_marks: block.negative_marks,
-        instructorId,
-      });
-    }
-
-  } catch (error) {
-    console.error("❌ Error storing question blocks:", error);
-    throw error;
-  }
-};
 
 // ==================== ENROLLMENTS ====================
-
-export const enrollStudent = async (assessmentId, email) => {
-  try {
-    const student = await assessmentRepo.findUserByEmailQuery(email);
-    if (!student) {
-      throw new Error("Student not found");
-    }
-    if (student.role !== "student") {
-      throw new Error("User is not a student");
-    }
-
-    const existing = await assessmentRepo.findEnrollmentQuery(assessmentId, student.id);
-    if (existing) {
-      throw new Error("Student already enrolled");
-    }
-
-    const enrollment = await assessmentRepo.createEnrollmentQuery(assessmentId, student.id);
-    return enrollment;
-  } catch (error) {
-    console.error("❌ Error enrolling student:", error);
-    throw error;
-  }
-};
-
-export const unenrollStudent = async (assessmentId, studentId) => {
-  try {
-    const enrollment = await assessmentRepo.deleteEnrollmentQuery(assessmentId, studentId);
-    if (!enrollment) {
-      throw new Error("Enrollment not found");
-    }
-    return enrollment;
-  } catch (error) {
-    console.error("❌ Error unenrolling student:", error);
-    throw error;
-  }
-};
 
 export const getEnrolledStudents = async (assessmentId) => {
   try {
@@ -218,52 +70,7 @@ export const getEnrolledStudents = async (assessmentId) => {
   }
 };
 
-// ==================== RESOURCE CHUNKS ====================
 
-export const storeResourceChunk = async (resourceId, chunkText, embedding, metadata) => {
-  try {
-    const chunk = await assessmentRepo.createResourceChunkQuery({
-      resourceId,
-      chunkText,
-      embedding,
-      chunkIndex: metadata.chunk_index,
-    });
-    return chunk;
-  } catch (error) {
-    console.error("❌ Error storing resource chunk:", error);
-    throw error;
-  }
-};
-
-// ==================== ASSESSMENT RESOURCES ====================
-
-export const linkResourceToAssessment = async (assessmentId, resourceId) => {
-  try {
-    const resource = await findResourceById(resourceId);
-    if (!resource) {
-      throw new Error("Resource not found");
-    }
-
-    const link = await assessmentRepo.linkResourceToAssessmentQuery(assessmentId, resourceId);
-    return link;
-  } catch (error) {
-    console.error("❌ Error linking resource to assessment:", error);
-    throw error;
-  }
-};
-
-export const clearLinksForAssessment = async (assessmentId) => {
-  try {
-    const success = await assessmentRepo.clearExternalLinksQuery(assessmentId);
-    if (!success) {
-      throw new Error("Assessment not found");
-    }
-    return true;
-  } catch (error) {
-    console.error("❌ Error clearing links for assessment:", error);
-    throw error;
-  }
-};
 
 // ==================== AI QUESTION GENERATION ====================
 

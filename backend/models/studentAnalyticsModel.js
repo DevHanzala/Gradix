@@ -114,21 +114,6 @@ export const getPerformanceOverTime = async (studentId, timeRange) => {
   }
 };
 
-export const getStudentAssessmentsList = async (studentId) => {
-  try {
-    const validationErrors = validateStudentAnalyticsQuery({ studentId });
-    if (validationErrors.length > 0) {
-      throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
-    }
-
-    const assessments = await analyticsRepo.findCompletedAssessmentsQuery(studentId);
-    return assessments;
-  } catch (error) {
-    console.error("❌ Error getting student assessments list:", error);
-    throw error;
-  }
-};
-
 export const getAssessmentAnalytics = async (studentId, assessmentId) => {
   try {
     const validationErrors = validateAssessmentAnalyticsQuery({ studentId, assessmentId });

@@ -76,12 +76,12 @@ export const extractTextFromFile = async (buffer, mimeType) => {
     throw unreadable("The uploaded file is empty.");
   }
 
-  let text = "";
+  let text;
 
   if (mimeType.includes("officedocument") || mimeType.includes("msword") || mimeType.includes("presentation")) {
     text = cleanText(await officeExtractor.extractText({ input: buffer, type: "buffer" }));
   } else if (mimeType === "application/pdf") {
-    let parsedText = "";
+    let parsedText;
     try {
       parsedText = cleanText((await pdfParse(buffer)).text);
     } catch {

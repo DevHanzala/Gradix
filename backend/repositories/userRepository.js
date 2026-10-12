@@ -81,12 +81,6 @@ export const findUserByResetTokenQuery = async (resetId) => {
   return result.rows[0] || null;
 };
 
-export const checkUserExistsByEmailQuery = async (email) => {
-  const query = "SELECT id FROM users WHERE LOWER(email) = LOWER($1)";
-  const result = await pool.query(query, [email]);
-  return result.rows.length > 0;
-};
-
 // ==================== USER VERIFICATION & PASSWORD ====================
 
 export const verifyUserQuery = async (token) => {
@@ -153,44 +147,7 @@ export const deleteUserQuery = async (userId) => {
 
 // ==================== USER SEARCH & FILTERING ====================
 
-export const findUsersByRoleQuery = async (role) => {
-  const query = `
-    SELECT id, name, email, role, verified, created_at 
-    FROM users 
-    WHERE role = $1 
-    ORDER BY name ASC
-  `;
-  const result = await pool.query(query, [role]);
-  return result.rows;
-};
-
-export const searchUsersQuery = async (searchTerm) => {
-  const query = `
-    SELECT id, name, email, role, verified, created_at 
-    FROM users 
-    WHERE name ILIKE $1 OR email ILIKE $1 
-    ORDER BY name ASC
-  `;
-  const result = await pool.query(query, [`%${searchTerm}%`]);
-  return result.rows;
-};
-
 // ==================== USER STATISTICS ====================
-
-export const getUserStatsQuery = async () => {
-  const query = `
-    SELECT 
-      COUNT(*) as total_users,
-      COUNT(CASE WHEN role = 'student' THEN 1 END) as total_students,
-      COUNT(CASE WHEN role = 'instructor' THEN 1 END) as total_instructors,
-      COUNT(CASE WHEN role = 'admin' THEN 1 END) as total_admins,
-      COUNT(CASE WHEN verified = true THEN 1 END) as verified_users,
-      COUNT(CASE WHEN verified = false THEN 1 END) as unverified_users
-    FROM users
-  `;
-  const result = await pool.query(query);
-  return result.rows[0];
-};
 
 export const setVerificationTokenQuery = async (userId, token) => {
   await pool.query(

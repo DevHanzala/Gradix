@@ -1,12 +1,10 @@
 import * as userRepo from "../repositories/userRepository.js";
 import {
-  VALID_ROLES,
   validateUserData,
   validateRoleChange,
   validateUserDeletion,
   validatePasswordUpdate,
   validateResetTokenUpdate,
-  validateSearchTerm,
 } from "../validator/user.validator.js";
 
 // ==================== USER CREATION ====================
@@ -24,7 +22,7 @@ export const createUser = async (name, email, hashedPassword, role, verification
   } catch (error) {
     if (error.code === "23505") {
       console.warn(`⚠️ Duplicate email: ${email}`);
-      throw new Error("User with this email already exists");
+      throw new Error("User with this email already exists", { cause: error });
     }
     console.error("❌ Error creating user:", error.message, error.stack);
     throw error;
@@ -42,7 +40,7 @@ export const createGoogleUser = async (name, email, uid, role) => {
   } catch (error) {
     if (error.code === "23505") {
       console.warn(`⚠️ Duplicate email: ${email}`);
-      throw new Error("User with this email already exists");
+      throw new Error("User with this email already exists", { cause: error });
     }
     console.error("❌ Error creating Google user:", error.message, error.stack);
     throw error;
@@ -59,17 +57,7 @@ export const findUserByEmail = async (email) => {
     return user;
   } catch (error) {
     console.error("❌ Error finding user by email:", error.message);
-    throw new Error("Database error during user lookup");
-  }
-};
-
-export const getUserByEmail = async (email) => {
-  try {
-    const user = await userRepo.findUserByEmailQuery(email);
-    return user;
-  } catch (error) {
-    console.error("❌ Error getting user by email:", error.message);
-    throw new Error("Database error during user lookup");
+    throw new Error("Database error during user lookup", { cause: error });
   }
 };
 
@@ -89,7 +77,7 @@ export const findUserByUID = async (uid) => {
     return user;
   } catch (error) {
     console.error("❌ Error finding user by UID:", error.message);
-    throw new Error("Database error during UID lookup");
+    throw new Error("Database error during UID lookup", { cause: error });
   }
 };
 
@@ -99,7 +87,7 @@ export const findUserByVerificationToken = async (token) => {
     return user;
   } catch (error) {
     console.error("❌ Error finding user by verification token:", error.message);
-    throw new Error("Database error during verification token lookup");
+    throw new Error("Database error during verification token lookup", { cause: error });
   }
 };
 
@@ -109,17 +97,7 @@ export const findUserByResetToken = async (resetId) => {
     return user;
   } catch (error) {
     console.error("❌ Error finding user by reset token:", error.message);
-    throw new Error("Database error during reset token lookup");
-  }
-};
-
-export const userExistsByEmail = async (email) => {
-  try {
-    const exists = await userRepo.checkUserExistsByEmailQuery(email);
-    return exists;
-  } catch (error) {
-    console.error("❌ Error checking user existence:", error.message);
-    throw error;
+    throw new Error("Database error during reset token lookup", { cause: error });
   }
 };
 
@@ -131,7 +109,7 @@ export const verifyUser = async (token) => {
     return user;
   } catch (error) {
     console.error("❌ Error verifying user:", error.message);
-    throw new Error("Database error during user verification");
+    throw new Error("Database error during user verification", { cause: error });
   }
 };
 
@@ -146,7 +124,7 @@ export const updateResetToken = async (email, resetId, expiresAt) => {
     return user;
   } catch (error) {
     console.error("❌ Error updating reset token:", error.message);
-    throw new Error("Database error during reset token update");
+    throw new Error("Database error during reset token update", { cause: error });
   }
 };
 
@@ -161,7 +139,7 @@ export const updatePasswordById = async (userId, hashedPassword) => {
     return user;
   } catch (error) {
     console.error("❌ Error updating password by ID:", error.message);
-    throw new Error("Database error during password update");
+    throw new Error("Database error during password update", { cause: error });
   }
 };
 
@@ -215,46 +193,6 @@ export const deleteUser = async (userId, requestingUserRole) => {
 
 // ==================== USER SEARCH & FILTERING ====================
 
-export const getUsersByRole = async (role) => {
-  try {
-    if (Array.isArray(role)) {
-      throw new Error('Role must be a string, not an array');
-    }
-    if (!VALID_ROLES.includes(role)) {
-      throw new Error(`Invalid role: ${role}. Must be one of ${VALID_ROLES.join(', ')}`);
-    }
-    const users = await userRepo.findUsersByRoleQuery(role);
-    return users;
-  } catch (error) {
-    console.error("❌ Error getting users by role:", error.message);
-    throw error;
-  }
-};
-
-export const searchUsers = async (searchTerm) => {
-  try {
-    const validationErrors = validateSearchTerm(searchTerm);
-    if (validationErrors.length > 0) {
-      throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
-    }
-    const users = await userRepo.searchUsersQuery(searchTerm);
-    return users;
-  } catch (error) {
-    console.error("❌ Error searching users:", error.message);
-    throw error;
-  }
-};
-
 // ==================== USER STATISTICS ====================
-
-export const getUserStats = async () => {
-  try {
-    const stats = await userRepo.getUserStatsQuery();
-    return stats;
-  } catch (error) {
-    console.error("❌ Error getting user stats:", error.message);
-    throw error;
-  }
-};
 
 export const setVerificationToken = async (userId, token) => userRepo.setVerificationTokenQuery(userId, token);

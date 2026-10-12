@@ -94,16 +94,6 @@ export const validateResetTokenUpdate = (data) => {
   return errors;
 };
 
-export const validateSearchTerm = (searchTerm) => {
-  const errors = [];
-
-  if (!searchTerm || typeof searchTerm !== 'string' || searchTerm.trim().length < 2) {
-    errors.push('Search term must be at least 2 characters');
-  }
-
-  return errors;
-};
-
 /** Same rule as the frontend: 8+ chars with upper, lower and a digit. */
 export const validatePasswordStrength = (password) => {
   const errors = [];

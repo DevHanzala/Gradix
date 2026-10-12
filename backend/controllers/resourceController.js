@@ -74,12 +74,6 @@ export const getInstructorResources = async (req, res, next) => {
       message: "Resources retrieved",
       data,
     });
-
-    console.log("[GET /resources]", {
-      userId: req.user.id,
-      role: req.user.role,
-      visibility: req.query.visibility,
-    });
   } catch (error) {
     if (isAppError(error)) return next(error);
     console.error("Get instructor resources error:", error);

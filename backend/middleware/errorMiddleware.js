@@ -179,7 +179,7 @@ export const errorHandler = (err, req, res, next) => {
 }
 
 // 404 handler for undefined routes
-export const notFound = (req, res, next) => {
+export const notFound = (req, res) => {
   const error = new Error(`Route ${req.originalUrl} not found`)
   res.status(404).json({
     success: false,

@@ -199,17 +199,6 @@ export const deleteAssessmentQuery = async (assessmentId) => {
   return rows[0] || null;
 };
 
-export const updateAssessmentExecutionStatusQuery = async (assessmentId, isExecuted) => {
-  const query = `
-    UPDATE assessments 
-    SET is_executed = $1, updated_at = NOW() 
-    WHERE id = $2
-    RETURNING *
-  `;
-  const { rows } = await db.query(query, [isExecuted, assessmentId]);
-  return rows[0] || null;
-};
-
 // ==================== QUESTION BLOCKS ====================
 
 export const deleteQuestionBlocksByAssessmentQuery = async (assessmentId, client = db) => {
@@ -269,22 +258,6 @@ export const findQuestionBlocksByAssessmentQuery = async (assessmentId) => {
 };
 
 // ==================== ENROLLMENTS ====================
-
-export const findUserByEmailQuery = async (email) => {
-  const { rows } = await db.query(
-    "SELECT id, role FROM users WHERE LOWER(email) = LOWER($1) ORDER BY id LIMIT 1", 
-    [email]
-  );
-  return rows[0] || null;
-};
-
-export const findEnrollmentQuery = async (assessmentId, studentId) => {
-  const { rows } = await db.query(
-    "SELECT 1 FROM enrollments WHERE assessment_id = $1 AND student_id = $2",
-    [assessmentId, studentId]
-  );
-  return rows[0] || null;
-};
 
 export const createEnrollmentQuery = async (assessmentId, studentId, client = db) => {
   const query = `
@@ -363,68 +336,9 @@ export const linkResourceToAssessmentQuery = async (assessmentId, resourceId, cl
   return rows[0];
 };
 
-export const clearExternalLinksQuery = async (assessmentId) => {
-  const { rowCount } = await db.query(
-    "UPDATE assessments SET external_links = '[]' WHERE id = $1 RETURNING *",
-    [assessmentId]
-  );
-  return rowCount > 0;
-};
-
 // ==================== GENERATED QUESTIONS ====================
 
-export const deleteGeneratedQuestionsByAttemptQuery = async (attemptId) => {
-  await db.query(`DELETE FROM generated_questions WHERE attempt_id = $1`, [attemptId]);
-};
-
-export const createGeneratedQuestionQuery = async (questionData) => {
-  const {
-    attemptId,
-    questionOrder,
-    questionType,
-    questionText,
-    options,
-    correctAnswer,
-    positiveMarks,
-    negativeMarks,
-    durationPerQuestion,
-  } = questionData;
-  
-  const query = `
-    INSERT INTO generated_questions (
-      attempt_id, question_order, question_type, question_text, options,
-      correct_answer, positive_marks, negative_marks, duration_per_question
-    )
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-    RETURNING *
-  `;
-  
-  const { rows } = await db.query(query, [
-    attemptId,
-    questionOrder,
-    questionType,
-    questionText,
-    options ? JSON.stringify(options) : null,
-    JSON.stringify(correctAnswer),
-    positiveMarks,
-    negativeMarks,
-    durationPerQuestion,
-  ]);
-  
-  return rows[0];
-};
-
 // ==================== ASSESSMENT ATTEMPTS ====================
-
-export const findAssessmentByIdQuery = async (assessmentId) => {
-  const query = `
-    SELECT id, title, prompt, external_links, is_executed
-    FROM assessments 
-    WHERE id = $1
-  `;
-  const { rows } = await db.query(query, [assessmentId]);
-  return rows[0] || null;
-};
 
 export const deleteAssessmentResourceLinksQuery = async (assessmentId, client = db) => {
   await client.query(`DELETE FROM assessment_resources WHERE assessment_id = $1`, [assessmentId]);

@@ -77,7 +77,7 @@ export const generatePhysicalPaperPDF = async (
     // letter is printed once, in the circle.
     const questionsHTML = questions
       .map((q, i) => {
-        let body = "";
+        let body;
         if (q.question_type === "multiple_choice") {
           body = `<div class="options-grid">${normalizeOptions(q.options)
             .map((opt, oi) => optionRow(optionLetter(oi), opt))
