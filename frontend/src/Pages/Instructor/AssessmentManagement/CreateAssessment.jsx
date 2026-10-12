@@ -161,8 +161,8 @@ assessmentData.append(
     question_count: Number(block.question_count),
     duration_per_question: Number(block.duration_per_question),
     num_options: block.question_type === "multiple_choice" ? Number(block.num_options) : null,
-    positive_marks: Number(block.positive_marks || 1),
-    negative_marks: Number(block.negative_marks || 0),
+    positive_marks: Number(block.positive_marks ?? 1),
+    negative_marks: Number(block.negative_marks ?? 0),
   })))
 );
 

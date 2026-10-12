@@ -61,7 +61,7 @@ function EditAssessment() {
             question_count: Number(block.question_count) || 1,
             duration_per_question: Number(block.duration_per_question) || 120,
             num_options: Number(block.num_options) || 4,
-            positive_marks: Number(block.positive_marks) || 1,
+            positive_marks: Number(block.positive_marks ?? 1),
             negative_marks: Number(block.negative_marks) || 0,
           }))
           : [{ question_type: "multiple_choice", question_count: 1, duration_per_question: 120, num_options: 4, positive_marks: 1, negative_marks: 0 }]
@@ -205,13 +205,13 @@ function EditAssessment() {
         question_count: b.question_count,
         duration_per_question: b.duration_per_question,
         num_options: b.question_type === "multiple_choice" ? b.num_options : null,
-        positive_marks: b.positive_marks || 1,
-        negative_marks: b.negative_marks || 0,
+        positive_marks: b.positive_marks ?? 1,
+        negative_marks: b.negative_marks ?? 0,
       }))));
     }
     
     assessmentData.append("selected_resources", JSON.stringify(selectedResources));
-    newFiles.forEach(f => assessmentData.append("new_files", f));
+    newFiles.forEach(f => assessmentData.append("files", f));
     
 
     console.log("DEBUG: Frontend EditAssessment - FormData contents:");
