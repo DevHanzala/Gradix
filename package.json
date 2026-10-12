@@ -1,0 +1,26 @@
+{
+  "name": "gradix",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Gradix: AI-generated, multilingual assessments (backend API + frontend SPA)",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev:backend": "npm run dev --workspace backend",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "dev": "concurrently --names backend,frontend --prefix-colors blue,magenta \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "build": "npm run build --workspace frontend",
+    "lint": "npm run lint --workspace backend && npm run lint --workspace frontend",
+    "test": "npm test --workspace backend",
+    "migrate": "npm run migrate --workspace backend",
+    "seed": "npm run seed --workspace backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

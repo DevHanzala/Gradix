@@ -1,7 +1,9 @@
 # Gradix (Gradewise-AI) — Codebase Audit
 
 **Audit date:** 2026-10-12
-**Scope:** `backend_temp/` (Node/Express API) and `frontend_temp/` (React/Vite SPA), every source file read.
+> Paths in this document were updated to the monorepo layout (`backend/`, `frontend/`). At audit time the folders were `backend_temp/` and `frontend_temp/`.
+
+**Scope:** `backend/` (Node/Express API) and `frontend/` (React/Vite SPA), every source file read.
 **Method:** Static reading of all source files, plus the scripts that already exist (`eslint`, `vite build`, `npm test`). Nothing was installed, fixed, or modified. The only file created is this one. The backend server was **not** started because it connects to live cloud services (Neon Postgres, Upstash Redis, Gmail, Gemini/Groq). Secret values in `.env` files were **not** read; only the variable names were listed.
 
 **Status legend**
@@ -43,7 +45,7 @@
 
 ```
 Gradewise-AI/                      (NOT a git repository; .gitignore files are inert)
-├── backend_temp/                  Node 22, Express 4, ESM ("type": "module")
+├── backend/                  Node 22, Express 4, ESM ("type": "module")
 │   ├── index.js                   entry point: mounts routes, /api/health, /api/logs
 │   ├── DB/db.js, DB/redis.js      pg Pool (Neon), Upstash Redis client
 │   ├── routes/ → controllers/ → services/ → models/ → repositories/   (layered)
@@ -53,7 +55,7 @@ Gradewise-AI/                      (NOT a git repository; .gitignore files are i
 │   ├── scripts/createSuperAdmin.js  only DDL in repo (users table) + seeds super admin
 │   ├── assets/tessdata/           OCR language packs: eng, ara, urd, hin
 │   └── fonts/NotoSansArabic-Regular.ttf
-└── frontend_temp/                 React 19 + Vite 7 + Tailwind 4 + Zustand + react-router 7
+└── frontend/                 React 19 + Vite 7 + Tailwind 4 + Zustand + react-router 7
     └── src/
         ├── main.jsx, App.jsx      entry + all routes
         ├── api/                   axios wrappers per domain
@@ -63,7 +65,7 @@ Gradewise-AI/                      (NOT a git repository; .gitignore files are i
         └── utils/                 translations.js (print dialog only), dead pdf/docx generators
 ```
 
-Entry points: `backend_temp/index.js` (`npm start` / `npm run dev`) and `frontend_temp/src/main.jsx` (`npm run dev` / `npm run build`).
+Entry points: `backend/index.js` (`npm start` / `npm run dev`) and `frontend/src/main.jsx` (`npm run dev` / `npm run build`).
 
 ### 2.2 Stack comparison
 
@@ -139,10 +141,10 @@ External services the code expects to be configured: **Neon Postgres with the pg
 
 | File:line | Error | Runtime effect |
 |---|---|---|
-| `frontend_temp/src/Pages/Login.jsx:59` | `'ZodError' is not defined` | Any failed login (wrong password, unverified email) throws `ReferenceError` inside `catch`, so **the user never sees an error message** |
-| `frontend_temp/src/Pages/Instructor/AssessmentManagement/EnrollStudents.jsx:16,22` | `'setIsLoading' is not defined` | Throws before the fetch, so **the enrolled-students list never loads** |
-| `frontend_temp/src/components/ErrorBoundary.jsx:79` | `'process' is not defined` | `process` does not exist in Vite browser builds, so **the error boundary crashes while rendering its fallback** (white screen) |
-| `frontend_temp/src/store/useStudentAnalyticsStore.js:118` | `'toast' is not defined` | Report-download failure path throws an unhandled `ReferenceError` |
+| `frontend/src/Pages/Login.jsx:59` | `'ZodError' is not defined` | Any failed login (wrong password, unverified email) throws `ReferenceError` inside `catch`, so **the user never sees an error message** |
+| `frontend/src/Pages/Instructor/AssessmentManagement/EnrollStudents.jsx:16,22` | `'setIsLoading' is not defined` | Throws before the fetch, so **the enrolled-students list never loads** |
+| `frontend/src/components/ErrorBoundary.jsx:79` | `'process' is not defined` | `process` does not exist in Vite browser builds, so **the error boundary crashes while rendering its fallback** (white screen) |
+| `frontend/src/store/useStudentAnalyticsStore.js:118` | `'toast' is not defined` | Report-download failure path throws an unhandled `ReferenceError` |
 
 The remaining errors are unused variables and empty `catch {}` blocks. The empty catches in `useStudentAnalyticsStore.js:48,59,70,81` silently swallow every analytics API failure. The warnings are missing hook dependencies (8).
 
@@ -189,7 +191,7 @@ The remaining errors are unused variables and empty `catch {}` blocks. The empty
 | 4.1 | Printable version in a selected language | **DONE** | `routes/assessmentRoutes.js:56`, `services/assessment.service.js:285-375`, `PhysicalPaperModal.jsx` | Generates a **fresh** question set in the chosen language, plus an answer key page. Each print makes a paid LLM call with no rate limit. |
 | 4.2 | Full layout conversion incl. RTL | **DONE** | `helper/Pdfkitgenerator.js:114-129,178,209,257` | Uses the Noto Sans Arabic font. Minor bug: options already contain `"A. …"` and the template prepends the letter again, giving **"A. A. text"** (`Pdfkitgenerator.js:68`). The answer key shows `?` whenever `correct_answer` doesn't string-match an option (`:84-88`). |
 | 4.3 | Custom header: date, time, instructor, institute, instructions | **DONE** | `PaperFormFields.jsx`, `assessment.service.js:285-375` | For non-English papers the header values (names, institute) are **sent through the LLM to be "translated"**, which can mangle proper nouns (`assessment.service.js:335-369`). |
-| 4.4 | Export DOC and PDF | **PARTIAL** | PDF: `Pdfkitgenerator.js`. DOC: `frontend_temp/src/utils/docxGenerator.js` | **PDF only.** The DOCX generator (and a client-side `pdfGenerator.js`) are imported nowhere, so they are dead code. The modal always saves `.pdf`. |
+| 4.4 | Export DOC and PDF | **PARTIAL** | PDF: `Pdfkitgenerator.js`. DOC: `frontend/src/utils/docxGenerator.js` | **PDF only.** The DOCX generator (and a client-side `pdfGenerator.js`) are imported nowhere, so they are dead code. The modal always saves `.pdf`. |
 
 ### F5: Negative marking
 
@@ -208,7 +210,7 @@ The remaining errors are unused variables and empty `catch {}` blocks. The empty
 | 6.2 | Review every question with correct/incorrect highlighted | **DONE** (MCQ/TF) | `StudentAnalytics.jsx:330-360`, `models/studentAnalyticsModel.js:235-280` | `is_correct` is **recomputed** with different logic than grading. For short answers it compares against the first keyword only, so it can disagree with the stored score. |
 | 6.3 | AI weak-area identification | **PARTIAL** | `services/studentAnalytics.service.js:212-299`, `models/studentAnalyticsModel.js:172-233` | Per-assessment: weak question texts go to Gemini (works, falls back to static text on failure). General report: `generateContent(client, prompt, …)` is called with the **wrong signature** (`studentAnalyticsModel.js:192`), so the prompt becomes `"[object Object]"` and it always falls back. "Weak areas" are grouped by **question type**, not topic. |
 | 6.4 | Personalized recommendations with resources | **PARTIAL** (backend only) | `studentAnalytics.service.js:212-299` | The AI study-plan JSON is returned by `/student-analytics/report`, but **no UI renders it**, and it never links resources. `/recommendations` is a hardcoded empty stub (`studentAnalytics.service.js:40-50`). |
-| 6.5 | Downloadable report (stats, gaps, study plan, practice) | **BROKEN** | `frontend_temp/src/store/useStudentAnalyticsStore.js:100-122` | Fetches the full report, then renders **only `<h1>{assessment_title}</h1>`** into the PDF, stretched to A4. Stats, gaps, and study plan are discarded. The failure path throws (`toast` undefined). A backend CSV export exists but no UI uses it. |
+| 6.5 | Downloadable report (stats, gaps, study plan, practice) | **BROKEN** | `frontend/src/store/useStudentAnalyticsStore.js:100-122` | Fetches the full report, then renders **only `<h1>{assessment_title}</h1>`** into the PDF, stretched to A4. Stats, gaps, and study plan are discarded. The failure path throws (`toast` undefined). A backend CSV export exists but no UI uses it. |
 | 6.6 | Report in student's selected language | **MISSING** | — | The AI prompt has no language parameter. The UI is English. |
 
 ### F7: Roles (Super Admin / Admin / Instructor / Student)
@@ -285,15 +287,15 @@ Scoring: DONE = 100, PARTIAL = 25–75 by judgment, BROKEN = 25, MISSING = 0, av
 
 ## 6. Top 10 most serious bugs (ranked by severity)
 
-1. **CRITICAL: Account takeover via Google auth.** `POST /api/auth/google-auth` (`backend_temp/routes/authRoutes.js:24`, no auth, no CAPTCHA) calls `googleAuthService` (`backend_temp/services/auth.service.js:59-85`), which trusts `email`/`uid` from the request body and **never verifies a Firebase ID token**. For an existing account (any provider, any role, verified or not) it signs a JWT. Anyone who knows the Super Admin's email becomes Super Admin. The frontend (`frontend_temp/src/store/authStore.js:50-54`) sends no ID token.
-2. **CRITICAL: Correct answers sent to students at exam start.** `startAssessmentForStudentService` selects `correct_answer` and returns it in the response (`backend_temp/services/studentAssessment.service.js:93-102`). Any student can read every answer in DevTools → Network.
+1. **CRITICAL: Account takeover via Google auth.** `POST /api/auth/google-auth` (`backend/routes/authRoutes.js:24`, no auth, no CAPTCHA) calls `googleAuthService` (`backend/services/auth.service.js:59-85`), which trusts `email`/`uid` from the request body and **never verifies a Firebase ID token**. For an existing account (any provider, any role, verified or not) it signs a JWT. Anyone who knows the Super Admin's email becomes Super Admin. The frontend (`frontend/src/store/authStore.js:50-54`) sends no ID token.
+2. **CRITICAL: Correct answers sent to students at exam start.** `startAssessmentForStudentService` selects `correct_answer` and returns it in the response (`backend/services/studentAssessment.service.js:93-102`). Any student can read every answer in DevTools → Network.
 3. **HIGH: "One attempt" not enforced.** Only concurrent `in_progress` attempts are blocked (`studentAssessment.service.js:69-78`). A student can retake after completing and get a new question set (and a better score). The dashboard even shows "Start" again for older completed assessments (`studentAnalyticsModel.js:52` + `StudentDashborad.jsx` `getAssessmentStatus`).
-4. **HIGH: Admins can change anyone's role, including the Super Admin.** `validateRoleChange` checks only the target role (`backend_temp/validator/user.validator.js:30-52`). `changeUserRoleService` (`auth.service.js:246-278`) never checks the target user's current role or group, so `PUT /api/auth/change-role {userId:<superadmin>, newRole:"student"}` from an Admin succeeds.
-5. **HIGH: Any instructor/admin can overwrite any assessment, even after execution.** `updateAssessmentService` (`backend_temp/services/assessment.service.js:134-192`) has no ownership check and no `is_executed` check. It also deletes all resource links of the target assessment (`:162`). The UI "lock" is only `disabled` inputs.
-6. **HIGH: Refresh or disconnect = permanent lockout + lost answers.** Answers live only in an un-persisted Zustand store (`frontend_temp/src/store/studentAssessmentStore.js`) and are saved server-side only at submit. After a refresh, Start returns `ALREADY_IN_PROGRESS` forever, and there is no resume endpoint. The same happens if LLM generation fails after the attempt row is inserted (`studentAssessment.service.js:81-89`, no cleanup). The exam screen tells students "Your progress is automatically saved" (`TakeAssessment.jsx:182`), which is false.
+4. **HIGH: Admins can change anyone's role, including the Super Admin.** `validateRoleChange` checks only the target role (`backend/validator/user.validator.js:30-52`). `changeUserRoleService` (`auth.service.js:246-278`) never checks the target user's current role or group, so `PUT /api/auth/change-role {userId:<superadmin>, newRole:"student"}` from an Admin succeeds.
+5. **HIGH: Any instructor/admin can overwrite any assessment, even after execution.** `updateAssessmentService` (`backend/services/assessment.service.js:134-192`) has no ownership check and no `is_executed` check. It also deletes all resource links of the target assessment (`:162`). The UI "lock" is only `disabled` inputs.
+6. **HIGH: Refresh or disconnect = permanent lockout + lost answers.** Answers live only in an un-persisted Zustand store (`frontend/src/store/studentAssessmentStore.js`) and are saved server-side only at submit. After a refresh, Start returns `ALREADY_IN_PROGRESS` forever, and there is no resume endpoint. The same happens if LLM generation fails after the attempt row is inserted (`studentAssessment.service.js:81-89`, no cleanup). The exam screen tells students "Your progress is automatically saved" (`TakeAssessment.jsx:182`), which is false.
 7. **HIGH: Exam timing is wrong and not enforced.** The backend returns total duration in **seconds** (`studentAssessment.service.js:42-45`); the store multiplies by 60 again (`studentAssessmentStore.js:60`), so 5 × 120 s questions get a 10-hour timer. Per-question timers are client-only, Previous/Next allows revisiting (`TakeAssessment.jsx:111-112`), and submit does no server-side time validation.
 8. **HIGH: Document ingestion fails for common inputs.**
-   - (a) OCR calls `worker.loadLanguage()`/`initialize()` (`backend_temp/helper/textProcessor.js:21-22`). Those methods do not exist in the installed tesseract.js 6.0.1, so **every image and every scanned or low-text PDF fails**.
+   - (a) OCR calls `worker.loadLanguage()`/`initialize()` (`backend/helper/textProcessor.js:21-22`). Those methods do not exist in the installed tesseract.js 6.0.1, so **every image and every scanned or low-text PDF fails**.
    - (b) `generateEmbedding` throws for chunks < 120 chars (`helper/embeddingGenerator.js:25-27`). The last 500-word chunk is often shorter, which fails the whole upload (`resource.service.js:76-81`) or the whole assessment create/edit (`assessment.service.js:396-419`, returns 500) and can leave a half-written resource.
    - (c) Edit-with-files always fails: field `new_files` vs multer's `files` (`EditAssessment.jsx:214` vs `routes/assessmentRoutes.js:40`).
 9. **MEDIUM-HIGH: Frontend runtime crashes and a dead role guard.**
@@ -302,9 +304,9 @@ Scoring: DONE = 100, PARTIAL = 25–75 by judgment, BROKEN = 25, MISSING = 0, av
    - `ErrorBoundary.jsx:79` (`process` undefined): the boundary crashes.
    - `ProtectedRoutes.jsx:12` reads `allowedRoles` but `App.jsx` passes `requiredRole`, so there is no UI role gating.
 10. **MEDIUM: Learning-pathway output is effectively empty.**
-    - The downloadable report PDF contains only the title (`frontend_temp/src/store/useStudentAnalyticsStore.js:107`).
+    - The downloadable report PDF contains only the title (`frontend/src/store/useStudentAnalyticsStore.js:107`).
     - The AI study plan is never rendered.
-    - General recommendations call `generateContent` with the wrong arguments (`backend_temp/models/studentAnalyticsModel.js:192`).
+    - General recommendations call `generateContent` with the wrong arguments (`backend/models/studentAnalyticsModel.js:192`).
     - Short-answer grading can crash submit (`JSON.parse` on a plain string, `studentAssessment.service.js:141-147`) or accept any answer (empty keyword list; also `normalizeText` strips all non-ASCII, `:320-325`, so every Urdu/Arabic short answer is "correct").
 
 Honourable mentions:
@@ -313,7 +315,7 @@ Honourable mentions:
 - `/resources/all` leaks private resources.
 - Gemini `generationConfig` ignored, so `temperature`/`maxOutputTokens`/JSON mode are not applied (`services/ai/generateContent.js:16-20`, `studentAnalytics.service.js:253`).
 - Duplicate `GET /student-analytics/assessments` route; the second handler is unreachable (`routes/studentAnalyticsRoutes.js:19,23`).
-- `fetchStudentAssessmentsApi` calls `GET /api/taking/assessments`, which doesn't exist (`frontend_temp/src/api/assessment.api.js:51-52`).
+- `fetchStudentAssessmentsApi` calls `GET /api/taking/assessments`, which doesn't exist (`frontend/src/api/assessment.api.js:51-52`).
 - Student assessment list cached in Redis for 10 minutes and never invalidated on enroll/submit (`studentAnalytics.service.js:58-72`).
 - Print header names get "translated" by the LLM.
 
@@ -325,19 +327,19 @@ Honourable mentions:
 |---|---|---|---|
 | S1 | **Critical** | Unauthenticated JWT minting for arbitrary email via `/google-auth` (no Firebase ID-token verification); also bypasses email verification and CAPTCHA | `services/auth.service.js:59-85`, `routes/authRoutes.js:24` |
 | S2 | **Critical** | Correct answers returned to the student client on exam start | `services/studentAssessment.service.js:93-102` |
-| S3 | **High** | **Hardcoded Upstash Redis REST URL and token** as fallbacks in source. Treat this token as compromised and rotate it. | `backend_temp/DB/redis.js:5-6` |
+| S3 | **High** | **Hardcoded Upstash Redis REST URL and token** as fallbacks in source. Treat this token as compromised and rotate it. | `backend/DB/redis.js:5-6` |
 | S4 | **High** | Admin can demote or alter Super Admin and other Admins; no group scoping | `validator/user.validator.js:30-52`, `services/auth.service.js:246-278` |
 | S5 | **High** | Broken object-level authorization on `PUT /api/assessments/:id` (no owner check) | `services/assessment.service.js:134-192` |
-| S6 | **Medium** | `GET /api/logs` is public and returns startup logs plus recent error messages **with stack traces** | `backend_temp/index.js:125-138` |
+| S6 | **Medium** | `GET /api/logs` is public and returns startup logs plus recent error messages **with stack traces** | `backend/index.js:125-138` |
 | S7 | **Medium** | **No rate limiting anywhere** (login, signup, forgot-password, verify). LLM-backed endpoints (`/preview-questions`, `/print`, `/start`, `/report`) can be spammed and run up AI cost. No `helmet`. | whole backend |
 | S8 | **Medium** | Default Super Admin password `***REMOVED***` hardcoded and **printed to the console** | `scripts/createSuperAdmin.js:67,109` |
-| S9 | **Medium** | `.env` files with live credentials sit inside both app folders. The project is **not a git repo**, so `.gitignore` gives no protection when the folder is zipped, uploaded, or submitted. (Values were not read during this audit.) | `backend_temp/.env`, `frontend_temp/.env` |
+| S9 | **Medium** | `.env` files with live credentials sit inside both app folders. The project is **not a git repo**, so `.gitignore` gives no protection when the folder is zipped, uploaded, or submitted. (Values were not read during this audit.) | `backend/.env`, `frontend/.env` |
 | S10 | **Medium** | Private resources of all instructors listed via `/resources/all` and linkable by anyone with the instructor role | `repositories/resourceRepository.js:43-54`, `services/resource.service.js` link |
 | S11 | **Medium** | Email verification oracle: any bogus token returns success if someone verified in the last hour; tokens never expire | `services/auth.service.js:151-158` |
 | S12 | Low | User enumeration: login reveals "use Google" / "not verified" before the password check; forgot-password reveals Google accounts | `auth.service.js:97-104,172` |
 | S13 | Low | Dev-mode error handler returns full error objects and stacks to clients if `NODE_ENV=development` in prod | `middleware/errorMiddleware.js:161-164` |
 | S14 | Low | HTML injection: user-controlled names, titles, and LLM output interpolated unescaped into email HTML (`utils/emailTemplates.js`) and the Puppeteer page (`helper/Pdfkitgenerator.js`, launched with `--no-sandbox`) | as listed |
-| S15 | Low | JWT in `localStorage` (XSS-exfiltratable), 24h lifetime, no logout invalidation | `frontend_temp/src/store/authStore.js` |
+| S15 | Low | JWT in `localStorage` (XSS-exfiltratable), 24h lifetime, no logout invalidation | `frontend/src/store/authStore.js` |
 
 ### Non-functional checks requested
 
@@ -345,7 +347,7 @@ Honourable mentions:
 - **Can one student fetch another student's questions/answers?** Not found. `/api/taking/submissions/:id` filters by `student_id = req.user.id` (`studentAssessment.service.js:212-238`). `/api/student-analytics/*` always uses `req.user.id`. `/api/instructor-analytics/...` requires role `instructor` and verifies ownership before returning answers (`models/InstructorAssessmentAnalyticsModel.js:95-98`). `GET /api/assessments/:id` for students requires enrollment and returns no questions. ⚠️ Students *do* receive their own correct answers (S2).
 - **In-progress answers persisted?** ❌ No. Memory only, lost on refresh, and the attempt is then locked (BUG-6).
 - **Rate limiting on auth:** ❌ None (S7). reCAPTCHA v3 on login/signup is the only throttle.
-- **Hardcoded secrets committed:** ⚠️ Upstash token in `DB/redis.js` (S3); default admin password (S8). Firebase web config and the reCAPTCHA *site* key in `frontend_temp/.env` are public by design.
+- **Hardcoded secrets committed:** ⚠️ Upstash token in `DB/redis.js` (S3); default admin password (S8). Firebase web config and the reCAPTCHA *site* key in `frontend/.env` are public by design.
 
 ---
 
@@ -384,7 +386,7 @@ Honourable mentions:
 - Frontend: `recharts`, `chart.js`, `react-chartjs-2`, `react-toast`, `react-toastify`, `lodash`, `@react-oauth/google`. `docx`, `fontkit`, `pdf-lib`, and `socket.io-client` are imported only by dead files.
 
 **Leftovers**
-- Folder names `backend_temp` / `frontend_temp`.
+- Folder names `backend_temp` / `frontend_temp` (resolved: the monorepo uses `backend/` and `frontend/`).
 - Default Vite `README.md`.
 - Misspelled folders and files: `scheema/`, `editAssessmnetSchemas.js`, `InstructorDashborad.jsx`, `StudentDashborad.jsx`, `AssesmentManagement/`.
 - Hardcoded log URLs `http://localhost:5000` / `:5173/api/health` regardless of `PORT` (`index.js:191-192`).

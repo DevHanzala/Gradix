@@ -1,6 +1,6 @@
 # Phase 1 Report — Gradix
 
-Work is on branch **`phase-1`** in `backend_temp` and `frontend_temp`, one commit per section after a "baseline before phase 1" commit. Root docs are in a small root repo. Nothing was pushed.
+Phase 1 was done on `phase-1` branches of the former `backend_temp` and `frontend_temp` repos, one commit per section. Those repos are now combined into the **gradix** monorepo (`backend/`, `frontend/`, root docs) with full history. Commit hashes below are the original ones; in the monorepo the same commits keep their messages but have new hashes (history was rewritten to remove secrets).
 
 **Phase 1 is complete: every checklist item is Done.**
 
@@ -68,7 +68,7 @@ Legend: ✅ Done · 🟡 Partially done · ❌ Not done
 | 1 | 4 runtime errors | ✅ | |
 | 2 | Lint 0, no empty catch, hook deps | ✅ | |
 | 3 | Dead code / deps; lazy jsPDF; no chunk > 500 kB | ✅ | Firebase also lazy-loaded |
-| 4 | Renames | ✅ | `_temp` folder names left as-is |
+| 4 | Renames | ✅ | `_temp` folders later became `backend/` and `frontend/` in the monorepo |
 | 5 | console.log removed | ✅ | |
 
 ### 1F Foundations — backend `767ac89`, root `0d5adce`

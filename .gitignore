@@ -1,6 +1,32 @@
-# Root repo tracks only top-level docs; the apps are their own git repos.
-backend_temp/
-frontend_temp/
-screenshots/
+# Dependencies
 node_modules/
+
+# Environment files: never commit secrets (examples are fine)
 .env
+.env.*
+!.env.example
+
+# Build output and coverage
+dist/
+build/
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Generated screenshots
+screenshots/
+
+# Credentials: Firebase/Google service-account keys and similar
+*serviceAccount*.json
+*service-account*.json
+*-firebase-adminsdk-*.json
+credentials*.json
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
