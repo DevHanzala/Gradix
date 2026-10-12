@@ -9,7 +9,9 @@ import {
   unlinkResourceFromAssessment,
   findAllResources,
 } from "../models/resourceModel.js";
-import { getAssessmentById, storeResourceChunk } from "../models/assessmentModel.js";
+import { storeResourceChunk } from "../models/assessmentModel.js";
+import { requireAssessmentAccess } from "./assessmentAccess.js";
+import { AppError } from "../utils/AppError.js";
 import { extractTextFromFile, chunkText } from "../helper/textProcessor.js";
 import { generateEmbedding } from "../helper/embeddingGenerator.js";
 import { getRedis } from "../DB/redis.js";
@@ -126,8 +128,8 @@ export const getInstructorResourcesService = async (
 
 
 // 3. GET ALL RESOURCES SERVICE
-export const getAllResourcesService = async () => {
-  const resources = await findAllResources();
+export const getAllResourcesService = async (userId) => {
+  const resources = await findAllResources(userId);
   return resources || [];
 };
 
@@ -139,7 +141,7 @@ export const getResourceByIdService = async (resourceId, userId, userRole) => {
     throw new Error("RESOURCE_NOT_FOUND");
   }
 
-  if (userRole === "instructor" && resource.uploaded_by !== Number(userId)) {
+  if (!canUseResource(resource, { id: userId, role: userRole })) {
     throw new Error("ACCESS_DENIED");
   }
 
@@ -188,17 +190,9 @@ export const deleteResourceService = async (resourceId, userId, userRole) => {
 
 // 7. LINK RESOURCE TO ASSESSMENT SERVICE
 export const linkResourceToAssessmentService = async (resourceId, assessmentId, userId, userRole) => {
-  const assessment = await getAssessmentById(assessmentId, userId, userRole);
-  
-  if (!assessment) {
-    throw new Error("ASSESSMENT_NOT_FOUND");
-  }
+  await requireAssessmentAccess(assessmentId, { id: userId, role: userRole }, { lockAfterExecution: true });
 
-  const resource = await findResourceById(resourceId);
-  
-  if (!resource) {
-    throw new Error("RESOURCE_NOT_FOUND");
-  }
+  await assertResourcesUsable([resourceId], { id: userId, role: userRole });
 
   const link = await linkResourceToAssessment(assessmentId, resourceId);
   return link;
@@ -206,11 +200,7 @@ export const linkResourceToAssessmentService = async (resourceId, assessmentId, 
 
 // 8. GET ASSESSMENT RESOURCES SERVICE
 export const getAssessmentResourcesService = async (assessmentId, userId, userRole) => {
-  const assessment = await getAssessmentById(assessmentId, userId, userRole);
-  
-  if (!assessment) {
-    throw new Error("ASSESSMENT_NOT_FOUND");
-  }
+  await requireAssessmentAccess(assessmentId, { id: userId, role: userRole });
 
   const resources = await getAssessmentResources(assessmentId);
   return resources || [];
@@ -218,11 +208,7 @@ export const getAssessmentResourcesService = async (assessmentId, userId, userRo
 
 // 9. UNLINK RESOURCE FROM ASSESSMENT SERVICE
 export const unlinkResourceFromAssessmentService = async (resourceId, assessmentId, userId, userRole) => {
-  const assessment = await getAssessmentById(assessmentId, userId, userRole);
-  
-  if (!assessment) {
-    throw new Error("ASSESSMENT_NOT_FOUND");
-  }
+  await requireAssessmentAccess(assessmentId, { id: userId, role: userRole }, { lockAfterExecution: true });
 
   const result = await unlinkResourceFromAssessment(assessmentId, resourceId);
   
@@ -231,6 +217,28 @@ export const unlinkResourceFromAssessmentService = async (resourceId, assessment
   }
 
   return { success: true };
+};
+
+// ==================== ACCESS HELPERS ====================
+
+/** A resource is usable by its uploader, by a super_admin, or by anyone if public. */
+export const canUseResource = (resource, user) =>
+  resource.visibility === "public" ||
+  resource.uploaded_by === Number(user.id) ||
+  user.role === "super_admin";
+
+/** Throw unless every id refers to a resource the user may attach to an assessment. */
+export const assertResourcesUsable = async (resourceIds, user) => {
+  for (const rawId of resourceIds || []) {
+    const id = Number.parseInt(rawId, 10);
+    const resource = Number.isInteger(id) ? await findResourceById(id) : null;
+    if (!resource) {
+      throw new AppError("RESOURCE_NOT_FOUND", 404, `Resource ${rawId} not found`);
+    }
+    if (!canUseResource(resource, user)) {
+      throw new AppError("RESOURCE_FORBIDDEN", 403, `You cannot use resource ${rawId}`);
+    }
+  }
 };
 
 // ==================== HELPER FUNCTIONS ====================

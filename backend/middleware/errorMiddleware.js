@@ -7,6 +7,11 @@ export const errorHandler = (err, req, res, next) => {
     return res.status(err.status).json({ success: false, code: err.code, message: err.message })
   }
 
+  // Upload errors (wrong field name, file too large, unsupported type)
+  if (err.name === "MulterError" || /^Unsupported file type/.test(err.message || "")) {
+    return res.status(400).json({ success: false, code: "UPLOAD_REJECTED", message: err.message })
+  }
+
   let error = { ...err }
   error.message = err.message
 
@@ -162,13 +167,14 @@ export const errorHandler = (err, req, res, next) => {
   const statusCode = error.statusCode || err.statusCode || 500
   const message = error.message || "Server Error"
 
+  if (statusCode >= 500) {
+    console.error(`[${req.method} ${req.originalUrl}]`, err.message)
+  }
+
+  // Never send stack traces or raw error objects to clients.
   res.status(statusCode).json({
     success: false,
-    message,
-    ...(process.env.NODE_ENV === "development" && {
-      error: err,
-      stack: err.stack,
-    }),
+    message: statusCode >= 500 && !error.statusCode ? "Server Error" : message,
   })
 }
 

@@ -2,6 +2,7 @@ import puppeteer from "puppeteer";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import { escapeHtml, escapeHtmlMultiline } from "../utils/escapeHtml.js";
 
 // Works correctly in both ESM and CJS, dev and production
 const __filename = fileURLToPath(import.meta.url);
@@ -65,14 +66,14 @@ export const generatePhysicalPaperPDF = async (
             (opt, oi) => `
             <div class="option-row">
               <span class="option-circle">${optionLetter(oi)}</span>
-              <span class="option-text">${optionLetter(oi)}. ${opt}</span>
+              <span class="option-text">${escapeHtml(opt)}</span>
             </div>`
           )
           .join("");
 
         return `
           <div class="question-block">
-            <p class="question-text"><strong>Q${i + 1}. ${q.question_text}</strong></p>
+            <p class="question-text"><strong>Q${i + 1}. ${escapeHtml(q.question_text)}</strong></p>
             <div class="options-grid">${optionsHTML}</div>
           </div>`;
       })
@@ -85,27 +86,27 @@ export const generatePhysicalPaperPDF = async (
           (opt) => opt === q.correct_answer
         );
         const letter = correctIndex >= 0 ? optionLetter(correctIndex) : "?";
-        return `<p class="answer-row"><strong>Q${i + 1}:</strong> ${letter}. ${q.correct_answer || "N/A"}</p>`;
+        return `<p class="answer-row"><strong>Q${i + 1}:</strong> ${letter}. ${escapeHtml(q.correct_answer ?? "N/A")}</p>`;
       })
       .join("");
 
     // ── Info rows — only render if value is provided ──────────────────────────
     const infoLeft = [
-      headers.teacherName && `<tr><td class="info-label">${lbl.teacher}:</td><td class="info-value">${headers.teacherName}</td></tr>`,
-      headers.subjectName && `<tr><td class="info-label">${lbl.subject}:</td><td class="info-value">${headers.subjectName}</td></tr>`,
+      headers.teacherName && `<tr><td class="info-label">${lbl.teacher}:</td><td class="info-value">${escapeHtml(headers.teacherName)}</td></tr>`,
+      headers.subjectName && `<tr><td class="info-label">${lbl.subject}:</td><td class="info-value">${escapeHtml(headers.subjectName)}</td></tr>`,
     ]
       .filter(Boolean)
       .join("");
 
     const infoRight = [
-      headers.paperDate && `<tr><td class="info-label">${lbl.date}:</td><td class="info-value">${headers.paperDate}</td></tr>`,
-      headers.paperTime && `<tr><td class="info-label">${lbl.time}:</td><td class="info-value">${headers.paperTime}</td></tr>`,
+      headers.paperDate && `<tr><td class="info-label">${lbl.date}:</td><td class="info-value">${escapeHtml(headers.paperDate)}</td></tr>`,
+      headers.paperTime && `<tr><td class="info-label">${lbl.time}:</td><td class="info-value">${escapeHtml(headers.paperTime)}</td></tr>`,
     ]
       .filter(Boolean)
       .join("");
 
     const notesHTML = headers.notes
-      ? `<p class="notes-text">${headers.notes}</p>`
+      ? `<p class="notes-text">${escapeHtmlMultiline(headers.notes)}</p>`
       : "";
 
     // ── Full HTML ─────────────────────────────────────────────────────────────
@@ -259,7 +260,7 @@ export const generatePhysicalPaperPDF = async (
       </style>
     </head>
     <body>
-      <h1 class="institute-name">${headers.instituteName || ""}</h1>
+      <h1 class="institute-name">${escapeHtml(headers.instituteName || "")}</h1>
 
       ${infoLeft || infoRight ? `
       <div class="info-wrapper">

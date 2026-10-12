@@ -11,53 +11,65 @@ import {
   updateResetToken,
   updatePasswordById,
   getAllUsers,
+  getUserById,
   updateUserRole,
   deleteUser,
-  getRecentlyVerifiedUsers,
   findUserByResetToken,
   linkGoogleAccount,
+  setVerificationToken,
 } from "../models/userModel.js";
 import { firebaseVerifier } from "../config/firebaseAdmin.js";
-import { 
-  sendVerificationEmail, 
-  sendPasswordResetEmail, 
-  sendRoleChangeEmail 
+import {
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+  sendPasswordChangedEmail,
+  sendRoleChangeEmail,
 } from "../helper/emailService.js";
-import dotenv from "dotenv";
+import { validatePasswordStrength, validateRoleChange, VALID_ROLES } from "../validator/user.validator.js";
+import { AppError } from "../utils/AppError.js";
 
-dotenv.config();
+const BCRYPT_ROUNDS = 12;
+const TOKEN_TTL = "24h";
+// Compared against when the account does not exist, so timing does not reveal it.
+const DUMMY_HASH = bcrypt.hashSync("gradix-dummy-password", BCRYPT_ROUNDS);
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const signToken = (user) =>
+  jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET, { expiresIn: TOKEN_TTL });
+
+const normalizeEmail = (email) => (typeof email === "string" ? email.trim().toLowerCase() : "");
+
+const assertStrongPassword = (password) => {
+  const errors = validatePasswordStrength(password);
+  if (errors.length > 0) throw new AppError("WEAK_PASSWORD", 400, errors[0]);
+};
+
+// Used when a login fails for ANY reason that could reveal whether an
+// account exists (unknown email, wrong password, Google-only account).
+const invalidCredentials = () => new AppError("INVALID_CREDENTIALS", 401, "Invalid email or password.");
 
 // ==================== SERVICE FUNCTIONS ====================
 
-// 1. SIGNUP SERVICE
-export const signupService = async (userData) => {
-  const { name, email, password, captchaToken } = userData;
+// 1. SIGNUP
+export const signupService = async ({ name, email, password }) => {
+  const normalizedEmail = normalizeEmail(email);
+  if (!name || !String(name).trim() || !normalizedEmail) {
+    throw new AppError("MISSING_FIELDS", 400, "Name, email and password are required.");
+  }
+  assertStrongPassword(password);
 
-
-  const existingUser = await findUserByEmail(email);
-  if (existingUser) {
-    console.warn(`User already exists: ${email}`);
+  if (await findUserByEmail(normalizedEmail)) {
     throw new Error("USER_EXISTS");
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
-
+  const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
   const verificationToken = crypto.randomBytes(32).toString("hex");
+  const newUser = await createUser(String(name).trim(), normalizedEmail, hashedPassword, "student", verificationToken, "manual", null);
 
-  const newUser = await createUser(name, email, hashedPassword, "student", verificationToken, "manual", null);
-
-  try {
-    await sendVerificationEmail(email, name, verificationToken);
-    return { user: newUser, emailSent: true };
-  } catch (emailError) {
-    console.error("Failed to send verification email:", emailError);
-    return { user: newUser, emailSent: false };
-  }
+  sendVerificationEmail(normalizedEmail, newUser.name, verificationToken);
+  return { user: newUser, emailSent: true };
 };
 
-// 2. GOOGLE AUTH SERVICE
+// 2. GOOGLE AUTH
 export const googleAuthService = async ({ idToken }) => {
   if (!idToken || typeof idToken !== "string") {
     throw new Error("INVALID_GOOGLE_TOKEN");
@@ -71,7 +83,8 @@ export const googleAuthService = async ({ idToken }) => {
     throw new Error("INVALID_GOOGLE_TOKEN");
   }
 
-  const { uid, email, email_verified: emailVerified, name } = decoded || {};
+  const { uid, email: rawEmail, email_verified: emailVerified, name } = decoded || {};
+  const email = normalizeEmail(rawEmail);
   if (!uid || !email || !emailVerified) {
     throw new Error("INVALID_GOOGLE_TOKEN");
   }
@@ -87,294 +100,195 @@ export const googleAuthService = async ({ idToken }) => {
       user = { ...user, ...(await linkGoogleAccount(user.id, uid)) };
     }
   } else {
-    const userByUID = await findUserByUID(uid);
-    if (userByUID) {
+    if (await findUserByUID(uid)) {
       throw new Error("GOOGLE_ACCOUNT_LINKED");
     }
     user = await createGoogleUser(name || email.split("@")[0], email, uid, "student");
   }
 
-  const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: "24h" });
-
-  return { user, token };
+  return { user, token: signToken(user) };
 };
 
-// 3. LOGIN SERVICE
-export const loginService = async (credentials) => {
-  const { email, password, captchaToken } = credentials;
+// 3. LOGIN
+export const loginService = async ({ email, password }) => {
+  const user = await findUserByEmail(normalizeEmail(email));
 
-  const user = await findUserByEmail(email);
-  if (!user) {
-    console.warn(`User not found: ${email}`);
-    throw new Error("INVALID_CREDENTIALS");
-  }
-
-  if (user.provider === "google") {
-    console.warn(`Google account detected: ${email}`);
-    throw new Error("USE_GOOGLE_SIGNIN");
-  }
-
-  if (!user.verified && user.role !== "super_admin") {
-    console.warn(`User not verified: ${email}`);
-    throw new Error("EMAIL_NOT_VERIFIED");
+  // Same error and (roughly) the same work whether or not the account exists.
+  if (!user || !user.password || typeof password !== "string") {
+    await bcrypt.compare(String(password ?? ""), DUMMY_HASH);
+    throw invalidCredentials();
   }
 
   const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) {
-    console.warn(`Invalid password for: ${email}`);
-    throw new Error("INVALID_CREDENTIALS");
+  if (!isMatch) throw invalidCredentials();
+
+  // Only reveal "unverified" to someone who knows the password.
+  if (!user.verified && user.role !== "super_admin") {
+    throw new AppError("EMAIL_NOT_VERIFIED", 403, "Please verify your email before logging in.");
   }
 
-  const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: "24h" });
-
-  return { user, token };
+  return { user, token: signToken(user) };
 };
 
-// 4. VERIFY EMAIL SERVICE
+// 4. VERIFY EMAIL
+// Tokens are single-use and expire after 24 hours. Anything else is an error.
 export const verifyEmailService = async (token) => {
+  if (!token || typeof token !== "string") throw new Error("INVALID_TOKEN");
+
   const user = await findUserByVerificationToken(token);
+  if (!user) throw new Error("INVALID_TOKEN");
 
-  if (user) {
-    if (user.verified) {
-      return {
-        status: "already_verified",
-        user: {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-          verified: user.verified,
-        },
-      };
-    } else {
-      const verifiedUser = await verifyUser(token);
-      if (verifiedUser) {
-        return {
-          status: "just_verified",
-          user: {
-            id: verifiedUser.id,
-            name: verifiedUser.name,
-            email: verifiedUser.email,
-            role: verifiedUser.role,
-            verified: verifiedUser.verified,
-          },
-        };
-      }
-    }
-  }
+  const verifiedUser = await verifyUser(token);
+  if (!verifiedUser) throw new Error("INVALID_TOKEN");
 
-  const recentUsers = await getRecentlyVerifiedUsers();
-
-  if (recentUsers.length > 0) {
-    return {
-      status: "already_used",
-      recentlyVerified: true,
-    };
-  }
-
-  throw new Error("INVALID_TOKEN");
+  return {
+    status: "just_verified",
+    user: {
+      id: verifiedUser.id,
+      name: verifiedUser.name,
+      email: verifiedUser.email,
+      role: verifiedUser.role,
+      verified: verifiedUser.verified,
+    },
+  };
 };
 
-// 5. FORGOT PASSWORD SERVICE
+// 4b. RESEND VERIFICATION (always answers the same way)
+export const resendVerificationService = async (email) => {
+  const user = await findUserByEmail(normalizeEmail(email));
+  if (!user || user.verified || user.provider === "google") return;
+
+  const token = crypto.randomBytes(32).toString("hex");
+  await setVerificationToken(user.id, token);
+  sendVerificationEmail(user.email, user.name, token);
+};
+
+// 5. FORGOT PASSWORD (always answers the same way)
 export const forgotPasswordService = async (email) => {
-  
-  const user = await findUserByEmail(email);
-  if (!user) {
-    console.warn(`User not found: ${email}`);
-    return { emailSent: false, userExists: false };
-  }
+  const user = await findUserByEmail(normalizeEmail(email));
+  // Unknown and Google-only accounts get the same response as real ones.
+  if (!user || !user.password) return;
 
-  if (user.provider === "google") {
-    console.warn(`Google account detected: ${email}`);
-    throw new Error("GOOGLE_USER_NO_RESET");
-  }
-
-  const resetId = crypto.randomBytes(16).toString("hex");
-  const expiresAt = new Date(Date.now() + 3600000); // 1 hour
-  await updateResetToken(email, resetId, expiresAt);
-  try {
-    await sendPasswordResetEmail(email, user.name, resetId);
-    return { emailSent: true, userExists: true };
-  } catch (emailError) {
-    console.error("Failed to send password reset email:", emailError);
-    throw new Error("EMAIL_SEND_FAILED");
-  }
+  const resetId = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+  await updateResetToken(user.email, resetId, expiresAt);
+  sendPasswordResetEmail(user.email, user.name, resetId);
 };
 
-// 6. CHANGE PASSWORD SERVICE
-export const changePasswordService = async (passwordData, authenticatedUser) => {
-  const { currentPassword, newPassword, resetId } = passwordData;
+// 6a. RESET PASSWORD (public, with emailed token)
+export const resetPasswordService = async ({ resetId, newPassword }) => {
+  if (!resetId || typeof resetId !== "string") throw new Error("INVALID_RESET_TOKEN");
+  assertStrongPassword(newPassword);
 
-  let user;
-
-  if (currentPassword && !resetId) {
-    if (!authenticatedUser) {
-      console.warn(`Authentication required for password change`);
-      throw new Error("AUTH_REQUIRED");
-    }
-    
-    user = await findUserByEmail(authenticatedUser.email);
-    if (!user) {
-      console.warn(`User not found: ${authenticatedUser.email}`);
-      throw new Error("USER_NOT_FOUND");
-    }
-    
-    const isValid = await bcrypt.compare(currentPassword, user.password);
-    if (!isValid) {
-      console.warn(`Invalid current password for: ${user.email}`);
-      throw new Error("INVALID_CURRENT_PASSWORD");
-    }
-  } else if (resetId && !currentPassword) {
-    const resetData = await findUserByResetToken(resetId);
-    if (!resetData || new Date() > resetData.reset_token_expires) {
-      console.warn(`Invalid or expired reset token: ${resetId.slice(0, 10)}...`);
-      throw new Error("INVALID_RESET_TOKEN");
-    }
-    user = resetData;
-  } else {
-    console.warn(`Invalid request: currentPassword=${!!currentPassword}, resetId=${!!resetId}`);
-    throw new Error("INVALID_REQUEST");
+  const user = await findUserByResetToken(resetId);
+  if (!user || new Date() > new Date(user.reset_token_expires)) {
+    throw new Error("INVALID_RESET_TOKEN");
   }
 
-  const hashedPassword = await bcrypt.hash(newPassword, 10);
-  const updatedUser = await updatePasswordById(user.id, hashedPassword);
+  const hashedPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+  const updated = await updatePasswordById(user.id, hashedPassword);
+  if (!updated) throw new Error("PASSWORD_UPDATE_FAILED");
+  await updateResetToken(user.email, null, null);
 
-  if (!updatedUser) {
-    console.error(`Failed to update password for: ${user.email}`);
-    throw new Error("PASSWORD_UPDATE_FAILED");
-  }
-
-  if (resetId) {
-    await updateResetToken(user.email, null, null);
-  }
-
+  sendPasswordChangedEmail(user.email, user.name);
   return { success: true };
 };
 
-// 7. GET USERS SERVICE
-export const getUsersService = async (userRole, userEmail) => {
-  const users = await getAllUsers(userRole);
-  return users;
+// 6b. CHANGE PASSWORD (authenticated, requires the current password)
+export const changePasswordService = async ({ currentPassword, newPassword }, authenticatedUser) => {
+  if (!authenticatedUser) throw new Error("AUTH_REQUIRED");
+  if (!currentPassword) throw new AppError("CURRENT_PASSWORD_REQUIRED", 400, "Current password is required.");
+  assertStrongPassword(newPassword);
+
+  const user = await findUserByEmail(authenticatedUser.email);
+  if (!user) throw new Error("USER_NOT_FOUND");
+  if (!user.password) {
+    throw new AppError("NO_PASSWORD", 400, "This account signs in with Google and has no password to change.");
+  }
+
+  const isValid = await bcrypt.compare(currentPassword, user.password);
+  if (!isValid) throw new Error("INVALID_CURRENT_PASSWORD");
+  if (await bcrypt.compare(newPassword, user.password)) {
+    throw new AppError("SAME_PASSWORD", 400, "The new password must be different from the current one.");
+  }
+
+  const hashedPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+  const updated = await updatePasswordById(user.id, hashedPassword);
+  if (!updated) throw new Error("PASSWORD_UPDATE_FAILED");
+
+  sendPasswordChangedEmail(user.email, user.name);
+  return { success: true };
 };
 
-// 8. CHANGE USER ROLE SERVICE
-export const changeUserRoleService = async (roleChangeData, requestingUser) => {
-  const { userId, newRole, userEmail } = roleChangeData;
+// 7. GET USERS
+export const getUsersService = async (userRole) => getAllUsers(userRole);
 
-  const userToChange =
-    (await findUserByEmail(userEmail)) || (await getAllUsers(requestingUser.role)).find((u) => u.id === userId);
-
-  if (!userToChange) {
-    console.warn(`User not found: ID=${userId}, Email=${userEmail}`);
-    throw new Error("USER_NOT_FOUND");
+// 8. CHANGE USER ROLE
+// The check uses the TARGET's current role from the database.
+export const changeUserRoleService = async ({ userId, newRole }, requestingUser) => {
+  const targetId = Number.parseInt(userId, 10);
+  if (!Number.isInteger(targetId)) throw new AppError("INVALID_USER_ID", 400, "Invalid user ID.");
+  if (!VALID_ROLES.includes(newRole)) throw new AppError("INVALID_ROLE", 400, "Invalid role.");
+  if (targetId === requestingUser.id) {
+    throw new AppError("CANNOT_CHANGE_OWN_ROLE", 400, "You cannot change your own role.");
   }
 
-  const oldRole = userToChange.role;
+  const target = await getUserById(targetId);
+  if (!target) throw new Error("USER_NOT_FOUND");
 
-  const updatedUser = await updateUserRole(userId, newRole, requestingUser.role);
-  if (!updatedUser) {
-    console.warn(`Failed to update role for: ${userToChange.email}`);
-    throw new Error("USER_NOT_FOUND");
-  }
+  const errors = validateRoleChange(requestingUser.role, target.role, newRole);
+  if (errors.length > 0) throw new AppError("ROLE_CHANGE_FORBIDDEN", 403, errors[0]);
 
-  try {
-    await sendRoleChangeEmail(
-      updatedUser.email,
-      updatedUser.name,
-      oldRole,
-      newRole,
-      requestingUser.name || "Administrator"
-    );
-  } catch (emailError) {
-    console.error("Failed to send role change email:", emailError);
-  }
+  if (target.role === newRole) return target;
 
+  const updatedUser = await updateUserRole(targetId, newRole, requestingUser.role, target.role);
+  if (!updatedUser) throw new Error("USER_NOT_FOUND");
+
+  sendRoleChangeEmail(updatedUser.email, updatedUser.name, target.role, newRole);
   return updatedUser;
 };
 
-// 9. REMOVE USER SERVICE
-export const removeUserService = async (userId, requestingUserRole, requestingUserEmail) => {
-  const deletedUser = await deleteUser(Number.parseInt(userId), requestingUserRole);
-  if (!deletedUser) {
-    console.warn(`User not found: ID=${userId}`);
-    throw new Error("USER_NOT_FOUND");
+// 9. REMOVE USER (super_admin only, enforced by route and model)
+export const removeUserService = async (userId, requestingUser) => {
+  const targetId = Number.parseInt(userId, 10);
+  if (!Number.isInteger(targetId)) throw new AppError("INVALID_USER_ID", 400, "Invalid user ID.");
+  if (targetId === requestingUser.id) {
+    throw new AppError("CANNOT_DELETE_SELF", 400, "You cannot delete your own account.");
   }
 
+  const deletedUser = await deleteUser(targetId, requestingUser.role);
+  if (!deletedUser) throw new Error("USER_NOT_FOUND");
   return deletedUser;
 };
 
-// 10. REGISTER STUDENT SERVICE
-export const registerStudentService = async (studentData, registrarUser) => {
-  const { name, email, password, roles } = studentData;
+// 10. REGISTER STUDENT (by admin / instructor / super_admin)
+export const registerStudentService = async ({ name, email, password, roles }, registrarUser) => {
+  if (roles !== undefined) throw new Error("INVALID_ROLES_FIELD");
+  if (!["admin", "instructor", "super_admin"].includes(registrarUser.role)) throw new Error("UNAUTHORIZED_ROLE");
 
+  const normalizedEmail = normalizeEmail(email);
+  if (!name || !normalizedEmail || !password) throw new Error("MISSING_FIELDS");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) throw new Error("INVALID_EMAIL");
+  assertStrongPassword(password);
 
-  if (roles !== undefined) {
-    console.error(`Invalid field 'roles' detected: ${JSON.stringify(roles)}`);
-    throw new Error("INVALID_ROLES_FIELD");
-  }
+  if (await findUserByEmail(normalizedEmail)) throw new Error("USER_EXISTS");
 
-  if (!["admin", "instructor", "super_admin"].includes(registrarUser.role)) {
-    console.warn(`Unauthorized role: ${registrarUser.role}`);
-    throw new Error("UNAUTHORIZED_ROLE");
-  }
-
-  if (!name || !email || !password) {
-    console.warn(`Missing required fields`);
-    throw new Error("MISSING_FIELDS");
-  }
-
-  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailPattern.test(email)) {
-    console.warn(`Invalid email format: ${email}`);
-    throw new Error("INVALID_EMAIL");
-  }
-
-  const existingUser = await findUserByEmail(email);
-  if (existingUser) {
-    console.warn(`User already exists: ${email}`);
-    throw new Error("USER_EXISTS");
-  }
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-
+  const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
   const verificationToken = crypto.randomBytes(32).toString("hex");
+  const newUser = await createUser(String(name).trim(), normalizedEmail, hashedPassword, "student", verificationToken, "manual", null);
 
-  const role = "student";
-  const newUser = await createUser(
-    name,
-    email,
-    hashedPassword,
-    role,
-    verificationToken,
-    "manual",
-    null
-  );
-
-
-  const token = jwt.sign(
-    { id: newUser.id, email: newUser.email, role: newUser.role },
-    JWT_SECRET,
-    { expiresIn: "24h" }
-  );
-
-  try {
-    await sendVerificationEmail(email, name, verificationToken);
-    return { user: newUser, token, emailSent: true };
-  } catch (emailError) {
-    console.error("Failed to send verification email:", emailError);
-    return { user: newUser, token, emailSent: false };
-  }
+  sendVerificationEmail(normalizedEmail, newUser.name, verificationToken);
+  // No token is returned: the registrar must not receive a session for the new student.
+  return { user: newUser, emailSent: true };
 };
 
-// ==================== HELPER FUNCTIONS ====================
+// ==================== HELPERS ====================
 
-export const formatUserResponse = (user) => {
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    verified: user.verified,
-    provider: user.provider,
-  };
-};
+export const formatUserResponse = (user) => ({
+  id: user.id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  verified: user.verified,
+  provider: user.provider,
+});

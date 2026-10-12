@@ -27,25 +27,34 @@ export const validateUserData = (data) => {
   return errors;
 };
 
-export const validateRoleChange = (requestingUserRole, targetRole) => {
+const PRIVILEGED_ROLES = ["admin", "super_admin"];
+
+/**
+ * Who may change whose role:
+ * - super_admin: any role for any other user.
+ * - admin: only students and instructors, and only to student or instructor.
+ * - nobody else.
+ * `targetCurrentRole` is the target user's role as stored in the DB.
+ */
+export const validateRoleChange = (requestingUserRole, targetCurrentRole, newRole) => {
   const errors = [];
 
-  if (!VALID_ROLES.includes(requestingUserRole)) {
-    errors.push('Requesting user has invalid role');
+  if (Array.isArray(newRole) || !VALID_ROLES.includes(newRole)) {
+    errors.push(`Target role must be one of: ${VALID_ROLES.join(", ")}`);
   }
 
-  if (Array.isArray(targetRole)) {
-    errors.push('Target role must be a string, not an array');
-  } else if (!VALID_ROLES.includes(targetRole)) {
-    errors.push(`Target role must be one of: ${VALID_ROLES.join(', ')}`);
+  if (requestingUserRole === "super_admin") return errors;
+
+  if (requestingUserRole !== "admin") {
+    errors.push("Insufficient permissions to change user roles");
+    return errors;
   }
 
-  if (!['admin', 'super_admin'].includes(requestingUserRole)) {
-    errors.push('Insufficient permissions to change user roles');
+  if (PRIVILEGED_ROLES.includes(targetCurrentRole)) {
+    errors.push("Admins cannot change the role of an admin or super admin");
   }
-
-  if (requestingUserRole === 'admin' && ['admin', 'super_admin'].includes(targetRole)) {
-    errors.push('Admin users cannot promote users to admin or super admin roles');
+  if (PRIVILEGED_ROLES.includes(newRole)) {
+    errors.push("Admins cannot grant the admin or super admin role");
   }
 
   return errors;
@@ -92,6 +101,20 @@ export const validateSearchTerm = (searchTerm) => {
     errors.push('Search term must be at least 2 characters');
   }
 
+  return errors;
+};
+
+/** Same rule as the frontend: 8+ chars with upper, lower and a digit. */
+export const validatePasswordStrength = (password) => {
+  const errors = [];
+  if (typeof password !== "string" || password.length < 8) {
+    errors.push("Password must be at least 8 characters");
+  } else if (!/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password)) {
+    errors.push("Password must contain an uppercase letter, a lowercase letter and a number");
+  }
+  if (typeof password === "string" && password.length > 128) {
+    errors.push("Password must be at most 128 characters");
+  }
   return errors;
 };
 

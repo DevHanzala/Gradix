@@ -183,9 +183,9 @@ export const getAllUsers = async (requestingUserRole) => {
   }
 };
 
-export const updateUserRole = async (userId, newRole, requestingUserRole) => {
+export const updateUserRole = async (userId, newRole, requestingUserRole, targetCurrentRole) => {
   try {
-    const validationErrors = validateRoleChange(requestingUserRole, newRole);
+    const validationErrors = validateRoleChange(requestingUserRole, targetCurrentRole, newRole);
     if (validationErrors.length > 0) {
       throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
     }
@@ -209,16 +209,6 @@ export const deleteUser = async (userId, requestingUserRole) => {
     return user;
   } catch (error) {
     console.error("❌ Error deleting user:", error.message);
-    throw error;
-  }
-};
-
-export const getRecentlyVerifiedUsers = async () => {
-  try {
-    const users = await userRepo.findRecentlyVerifiedUsersQuery();
-    return users;
-  } catch (error) {
-    console.error("❌ Error getting recently verified users:", error.message);
     throw error;
   }
 };
@@ -266,3 +256,5 @@ export const getUserStats = async () => {
     throw error;
   }
 };
+
+export const setVerificationToken = async (userId, token) => userRepo.setVerificationTokenQuery(userId, token);

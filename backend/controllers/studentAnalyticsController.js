@@ -1,3 +1,4 @@
+import { isAppError } from "../utils/AppError.js";
 // STUDENT ANALYTICS CONTROLLER - Request/Response Handler Layer
 import {
   getStudentOverviewService,
@@ -12,7 +13,7 @@ import {
 // ==================== CONTROLLER FUNCTIONS ====================
 
 // 1. GET STUDENT OVERVIEW ANALYTICS
-export const getStudentOverview = async (req, res) => {
+export const getStudentOverview = async (req, res, next) => {
   try {
     const studentId = req.user.id;
 
@@ -24,6 +25,7 @@ export const getStudentOverview = async (req, res) => {
       data: analytics,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error("❌ Get student overview error:", error.stack || error.message);
 
     if (error.message === "UNAUTHORIZED_ROLE") {
@@ -42,7 +44,7 @@ export const getStudentOverview = async (req, res) => {
 };
 
 // 2. GET STUDENT PERFORMANCE OVER TIME
-export const getStudentPerformance = async (req, res) => {
+export const getStudentPerformance = async (req, res, next) => {
   try {
     const studentId = req.user.id;
     const { timeRange = "month" } = req.query;
@@ -59,6 +61,7 @@ export const getStudentPerformance = async (req, res) => {
       data: performance,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error("❌ Get student performance error:", error.stack || error.message);
 
     if (error.message === "UNAUTHORIZED_ROLE") {
@@ -77,7 +80,7 @@ export const getStudentPerformance = async (req, res) => {
 };
 
 // 3. GET STUDENT LEARNING RECOMMENDATIONS
-export const getStudentRecommendations = async (req, res) => {
+export const getStudentRecommendations = async (req, res, next) => {
   try {
     const studentId = req.user.id;
 
@@ -92,6 +95,7 @@ export const getStudentRecommendations = async (req, res) => {
       data: recommendations,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error("Get student recommendations error:", error);
 
     if (error.message === "UNAUTHORIZED_ROLE") {
@@ -109,7 +113,7 @@ export const getStudentRecommendations = async (req, res) => {
 };
 
 // 4. GET STUDENT ASSESSMENTS
-export const getStudentAssessments = async (req, res) => {
+export const getStudentAssessments = async (req, res, next) => {
   try {
     const studentId = req.user.id;
 
@@ -121,6 +125,7 @@ export const getStudentAssessments = async (req, res) => {
       data,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error("Get student assessments error:", error);
 
     if (error.message === "UNAUTHORIZED_ROLE") {
@@ -138,7 +143,7 @@ export const getStudentAssessments = async (req, res) => {
 };
 
 // 5. GET DETAILED ASSESSMENT ANALYTICS
-export const getAssessmentDetails = async (req, res) => {
+export const getAssessmentDetails = async (req, res, next) => {
   try {
     const studentId = req.user.id;
     const assessmentId = parseInt(req.params.id);
@@ -155,6 +160,7 @@ export const getAssessmentDetails = async (req, res) => {
       data: details,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error("❌ Get assessment details error:", error.stack || error.message);
 
     if (error.message === "UNAUTHORIZED_ROLE") {
@@ -180,7 +186,7 @@ export const getAssessmentDetails = async (req, res) => {
 };
 
 // 6. GET ASSESSMENT QUESTIONS AND ANSWERS
-export const getAssessmentQuestions = async (req, res) => {
+export const getAssessmentQuestions = async (req, res, next) => {
   try {
     const studentId = req.user.id;
     const assessmentId = parseInt(req.params.id);
@@ -197,6 +203,7 @@ export const getAssessmentQuestions = async (req, res) => {
       data: questions,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error("❌ Get assessment questions error:", error.stack || error.message);
 
     if (error.message === "UNAUTHORIZED_ROLE") {
@@ -215,7 +222,7 @@ export const getAssessmentQuestions = async (req, res) => {
 };
 
 // 7. GENERATE DETAILED STUDENT REPORT WITH AI RECOMMENDATIONS
-export const getStudentReport = async (req, res) => {
+export const getStudentReport = async (req, res, next) => {
   try {
     const studentId = req.user.id;
     const { format = "json", assessmentId } = req.query;
@@ -242,6 +249,7 @@ export const getStudentReport = async (req, res) => {
       data: result.data,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error("❌ Get student report error:", error.stack || error.message);
 
     if (error.message === "UNAUTHORIZED_ROLE") {

@@ -1,6 +1,7 @@
 import express from 'express';
 import { protect, authorizeRoles } from '../middleware/authMiddleware.js';
 import { uploadFiles } from '../middleware/uploadMiddleware.js';
+import { aiLimiter } from '../middleware/rateLimiters.js';
 import {
   createAssessmentBasic,
   getInstructorAssessments,
@@ -52,7 +53,7 @@ router.post('/:id/enroll', protect, authorizeRoles('instructor', 'admin', 'super
 router.delete('/:id/enroll/:studentId', protect, authorizeRoles('instructor', 'admin', 'super_admin'), unenrollStudentController);
 router.get('/:id/enrolled-students', protect, authorizeRoles('instructor', 'admin', 'super_admin'), getEnrolledStudentsController);
 
-router.get('/:id/preview-questions', protect, authorizeRoles('instructor', 'admin', 'super_admin'), previewQuestions);
-router.post('/:id/print', protect, authorizeRoles('instructor', 'admin', 'super_admin'), generatePhysicalPaper);
+router.get('/:id/preview-questions', protect, authorizeRoles('instructor', 'admin', 'super_admin'), aiLimiter, previewQuestions);
+router.post('/:id/print', protect, authorizeRoles('instructor', 'admin', 'super_admin'), aiLimiter, generatePhysicalPaper);
 
 export default router;

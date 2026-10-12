@@ -19,11 +19,18 @@ import { sendAssessmentEnrollmentEmail } from '../helper/emailService.js';
 import { extractTextFromFile, chunkText } from '../helper/textProcessor.js';
 import { generateEmbedding } from '../helper/embeddingGenerator.js';
 import pool from '../DB/db.js';
+import { requireAssessmentAccess } from './assessmentAccess.js';
+import { assertResourcesUsable } from './resource.service.js';
+import { findAssessmentByIdForInstructorQuery } from '../repositories/assessmentRepository.js';
 
 // ==================== SERVICE FUNCTIONS ====================
 
 // 1. CREATE ASSESSMENT BASIC SERVICE
-export const createAssessmentBasicService = async (payload, userId, files) => {
+export const createAssessmentBasicService = async (payload, userId, files, userRole = "instructor") => {
+  await assertResourcesUsable(Array.isArray(payload.selected_resources) ? payload.selected_resources : [], {
+    id: userId,
+    role: userRole,
+  });
   const assessment = await createAssessmentRecord(payload, userId);
 
   await processQuestionBlocks(
@@ -117,12 +124,26 @@ export const getInstructorAssessmentsService = async (instructorId) => {
 };
 
 // 4. GET SINGLE ASSESSMENT SERVICE — Redis removed, always hits DB
-export const getAssessmentService = async (assessmentId, userId, userRole) => {
+export const getAssessmentService = async (assessmentId, user) => {
   if (isNaN(assessmentId)) {
     throw new Error('Invalid assessment ID');
   }
 
-  const assessment = await getAssessmentById(assessmentId, userId, userRole);
+  if (user.role !== 'student') {
+    const owned = await requireAssessmentAccess(assessmentId, user);
+    const full = await findAssessmentByIdForInstructorQuery(owned.id, owned.instructor_id);
+    return {
+      data: {
+        ...full,
+        external_links: full.external_links || [],
+        question_blocks: full.question_blocks || [],
+        resources: full.resources || [],
+      },
+      fromCache: false,
+    };
+  }
+
+  const assessment = await getAssessmentById(assessmentId, user.id, user.role);
   if (!assessment) {
     throw new Error('Assessment not found or access denied');
   }
@@ -131,8 +152,11 @@ export const getAssessmentService = async (assessmentId, userId, userRole) => {
 };
 
 // 5. UPDATE ASSESSMENT SERVICE
-export const updateAssessmentService = async (assessmentId, updateData, userId, files) => {
+export const updateAssessmentService = async (assessmentId, updateData, user, files) => {
+  await requireAssessmentAccess(assessmentId, user, { lockAfterExecution: true });
+  const userId = user.id;
   const { title, prompt, externalLinks, question_blocks, selected_resources } = updateData;
+  await assertResourcesUsable(selected_resources, user);
   const new_files = files || [];
 
   if (!title?.trim()) {
@@ -192,15 +216,8 @@ export const updateAssessmentService = async (assessmentId, updateData, userId, 
 };
 
 // 6. DELETE ASSESSMENT SERVICE
-export const deleteAssessmentService = async (assessmentId, userId, userRole) => {
-  if (!assessmentId || isNaN(parseInt(assessmentId))) {
-    throw new Error('Invalid assessment ID');
-  }
-
-  const assessment = await getAssessmentById(parseInt(assessmentId), userId, userRole);
-  if (!assessment) {
-    throw new Error('Assessment not found or access denied');
-  }
+export const deleteAssessmentService = async (assessmentId, user) => {
+  await requireAssessmentAccess(assessmentId, user, { lockAfterExecution: true });
 
   await deleteAssessment(parseInt(assessmentId));
   return { success: true };
@@ -216,10 +233,7 @@ export const enrollStudentService = async (assessmentId, email, userId, userRole
     throw new Error('Student email is required and must be a valid string');
   }
 
-  const assessment = await getAssessmentById(parseInt(assessmentId), userId, userRole);
-  if (!assessment) {
-    throw new Error('Assessment not found or access denied');
-  }
+  const assessment = await requireAssessmentAccess(assessmentId, { id: userId, role: userRole });
 
   const student = await findUserByEmail(email);
   if (!student) {
@@ -246,10 +260,7 @@ export const unenrollStudentService = async (assessmentId, studentId, userId, us
     throw new Error('Invalid student ID');
   }
 
-  const assessment = await getAssessmentById(parseInt(assessmentId), userId, userRole);
-  if (!assessment) {
-    throw new Error('Assessment not found or access denied');
-  }
+  const assessment = await requireAssessmentAccess(assessmentId, { id: userId, role: userRole });
 
   const result = await unenrollStudent(parseInt(assessmentId), parseInt(studentId));
   return result;
@@ -261,10 +272,7 @@ export const getEnrolledStudentsService = async (assessmentId, userId, userRole)
     throw new Error('Invalid assessment ID');
   }
 
-  const assessment = await getAssessmentById(parseInt(assessmentId), userId, userRole);
-  if (!assessment) {
-    throw new Error('Assessment not found or access denied');
-  }
+  const assessment = await requireAssessmentAccess(assessmentId, { id: userId, role: userRole });
 
   const students = await getEnrolledStudents(parseInt(assessmentId));
   return students;
@@ -272,10 +280,7 @@ export const getEnrolledStudentsService = async (assessmentId, userId, userRole)
 
 // 10. PREVIEW QUESTIONS SERVICE
 export const previewQuestionsService = async (assessmentId, instructorId, userRole) => {
-  const assessment = await getAssessmentById(assessmentId, instructorId, userRole);
-  if (!assessment) {
-    throw new Error('Assessment not found');
-  }
+  const assessment = await requireAssessmentAccess(assessmentId, { id: instructorId, role: userRole });
 
   const { questions } = await generateAssessmentQuestions(assessmentId, 'en', assessment);
   return questions;
@@ -293,10 +298,7 @@ export const generatePhysicalPaperService = async (assessmentId, instructorId, u
     notes = '',
   } = paperData;
 
-  const assessment = await getAssessmentById(assessmentId, instructorId, userRole);
-  if (!assessment) {
-    throw new Error('Assessment not found');
-  }
+  const assessment = await requireAssessmentAccess(assessmentId, { id: instructorId, role: userRole });
 
   const { questions } = await generateAssessmentQuestions(assessmentId, language, assessment);
 

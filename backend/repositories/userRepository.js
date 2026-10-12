@@ -6,8 +6,9 @@ export const createUserQuery = async (userData) => {
   const { name, email, hashedPassword, role, verificationToken, provider, uid } = userData;
   
   const query = `
-    INSERT INTO users (name, email, password, role, verified, verification_token, provider, uid, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+    INSERT INTO users (name, email, password, role, verified, verification_token,
+                       verification_token_expires, provider, uid, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, NOW() + INTERVAL '24 hours', $7, $8, NOW(), NOW())
     RETURNING id, name, email, role, verified, provider, uid, created_at
   `;
   
@@ -61,8 +62,14 @@ export const findUserByUIDQuery = async (uid) => {
   return result.rows[0] || null;
 };
 
+// Only unexpired tokens match. Rows created before expiry was tracked fall
+// back to created_at + 24h.
 export const findUserByVerificationTokenQuery = async (token) => {
-  const query = "SELECT * FROM users WHERE verification_token = $1";
+  const query = `
+    SELECT * FROM users
+    WHERE verification_token = $1
+      AND COALESCE(verification_token_expires, created_at + INTERVAL '24 hours') > NOW()
+  `;
   const result = await pool.query(query, [token]);
   return result.rows[0] || null;
 };
@@ -84,7 +91,7 @@ export const checkUserExistsByEmailQuery = async (email) => {
 export const verifyUserQuery = async (token) => {
   const query = `
     UPDATE users 
-    SET verified = true, verification_token = NULL, updated_at = NOW() 
+    SET verified = true, verification_token = NULL, verification_token_expires = NULL, updated_at = NOW() 
     WHERE verification_token = $1 
     RETURNING id, name, email, role, verified
   `;
@@ -143,19 +150,6 @@ export const deleteUserQuery = async (userId) => {
   return result.rows[0] || null;
 };
 
-export const findRecentlyVerifiedUsersQuery = async () => {
-  const query = `
-    SELECT id, name, email, role, verified, created_at 
-    FROM users 
-    WHERE verified = true AND verification_token IS NULL
-    AND updated_at > NOW() - INTERVAL '1 hour'
-    ORDER BY updated_at DESC
-    LIMIT 5
-  `;
-  const result = await pool.query(query);
-  return result.rows;
-};
-
 // ==================== USER SEARCH & FILTERING ====================
 
 export const findUsersByRoleQuery = async (role) => {
@@ -195,4 +189,13 @@ export const getUserStatsQuery = async () => {
   `;
   const result = await pool.query(query);
   return result.rows[0];
+};
+
+export const setVerificationTokenQuery = async (userId, token) => {
+  await pool.query(
+    `UPDATE users
+     SET verification_token = $2, verification_token_expires = NOW() + INTERVAL '24 hours', updated_at = NOW()
+     WHERE id = $1`,
+    [userId, token]
+  );
 };

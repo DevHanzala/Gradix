@@ -1,100 +1,65 @@
 import nodemailer from "nodemailer";
-import dotenv from "dotenv";
 import {
   verificationEmailTemplate,
   passwordResetEmailTemplate,
-  welcomeEmailTemplate,
+  passwordChangedEmailTemplate,
   roleChangeEmailTemplate,
   assessmentEnrollmentTemplate,
-  assessmentReminderTemplate,
 } from "../utils/emailTemplates.js";
 
-dotenv.config();
-
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
-
-export const sendEmail = async (to, subject, html) => {
-  const result = await transporter.sendMail({
-    from: `"Gradewise AI" <${process.env.EMAIL_USER}>`,
-    to,
-    subject,
-    html,
-    text: html.replace(/<[^>]*>/g, ""),
-  });
-  return { success: true, messageId: result.messageId };
+let transporter = null;
+const getTransporter = () => {
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+    });
+  }
+  return transporter;
 };
 
-export const sendVerificationEmail = async (email, name, token) => {
-  const url = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
-  const { subject, html } = verificationEmailTemplate({ name, verificationUrl: url });
-
-  sendEmail(email, subject, html).catch(console.error);
+/**
+ * Indirection so tests can capture emails instead of sending them.
+ */
+export const mailer = {
+  send: async ({ to, subject, html }) =>
+    getTransporter().sendMail({
+      from: `"Gradix" <${process.env.EMAIL_USER}>`,
+      to,
+      subject,
+      html,
+      text: html.replace(/<[^>]*>/g, ""),
+    }),
 };
 
-export const sendPasswordResetEmail = async (email, name, token) => {
-  const url = `${process.env.FRONTEND_URL}/reset-password/${token}`;
-  const { subject, html } = passwordResetEmailTemplate({ name, resetUrl: url });
-
-  sendEmail(email, subject, html).catch(console.error);
+/**
+ * Fire-and-forget delivery. Call ONLY after the related DB change has been
+ * committed. A failed email is logged and never fails the request.
+ */
+const deliver = (to, { subject, html }) => {
+  Promise.resolve()
+    .then(() => mailer.send({ to, subject, html }))
+    .catch((error) => {
+      console.error(`[email] "${subject}" to ${to} failed: ${error.message}`);
+    });
 };
 
-export const sendWelcomeEmail = async (email, name, role) => {
-  const url = `${process.env.FRONTEND_URL}/dashboard`;
-  const { subject, html } = welcomeEmailTemplate({ name, role, dashboardUrl: url });
+const appUrl = (path) => `${process.env.FRONTEND_URL || ""}${path}`;
 
-  return sendEmail(email, subject, html);
-};
+export const sendVerificationEmail = (email, name, token) =>
+  deliver(email, verificationEmailTemplate({ name, verificationUrl: appUrl(`/verify-email?token=${token}`) }));
 
-export const sendRoleChangeEmail = async (email, name, oldRole, newRole) => {
-  const dashboardUrl = `${process.env.FRONTEND_URL}/dashboard`;
-  const { subject, html } = roleChangeEmailTemplate({
-    name,
-    oldRole,
-    newRole,
-    dashboardUrl,
-  });
+export const sendPasswordResetEmail = (email, name, token) =>
+  deliver(email, passwordResetEmailTemplate({ name, resetUrl: appUrl(`/reset-password/${token}`) }));
 
-  return sendEmail(email, subject, html);
-};
+export const sendPasswordChangedEmail = (email, name) =>
+  deliver(email, passwordChangedEmailTemplate({ name, changedAt: new Date().toISOString().replace("T", " ").slice(0, 16) }));
 
-export const sendAssessmentEnrollmentEmail = async (email, name, assessmentTitle, dueDate) => {
-  const dashboardUrl = `${process.env.FRONTEND_URL}/student/dashboard`;
-  const { subject, html } = assessmentEnrollmentTemplate({
-    name,
-    assessmentTitle,
-    dueDate,
-    dashboardUrl,
-  });
+export const sendRoleChangeEmail = (email, name, oldRole, newRole) =>
+  deliver(email, roleChangeEmailTemplate({ name, oldRole, newRole, dashboardUrl: appUrl("/login") }));
 
-  return sendEmail(email, subject, html);
-};
-
-export const sendAssessmentReminderEmail = async (
-  email,
-  name,
-  assessmentTitle,
-  dueDate,
-  hoursRemaining
-) => {
-  const dashboardUrl = `${process.env.FRONTEND_URL}/dashboard`;
-  const { subject, html } = assessmentReminderTemplate({
-    name,
-    assessmentTitle,
-    dueDate,
-    hoursRemaining,
-    dashboardUrl,
-  });
-
-  return sendEmail(email, subject, html);
-};
-
-export const testEmailConfiguration = async () => {
-  await transporter.verify();
-  return { success: true, message: "Email configuration is valid" };
-};
+export const sendAssessmentEnrollmentEmail = (email, name, assessmentTitle, instructorName) =>
+  deliver(
+    email,
+    assessmentEnrollmentTemplate({ name, assessmentTitle, instructorName, dashboardUrl: appUrl("/student/dashboard") })
+  );

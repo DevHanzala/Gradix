@@ -40,16 +40,18 @@ export const findResourcesByUploaderQuery = async (uploadedBy, visibility = null
   return rows;
 };
 
-export const findAllResourcesQuery = async () => {
+// Resources a user may reuse: every public resource plus their own.
+export const findAllResourcesQuery = async (userId) => {
   const query = `
     SELECT r.*, u.name as uploader_name
     FROM resources r
     JOIN users u ON r.uploaded_by = u.id
     WHERE r.content_type = 'file'
+      AND (r.visibility = 'public' OR r.uploaded_by = $1)
     ORDER BY r.created_at DESC
   `;
-  
-  const { rows } = await pool.query(query);
+
+  const { rows } = await pool.query(query, [userId]);
   return rows;
 };
 

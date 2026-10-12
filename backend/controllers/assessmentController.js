@@ -1,3 +1,4 @@
+import { isAppError } from "../utils/AppError.js";
 import {
   createAssessmentBasicService,
   createNewAssessmentService,
@@ -17,7 +18,7 @@ import { generatePhysicalPaperPDF } from '../helper/Pdfkitgenerator.js';
 // ==================== CONTROLLER FUNCTIONS ====================
 
 // 1. CREATE ASSESSMENT BASIC
-export const createAssessmentBasic = async (req, res) => {
+export const createAssessmentBasic = async (req, res, next) => {
   try {
     //  NORMALIZE FormData JSON fields FIRST
     const parseIfString = (v) => {
@@ -34,17 +35,19 @@ export const createAssessmentBasic = async (req, res) => {
     const assessment = await createAssessmentBasicService(
       req.body,
       req.user.id,
-      req.files
+      req.files,
+      req.user.role
     )
 
     res.status(201).json({ success: true, data: assessment });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
 // 2. CREATE NEW ASSESSMENT  //hold this function for future use
-export const createNewAssessment = async (req, res) => {
+export const createNewAssessment = async (req, res, next) => {
   try {
     const newAssessment = await createNewAssessmentService(req.body, req.user.id, req.files);
 
@@ -54,6 +57,7 @@ export const createNewAssessment = async (req, res) => {
       data: newAssessment,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error('Create assessment error:', error);
     res.status(500).json({
       success: false,
@@ -63,7 +67,7 @@ export const createNewAssessment = async (req, res) => {
 };
 
 // 3. GET ASSESSMENTS FOR INSTRUCTOR 
-export const getInstructorAssessments = async (req, res) => {
+export const getInstructorAssessments = async (req, res, next) => {
   try {
     const { data } = await getInstructorAssessmentsService(req.user.id);
 
@@ -73,6 +77,7 @@ export const getInstructorAssessments = async (req, res) => {
       data,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error('Get assessments error:', error);
     res.status(500).json({
       success: false,
@@ -82,10 +87,10 @@ export const getInstructorAssessments = async (req, res) => {
 };
 
 // 4. GET SINGLE ASSESSMENT
-export const getAssessment = async (req, res) => {
+export const getAssessment = async (req, res, next) => {
   try {
     const assessment_id = parseInt(req.params.id);
-    const { data } = await getAssessmentService(assessment_id, req.user.id, req.user.role);
+    const { data } = await getAssessmentService(assessment_id, req.user);
 
     res.status(200).json({
       success: true,
@@ -93,6 +98,7 @@ export const getAssessment = async (req, res) => {
       data,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error('Get assessment error:', error);
     
     if (error.message === 'Invalid assessment ID') {
@@ -110,7 +116,7 @@ export const getAssessment = async (req, res) => {
 };
 
 // 5. UPDATE ASSESSMENT DATA
-export const updateAssessmentData = async (req, res) => {
+export const updateAssessmentData = async (req, res, next) => {
   try {
     const assessment_id = req.params.id;
     
@@ -125,7 +131,7 @@ export const updateAssessmentData = async (req, res) => {
     const updatedAssessment = await updateAssessmentService(
       assessment_id,
       updateData,
-      req.user.id,
+      req.user,
       req.files
     );
 
@@ -135,6 +141,7 @@ export const updateAssessmentData = async (req, res) => {
       data: updatedAssessment,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error('Update assessment error:', error);
     
     if (error.message.includes('required') || error.message.includes('must provide')) {
@@ -149,17 +156,18 @@ export const updateAssessmentData = async (req, res) => {
 };
 
 // 6. DELETE ASSESSMENT DATA
-export const deleteAssessmentData = async (req, res) => {
+export const deleteAssessmentData = async (req, res, next) => {
   try {
     const assessment_id = req.params.id;
     
-    await deleteAssessmentService(parseInt(assessment_id), req.user.id, req.user.role);
+    await deleteAssessmentService(assessment_id, req.user);
 
     res.status(200).json({
       success: true,
       message: 'Assessment deleted successfully',
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error('❌ Delete assessment error:', error);
     
     if (error.message === 'Invalid assessment ID') {
@@ -178,7 +186,7 @@ export const deleteAssessmentData = async (req, res) => {
 };
 
 // 7. ENROLL STUDENT TO ASSESSMENT
-export const enrollStudentController = async (req, res) => {
+export const enrollStudentController = async (req, res, next) => {
   try {
     const assessmentId = req.params.id;
     const { email } = req.body;
@@ -196,6 +204,7 @@ export const enrollStudentController = async (req, res) => {
       data: enrollment,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error('❌ Error enrolling student:', error.message, error.stack);
     
     if (error.message === 'Student already enrolled') {
@@ -219,7 +228,7 @@ export const enrollStudentController = async (req, res) => {
 };
 
 // 8. UNENROLL STUDENT FROM ASSESSMENT
-export const unenrollStudentController = async (req, res) => {
+export const unenrollStudentController = async (req, res, next) => {
   try {
     const assessmentId = req.params.id;
     const studentId = req.params.studentId;
@@ -237,6 +246,7 @@ export const unenrollStudentController = async (req, res) => {
       data: result,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error('❌ Unenroll student error:', error);
     
     if (error.message.includes('Invalid')) {
@@ -255,7 +265,7 @@ export const unenrollStudentController = async (req, res) => {
 };
 
 // 9. GET ENROLLED STUDENTS FOR ASSESSMENT
-export const getEnrolledStudentsController = async (req, res) => {
+export const getEnrolledStudentsController = async (req, res, next) => {
   try {
     const assessmentId = req.params.id;
 
@@ -271,6 +281,7 @@ export const getEnrolledStudentsController = async (req, res) => {
       data: students,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error('❌ Get enrolled students error:', error);
     
     if (error.message === 'Invalid assessment ID') {
@@ -289,7 +300,7 @@ export const getEnrolledStudentsController = async (req, res) => {
 };
 
 // 10. PREVIEW QUESTIONS FOR ASSESSMENT
-export const previewQuestions = async (req, res) => {
+export const previewQuestions = async (req, res, next) => {
   try {
     const assessmentId = parseInt(req.params.id);
     const instructorId = req.user.id;
@@ -305,6 +316,7 @@ export const previewQuestions = async (req, res) => {
       questions 
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error('[PREVIEW] ERROR:', error.message);
     
     if (error.message === 'Assessment not found') {
@@ -320,7 +332,7 @@ export const previewQuestions = async (req, res) => {
 
 // 11. GENERATE PHYSICAL PAPER FOR ASSESSMENT
 // UPDATED CONTROLLER - Generate PDF on Backend
-export const generatePhysicalPaper = async (req, res) => {
+export const generatePhysicalPaper = async (req, res, next) => {
   try {
     const assessmentId = parseInt(req.params.id);
     const instructorId = req.user.id;
@@ -368,6 +380,7 @@ export const generatePhysicalPaper = async (req, res) => {
     res.end(pdfBuffer);
 
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error('[CONTROLLER] ERROR:', error);
 
     res.status(500).json({ 

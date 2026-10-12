@@ -14,21 +14,21 @@ const router = express.Router();
  * @desc Retrieve instructor's executed assessments
  * @access Private (Instructor)
  */
-router.get("/assessments", protect, getInstructorExecutedAssessments);
+router.get("/assessments", protect, authorizeRoles("instructor"), getInstructorExecutedAssessments);
 
 /**
  * @route GET /api/instructor-analytics/assessment/:id/students
  * @desc Get students who completed a specific assessment
  * @access Private (Instructor)
  */
-router.get("/assessment/:id/students", protect, getAssessmentStudents);
+router.get("/assessment/:id/students", protect, authorizeRoles("instructor"), getAssessmentStudents);
 
 /**
  * @route GET /api/instructor-analytics/assessment/:id/student/:studentId/questions
  * @desc Get a student's questions and answers for a specific assessment
  * @access Private (Instructor)
  */
-router.get("/assessment/:id/student/:studentId/questions", protect, getStudentAttemptQuestions);
+router.get("/assessment/:id/student/:studentId/questions", protect, authorizeRoles("instructor"), getStudentAttemptQuestions);
 
 /**
  * @route   GET /api/instructor-analytics
@@ -39,7 +39,7 @@ router.get("/assessment/:id/student/:studentId/questions", protect, getStudentAt
 router.get(
   "/",
   protect,
-authorizeRoles('instructor', 'admin', 'super_admin'),  // ← SPREAD ARGS,
+  authorizeRoles("instructor"),
   getInstructorOverview
 );
 

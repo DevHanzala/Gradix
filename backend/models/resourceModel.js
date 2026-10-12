@@ -29,9 +29,9 @@ export const findResourcesByUploader = async (uploadedBy, visibility = null) => 
   }
 };
 
-export const findAllResources = async () => {
+export const findAllResources = async (userId) => {
   try {
-    const resources = await resourceRepo.findAllResourcesQuery();
+    const resources = await resourceRepo.findAllResourcesQuery(userId);
     return resources;
   } catch (error) {
     console.error("Error fetching all resources:", error);

@@ -1,3 +1,4 @@
+import { isAppError } from "../utils/AppError.js";
 // RESOURCE CONTROLLER - Request/Response Handler Layer
 import {
   uploadResourceService,
@@ -14,7 +15,7 @@ import {
 // ==================== CONTROLLER FUNCTIONS ====================
 
 // 1. UPLOAD RESOURCE (FILES + URL)
-export const uploadResource = async (req, res) => {
+export const uploadResource = async (req, res, next) => {
   const { name, url, visibility } = req.body;
   const uploadedBy = req.user?.id;
   const files = req.files || [];
@@ -33,6 +34,7 @@ export const uploadResource = async (req, res) => {
       skipped: skippedFiles,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error("Upload resource error:", error);
 
     if (error.message === "NO_FILES_OR_URL") {
@@ -57,7 +59,7 @@ export const uploadResource = async (req, res) => {
 };
 
 // 2. GET INSTRUCTOR'S RESOURCES
-export const getInstructorResources = async (req, res) => {
+export const getInstructorResources = async (req, res, next) => {
   try {
     const instructorId = req.user.id;
     const visibility = req.query.visibility || "all";
@@ -79,6 +81,7 @@ export const getInstructorResources = async (req, res) => {
       visibility: req.query.visibility,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error("Get instructor resources error:", error);
     res.status(500).json({
       success: false,
@@ -88,9 +91,9 @@ export const getInstructorResources = async (req, res) => {
 };
 
 // 3. GET ALL SYSTEM RESOURCES (FILE-BASED)
-export const getAllResources = async (req, res) => {
+export const getAllResources = async (req, res, next) => {
   try {
-    const resources = await getAllResourcesService();
+    const resources = await getAllResourcesService(req.user.id);
 
     res.json({
       success: true,
@@ -98,6 +101,7 @@ export const getAllResources = async (req, res) => {
       data: resources,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error("Get all resources error:", error);
     res.status(500).json({
       success: false,
@@ -107,7 +111,7 @@ export const getAllResources = async (req, res) => {
 };
 
 // 4. GET RESOURCE BY ID
-export const getResourceById = async (req, res) => {
+export const getResourceById = async (req, res, next) => {
   try {
     const resource = await getResourceByIdService(
       req.params.resourceId,
@@ -121,6 +125,7 @@ export const getResourceById = async (req, res) => {
       data: resource,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error("Get resource error:", error);
 
     if (error.message === "RESOURCE_NOT_FOUND") {
@@ -145,7 +150,7 @@ export const getResourceById = async (req, res) => {
 };
 
 // 5. UPDATE RESOURCE
-export const updateResourceController = async (req, res) => {
+export const updateResourceController = async (req, res, next) => {
   try {
     const updated = await updateResourceService(
       req.params.resourceId,
@@ -160,6 +165,7 @@ export const updateResourceController = async (req, res) => {
       data: updated,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error("Update resource error:", error);
 
     if (error.message === "RESOURCE_NOT_FOUND") {
@@ -184,7 +190,7 @@ export const updateResourceController = async (req, res) => {
 };
 
 // 6. DELETE RESOURCE
-export const deleteResourceController = async (req, res) => {
+export const deleteResourceController = async (req, res, next) => {
   try {
     await deleteResourceService(
       req.params.resourceId,
@@ -197,6 +203,7 @@ export const deleteResourceController = async (req, res) => {
       message: "Resource deleted successfully",
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error("Delete resource error:", error);
 
     if (error.message === "RESOURCE_NOT_FOUND") {
@@ -221,7 +228,7 @@ export const deleteResourceController = async (req, res) => {
 };
 
 // 7. LINK RESOURCE TO ASSESSMENT
-export const linkResourceToAssessmentController = async (req, res) => {
+export const linkResourceToAssessmentController = async (req, res, next) => {
   try {
     const { resourceId, assessmentId } = req.params;
 
@@ -238,6 +245,7 @@ export const linkResourceToAssessmentController = async (req, res) => {
       data: link,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error("Link resource error:", error);
 
     if (error.message === "ASSESSMENT_NOT_FOUND") {
@@ -262,7 +270,7 @@ export const linkResourceToAssessmentController = async (req, res) => {
 };
 
 // 8. GET ASSESSMENT RESOURCES
-export const getAssessmentResourcesController = async (req, res) => {
+export const getAssessmentResourcesController = async (req, res, next) => {
   try {
     const resources = await getAssessmentResourcesService(
       req.params.assessmentId,
@@ -276,6 +284,7 @@ export const getAssessmentResourcesController = async (req, res) => {
       data: resources,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error("Get assessment resources error:", error);
 
     if (error.message === "ASSESSMENT_NOT_FOUND") {
@@ -293,7 +302,7 @@ export const getAssessmentResourcesController = async (req, res) => {
 };
 
 // 9. UNLINK RESOURCE FROM ASSESSMENT
-export const unlinkResourceFromAssessmentController = async (req, res) => {
+export const unlinkResourceFromAssessmentController = async (req, res, next) => {
   try {
     const { resourceId, assessmentId } = req.params;
 
@@ -309,6 +318,7 @@ export const unlinkResourceFromAssessmentController = async (req, res) => {
       message: "Resource unlinked successfully",
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error("Unlink resource error:", error);
 
     if (error.message === "ASSESSMENT_NOT_FOUND") {

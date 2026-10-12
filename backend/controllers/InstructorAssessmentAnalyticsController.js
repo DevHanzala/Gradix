@@ -1,3 +1,4 @@
+import { isAppError } from "../utils/AppError.js";
 // INSTRUCTOR ANALYTICS CONTROLLER - Request/Response Handler Layer
 import {
   getInstructorExecutedAssessmentsService,
@@ -9,7 +10,7 @@ import {
 // ==================== CONTROLLER FUNCTIONS ====================
 
 // 1. GET INSTRUCTOR EXECUTED ASSESSMENTS
-export const getInstructorExecutedAssessments = async (req, res) => {
+export const getInstructorExecutedAssessments = async (req, res, next) => {
   try {
     const instructorId = req.user?.id;
 
@@ -26,6 +27,7 @@ export const getInstructorExecutedAssessments = async (req, res) => {
       data: assessments,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error("❌ Error fetching executed assessments:", error);
 
     if (error.message === "UNAUTHORIZED_ROLE") {
@@ -44,7 +46,7 @@ export const getInstructorExecutedAssessments = async (req, res) => {
 };
 
 // 2. GET ASSESSMENT STUDENTS
-export const getAssessmentStudents = async (req, res) => {
+export const getAssessmentStudents = async (req, res, next) => {
   try {
     const assessmentId = parseInt(req.params.id);
     const instructorId = req.user?.id;
@@ -61,6 +63,7 @@ export const getAssessmentStudents = async (req, res) => {
       data,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error("Error fetching assessment students:", error);
 
     if (error.message === "INVALID_REQUEST") {
@@ -78,7 +81,7 @@ export const getAssessmentStudents = async (req, res) => {
 };
 
 // 3. GET STUDENT ATTEMPT QUESTIONS
-export const getStudentAttemptQuestions = async (req, res) => {
+export const getStudentAttemptQuestions = async (req, res, next) => {
   try {
     const assessmentId = parseInt(req.params.id);
     const studentId = parseInt(req.params.studentId);
@@ -99,6 +102,7 @@ export const getStudentAttemptQuestions = async (req, res) => {
       data: questions,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error("❌ Error fetching student attempt questions:", error);
 
     if (error.message === "UNAUTHORIZED_ROLE") {
@@ -125,7 +129,7 @@ export const getStudentAttemptQuestions = async (req, res) => {
 
 
 // 4. GET INSTRUCTOR DASHBOARD OVERVIEW
-export const getInstructorOverview = async (req, res) => {
+export const getInstructorOverview = async (req, res, next) => {
   try {
     const instructorId = req.user.id;
 
@@ -137,6 +141,7 @@ export const getInstructorOverview = async (req, res) => {
       data: overview,
     });
   } catch (error) {
+    if (isAppError(error)) return next(error);
     console.error("❌ Error fetching instructor overview:", error);
     res.status(500).json({
       success: false,
