@@ -1,0 +1,61 @@
+{
+  "name": "gradewise-ai-backend",
+  "version": "1.0.0",
+  "description": "Backend for Gradewise AI - An Intelligent Assessment Platform",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "migrate": "node scripts/migrate.js up",
+    "migrate:down": "node scripts/migrate.js down",
+    "create-super-admin": "node scripts/createSuperAdmin.js",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand --silent",
+    "lint": "eslint .",
+    "seed": "node scripts/seed.js"
+  },
+  "keywords": [
+    "education",
+    "assessment",
+    "ai",
+    "gradewise"
+  ],
+  "author": "Gradewise AI Team",
+  "license": "MIT",
+  "dependencies": {
+    "@google/genai": "^1.21.0",
+    "@napi-rs/canvas": "^1.0.11",
+    "@xenova/transformers": "^2.17.2",
+    "axios": "^1.13.5",
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.7.1",
+    "firebase-admin": "^14.5.0",
+    "groq-sdk": "^0.37.0",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.2",
+    "multer": "^1.4.5-lts.1",
+    "node-pg-migrate": "^9.0.0",
+    "nodemailer": "^6.9.7",
+    "office-text-extractor": "^3.0.3",
+    "pdf-parse": "^1.1.4",
+    "pdf-to-img": "^7.0.1",
+    "pg": "^8.11.3",
+    "puppeteer": "^24.37.3",
+    "tesseract.js": "^6.0.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite-pgvector": "^0.0.9",
+    "@electric-sql/pglite-socket": "^0.2.11",
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.12.0",
+    "globals": "^17.13.0",
+    "jest": "^30.5.2",
+    "nodemon": "^3.1.10",
+    "pdf-lib": "^1.17.1",
+    "supertest": "^7.3.1"
+  }
+}
