@@ -1,5 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef } from "react";
+import { createPortal } from "react-dom";
+import { FaCheckCircle, FaExclamationTriangle, FaInfoCircle, FaTimes, FaTimesCircle } from "react-icons/fa";
 
+const TYPE_STYLES = {
+  success: { icon: FaCheckCircle, color: "text-success-600", bg: "bg-success-50" },
+  error: { icon: FaTimesCircle, color: "text-danger-600", bg: "bg-danger-50" },
+  warning: { icon: FaExclamationTriangle, color: "text-warning-600", bg: "bg-warning-50" },
+  info: { icon: FaInfoCircle, color: "text-primary-600", bg: "bg-primary-50" },
+};
+
+const FOCUSABLE =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/**
+ * Accessible dialog.
+ * - Focus moves into the dialog, Tab is trapped, Escape closes, focus returns on close.
+ * - Full-screen sheet on mobile, centered card from `sm` up.
+ * - Pass `onConfirm` for a confirm dialog (Cancel + Confirm buttons).
+ */
 function Modal({
   isOpen,
   onClose,
@@ -9,198 +27,116 @@ function Modal({
   onConfirm,
   confirmText = "Confirm",
   cancelText = "Cancel",
+  confirmVariant,
+  size = "md",
 }) {
-  const [progress, setProgress] = useState(100);
-  const [isClosing, setIsClosing] = useState(false);
+  const titleId = useId();
+  const panelRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
-  const isConfirmModal = typeof onConfirm === "function";
-
-  // Auto close ONLY for non-confirm modals
   useEffect(() => {
-    if (!isOpen || isConfirmModal) {
-      setProgress(100);
-      setIsClosing(false);
-      return;
-    }
+    if (!isOpen) return undefined;
 
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => Math.max(prev - 100 / 60, 0));
-    }, 100);
+    const previouslyFocused = document.activeElement;
+    const panel = panelRef.current;
+    const firstFocusable = panel?.querySelector(FOCUSABLE);
+    (firstFocusable || panel)?.focus();
 
-    const timer = setTimeout(() => {
-      handleClose();
-    }, 6000);
-
-    return () => {
-      clearTimeout(timer);
-      clearInterval(progressInterval);
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onCloseRef.current?.();
+        return;
+      }
+      if (event.key !== "Tab" || !panel) return;
+      const items = Array.from(panel.querySelectorAll(FOCUSABLE));
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
-  }, [isOpen, isConfirmModal]);
 
-  // Prevent background scroll
-  useEffect(() => {
-    if (isOpen) document.body.style.overflow = "hidden";
-    return () => (document.body.style.overflow = "unset");
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleClose = () => {
-    setIsClosing(true);
-    setTimeout(() => onClose(), 300);
-  };
+  const style = TYPE_STYLES[type] || TYPE_STYLES.info;
+  const Icon = style.icon;
+  const isConfirm = typeof onConfirm === "function";
+  const widths = { sm: "sm:max-w-sm", md: "sm:max-w-md", lg: "sm:max-w-2xl", xl: "sm:max-w-4xl" };
+  const danger = confirmVariant === "danger" || (isConfirm && type === "warning");
 
   const handleConfirm = async () => {
     await onConfirm();
-    handleClose();
+    onCloseRef.current?.();
   };
 
-  const getTypeStyles = () => {
-    switch (type) {
-      case "success":
-        return {
-          bg: "bg-gradient-to-br from-green-50 to-emerald-50",
-          border: "border-green-500",
-          icon: "✓",
-          iconBg: "bg-gradient-to-br from-green-500 to-emerald-600",
-          text: "text-green-900",
-          progressBg: "bg-green-500",
-        };
-      case "error":
-        return {
-          bg: "bg-gradient-to-br from-red-50 to-pink-50",
-          border: "border-red-500",
-          icon: "✕",
-          iconBg: "bg-gradient-to-br from-red-500 to-pink-600",
-          text: "text-red-900",
-          progressBg: "bg-red-500",
-        };
-      case "warning":
-        return {
-          bg: "bg-gradient-to-br from-yellow-50 to-amber-50",
-          border: "border-yellow-500",
-          icon: "⚠",
-          iconBg: "bg-gradient-to-br from-yellow-500 to-amber-600",
-          text: "text-yellow-900",
-          progressBg: "bg-yellow-500",
-        };
-      default:
-        return {
-          bg: "bg-gradient-to-br from-blue-50 to-indigo-50",
-          border: "border-blue-500",
-          icon: "ℹ",
-          iconBg: "bg-gradient-to-br from-blue-500 to-indigo-600",
-          text: "text-blue-900",
-          progressBg: "bg-blue-500",
-        };
-    }
-  };
-
-  const styles = getTypeStyles();
-
-  return (
-    <div className="fixed inset-0 z-50 pointer-events-none">
-      {/* Toast Container - WIDER and better positioned */}
-      <div className="fixed top-4 right-4 left-1 sm:left-auto sm:right-6 md:right-8 pointer-events-auto w-full sm:max-w-md md:max-w-lg lg:max-w-xl">
-        <div
-          className={`
-            bg-white rounded-2xl shadow-2xl border-l-4 ${styles.border}
-            transform transition-all duration-300 ease-out
-            ${isClosing 
-              ? "translate-x-full opacity-0 scale-95" 
-              : "translate-x-0 opacity-100 scale-100"
-            }
-          `}
-          style={{
-            animation: !isClosing ? 'slideInRight 0.3s ease-out' : undefined
-          }}
-        >
-          {/* Close Button */}
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
+      <div className="absolute inset-0 bg-gray-900/50" aria-hidden="true" onClick={() => onCloseRef.current?.()} />
+      <div
+        ref={panelRef}
+        role={type === "error" || type === "warning" ? "alertdialog" : "dialog"}
+        aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
+        tabIndex={-1}
+        className={`relative flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-xl focus:outline-none sm:max-h-[85vh] sm:rounded-2xl ${widths[size] || widths.md}`}
+      >
+        <div className="flex items-start gap-3 border-b border-line px-5 py-4">
+          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${style.bg} ${style.color}`}>
+            <Icon aria-hidden="true" />
+          </span>
+          {title && (
+            <h2 id={titleId} className="flex-1 pt-1 text-lg font-semibold text-ink">
+              {title}
+            </h2>
+          )}
           <button
-            onClick={handleClose}
-            className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-800 transition-all duration-200 hover:scale-110 active:scale-95 shadow-sm z-10"
-            aria-label="Close notification"
+            type="button"
+            onClick={() => onCloseRef.current?.()}
+            className="-me-2 inline-flex h-11 w-11 items-center justify-center rounded-lg text-ink-muted hover:bg-gray-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary-200"
+            aria-label="Close"
           >
-            <span className="text-lg leading-none">×</span>
+            <FaTimes aria-hidden="true" />
           </button>
+        </div>
 
-          {/* Content Area */}
-          <div className={`p-5 sm:p-6 ${styles.bg} rounded-2xl`}>
-            <div className="flex items-start gap-4 mb-3">
-              {/* Icon Badge */}
-              <div
-                className={`
-                  flex-shrink-0 w-10 h-10 sm:w-12 sm:h-12 rounded-full ${styles.iconBg}
-                  flex items-center justify-center text-white text-xl sm:text-2xl font-bold
-                  shadow-lg
-                `}
-              >
-                {styles.icon}
-              </div>
+        <div className="overflow-y-auto px-5 py-4 text-ink-muted">{children}</div>
 
-              {/* Text Content */}
-              <div className="flex-1 pr-6">
-                <h3 className={`text-base sm:text-lg font-bold ${styles.text} mb-1.5 leading-tight`}>
-                  {title}
-                </h3>
-                <div className="text-sm sm:text-base text-gray-700 leading-relaxed">
-                  {children}
-                </div>
-              </div>
-            </div>
-
-            {/* ACTION BUTTONS (ONLY FOR CONFIRM MODALS) */}
-            {isConfirmModal && (
-              <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 mt-5 pt-4 border-t border-gray-200">
-                <button
-                  onClick={handleClose}
-                  className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-sm font-semibold text-gray-700 transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm"
-                >
-                  {cancelText}
-                </button>
-
-                <button
-                  onClick={handleConfirm}
-                  className={`
-                    w-full sm:w-auto px-5 py-2.5 rounded-xl text-white text-sm font-semibold
-                    transition-all duration-200 hover:scale-105 active:scale-95 shadow-lg
-                    ${type === "warning"
-                      ? "bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800"
-                      : "bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800"
-                    }
-                  `}
-                >
-                  {confirmText}
-                </button>
-              </div>
-            )}
-
-            {/* PROGRESS BAR (ONLY FOR AUTO-CLOSE MODALS) */}
-            {!isConfirmModal && (
-              <div className="mt-4 h-1.5 bg-gray-200 rounded-full overflow-hidden shadow-inner">
-                <div
-                  className={`h-full ${styles.progressBg} transition-all duration-100 ease-linear rounded-full`}
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-            )}
-          </div>
+        <div className="flex flex-col-reverse gap-3 border-t border-line px-5 py-4 sm:flex-row sm:justify-end">
+          {isConfirm ? (
+            <>
+              <button type="button" className="btn-secondary" onClick={() => onCloseRef.current?.()}>
+                {cancelText}
+              </button>
+              <button type="button" className={danger ? "btn-danger" : "btn-primary"} onClick={handleConfirm}>
+                {confirmText}
+              </button>
+            </>
+          ) : (
+            <button type="button" className="btn-primary" onClick={() => onCloseRef.current?.()}>
+              OK
+            </button>
+          )}
         </div>
       </div>
-
-      <style>{`
-        @keyframes slideInRight {
-          from {
-            transform: translateX(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-      `}</style>
-    </div>
+    </div>,
+    document.body
   );
 }
 

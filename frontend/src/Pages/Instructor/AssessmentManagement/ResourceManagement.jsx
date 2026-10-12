@@ -4,7 +4,7 @@ import useResourceStore from "../../../store/resourceStore.js";
 import { Card, CardHeader, CardContent } from "../../../components/ui/Card";
 import LoadingSpinner from "../../../components/ui/LoadingSpinner";
 import Modal from "../../../components/ui/Modal";
-import { validateFiles } from "../../../scheema/resourceSchema.js";
+import { validateFiles } from "../../../schemas/resourceSchema.js";
 
 function ResourceManagement() {
   const navigate = useNavigate();

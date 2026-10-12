@@ -1,7 +1,5 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { signInWithPopup } from "firebase/auth";
-import { auth, googleProvider } from "../config/firebase";
 
 import {
   loginApi,
@@ -46,6 +44,11 @@ const useAuthStore = create(
 
       googleAuth: async () => {
         try {
+          // Firebase is loaded only when Google sign-in is used (keeps it out of the main bundle).
+          const [{ signInWithPopup }, { auth, googleProvider }] = await Promise.all([
+            import("firebase/auth"),
+            import("../config/firebase"),
+          ]);
           const result = await signInWithPopup(auth, googleProvider);
           // The backend verifies this token with Firebase Admin and derives
           // the user's identity from it; nothing else is trusted.
@@ -81,8 +84,9 @@ const useAuthStore = create(
 
       registerStudent: async (studentData) => {
         try {
-          const { role, ...cleanedData } = studentData;
-          const response = await registerStudentApi(cleanedData);
+          // New accounts are always students; never forward a role field.
+          const { name, email, password } = studentData;
+          const response = await registerStudentApi({ name, email, password });
           return response.data;
         } catch (error) {
           throw error.response?.data || error;

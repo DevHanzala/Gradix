@@ -45,7 +45,7 @@ const [deleteTarget, setDeleteTarget] = useState(null);
       setIsLoading(true);
       try {
         await getInstructorAssessments();
-      } catch (error) {
+      } catch {
 setModal({
   isOpen: true,
   type: "error",

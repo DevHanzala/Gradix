@@ -66,7 +66,7 @@ const StudentAnalytics = () => {
         });
       }, 300);
     }
-  }, [selectedAssessmentDetails, showType]);
+  }, [selectedAssessment, selectedAssessmentDetails, showType]);
 
   useEffect(() => {
     if (
@@ -83,7 +83,7 @@ const StudentAnalytics = () => {
         });
       }, 300);
     }
-  }, [questions, showType]);
+  }, [selectedAssessment, questions, showType]);
 
   const formatTime = (seconds) => {
     if (!seconds) return "0m 0s";

@@ -96,20 +96,6 @@ function AssessmentAnalytics() {
     );
   }
 
-  // SMART COMPARISON — WORKS FOR ALL QUESTION TYPES
-  const isAnswerCorrect = (correct, student, type) => {
-    if (!student) return false;
-
-    let c = String(correct || "").trim();
-    let s = String(student || "").trim();
-
-    // Remove escaped quotes and extra spaces
-    c = c.replace(/\\"/g, '"').replace(/^["'\s]+|["'\s]+$/g, '').trim();
-    s = s.replace(/\\"/g, '"').replace(/^["'\s]+|["'\s]+$/g, '').trim();
-
-    return c.toLowerCase() === s.toLowerCase();
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-8 sm:py-12 max-w-7xl">
@@ -323,7 +309,8 @@ function AssessmentAnalytics() {
               <CardContent className="p-6 sm:p-8">
                 <div className="space-y-6">
                   {studentQuestions.map((q, i) => {
-                    const isCorrect = isAnswerCorrect(q.correct_answer, q.student_answer, q.question_type);
+                    // Graded on the server with the same function used at submission.
+                    const isCorrect = Boolean(q.is_correct);
 
                     return (
                       <div 
@@ -348,7 +335,7 @@ function AssessmentAnalytics() {
                           <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
                             <strong className="text-sm font-semibold text-gray-700 uppercase block mb-2">Options:</strong>
                             <ul className="space-y-1">
-                              {(typeof q.options === "string" ? JSON.parse(q.options) : q.options).map((opt, idx) => (
+                              {q.options.map((opt, idx) => (
                                 <li key={idx} className="text-sm text-gray-700 flex items-start gap-2">
                                   <span className="text-blue-600 font-bold">•</span>
                                   <span>{opt}</span>

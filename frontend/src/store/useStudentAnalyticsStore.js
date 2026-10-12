@@ -1,37 +1,30 @@
 import { create } from "zustand";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
-import useAuthStore from "./authStore.js";
 import {
-  fetchOverviewAPI,
   fetchAssessmentsAPI,
-  fetchPerformanceAPI,
-  fetchRecommendationsAPI,
   fetchAssessmentDetailsAPI,
   fetchReportAPI,
   fetchAssessmentQuestionsAPI,
 } from "../api/studentAnalytics.api.js";
+import { reportError } from "../utils/reportError.js";
 
 const useStudentAnalyticsStore = create((set) => ({
-   assessments: [],
+  assessments: [],
   selectedAssessment: null,
-  analytics: null,
-  performance: [],
-  recommendations: null,
   selectedAssessmentDetails: null,
-  loading: false,
-  error: null,
   questions: [],
-questionsLoading: false,
+  loading: false,
+  questionsLoading: false,
+  downloading: false,
+  error: null,
 
-
-fetchAssessments: async () => {
+  /** Enrolled assessments with status (not_started / in_progress / completed). */
+  fetchAssessments: async () => {
+    set({ loading: true, error: null });
     try {
-      set({ loading: true, error: null });
       const res = await fetchAssessmentsAPI();
       set({ assessments: res.data.data || [] });
     } catch (err) {
-      set({ assessments: [], error: err.message });
+      set({ assessments: [], error: reportError(err, "Could not load your assessments.", { silent: true }) });
     } finally {
       set({ loading: false });
     }
@@ -39,85 +32,44 @@ fetchAssessments: async () => {
 
   setSelectedAssessment: (id) => set({ selectedAssessment: id }),
 
-
-  fetchOverview: async () => {
-    try {
-      set({ loading: true });
-      const res = await fetchOverviewAPI();
-      set({ analytics: res.data.data });
-    } catch (err) {
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  fetchPerformance: async (timeRange = "month") => {
-    try {
-      set({ loading: true });
-      const res = await fetchPerformanceAPI(timeRange);
-      set({ performance: res.data.data.performance_data || [] });
-    } catch (err) {
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  fetchRecommendations: async () => {
-    try {
-      set({ loading: true });
-      const res = await fetchRecommendationsAPI();
-      set({ recommendations: res.data.data });
-    } catch (err) {
-    } finally {
-      set({ loading: false });
-    }
-  },
-
   fetchAssessmentDetails: async (id) => {
+    set({ loading: true, selectedAssessmentDetails: null });
     try {
-      set({ loading: true });
       const res = await fetchAssessmentDetailsAPI(id);
       set({ selectedAssessmentDetails: res.data.data });
     } catch (err) {
+      reportError(err, "Could not load the results for this assessment.");
     } finally {
       set({ loading: false });
     }
   },
 
   fetchAssessmentQuestions: async (assessmentId) => {
-  try {
-    set({ questionsLoading: true });
-    const res = await fetchAssessmentQuestionsAPI(assessmentId);
-    set({ questions: res.data.data || [] });
-  } catch (err) {
-    set({ error: err.message || "Failed to fetch questions" });
-  } finally {
-    set({ questionsLoading: false });
-  }
-},
-
-
-  downloadReport: async (assessmentId) => {
+    set({ questionsLoading: true, questions: [] });
     try {
-      set({ loading: true });
-      const res = await fetchReportAPI(assessmentId);
-      const details = res.data.data;
-      const { user } = useAuthStore.getState();
-
-      const container = document.createElement("div");
-      container.innerHTML = `<h1>${details.assessment_title}</h1>`;
-      document.body.appendChild(container);
-
-      const canvas = await html2canvas(container);
-      const pdf = new jsPDF();
-      pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, 210, 297);
-      pdf.save(`Assessment_Report_${assessmentId}.pdf`);
-
-      document.body.removeChild(container);
+      const res = await fetchAssessmentQuestionsAPI(assessmentId);
+      set({ questions: res.data.data || [] });
     } catch (err) {
-      toast.error("Failed to generate report");
+      reportError(err, "Could not load the questions for this assessment.");
     } finally {
-      set({ loading: false });
+      set({ questionsLoading: false });
+    }
+  },
+
+  /** Build and download a PDF with the stats, weak areas and study plan. */
+  downloadReport: async (assessmentId) => {
+    set({ downloading: true });
+    try {
+      const [res, { buildStudentReportPdf }] = await Promise.all([
+        fetchReportAPI(assessmentId),
+        import("../utils/studentReportPdf.js"), // jsPDF is only loaded on demand
+      ]);
+      const pdf = await buildStudentReportPdf(res.data.data);
+      pdf.save(`Assessment_Report_${assessmentId}.pdf`);
+    } catch (err) {
+      reportError(err, "Could not generate the report.");
+    } finally {
+      set({ downloading: false });
     }
   },
 }));

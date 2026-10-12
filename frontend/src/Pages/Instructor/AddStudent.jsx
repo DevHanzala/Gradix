@@ -8,8 +8,7 @@ import { FaUser, FaEnvelope, FaLock, FaUserPlus, FaArrowLeft, FaUserGraduate } f
 import {
   registerStudentSchema,
   enrollStudentSchema,
-} from "../../scheema/studentSchemas.js";
-import { email } from "zod";
+} from "../../schemas/studentSchemas.js";
 
 
 function AddStudent({ assessmentId, onStudentAdded, compact = false }) {
@@ -90,7 +89,6 @@ try {
   };
 
 const handleEnroll = async (e) => {
-  console.log("Enroll calling.....")
   e.preventDefault();
   try {
     enrollStudentSchema.parse({ email: formData.email });
@@ -105,7 +103,6 @@ const handleEnroll = async (e) => {
 
   try {
     await enrollStudent(assessmentId, formData.email.trim());
-    console.log(email)
     showModal("success", "Success", "Student enrolled successfully!");
     setFormData((prev) => ({ ...prev, email: "" }));
     onStudentAdded?.();

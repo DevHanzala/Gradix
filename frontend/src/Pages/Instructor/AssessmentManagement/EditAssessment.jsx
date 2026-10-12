@@ -5,7 +5,7 @@ import useResourceStore from "../../../store/resourceStore.js";
 import { Card, CardHeader, CardContent } from "../../../components/ui/Card";
 import LoadingSpinner from "../../../components/ui/LoadingSpinner";
 import Modal from "../../../components/ui/Modal";
-import { validateAssessmentForm, validateFiles } from "../../../scheema/editAssessmnetSchemas.js";
+import { validateAssessmentForm, validateFiles } from "../../../schemas/editAssessmentSchemas.js";
 
 function EditAssessment() {
   const { id } = useParams();
@@ -71,7 +71,6 @@ function EditAssessment() {
           ? currentAssessment.resources.map(r => r.id).filter(id => id && !isNaN(id))
           : []
       );
-      console.log(`🔍 Loaded selectedResources:`, currentAssessment.resources?.map(r => r.id));
     }
   }, [currentAssessment]);
 
@@ -189,8 +188,6 @@ function EditAssessment() {
     
     const assessmentData = new FormData();
 
-    console.log("DEBUG: Frontend EditAssessment - Title before append:", formData.title, "Trimmed:", formData.title.trim());
-
     assessmentData.append("title", formData.title.trim());
 
     if (formData.prompt?.trim()) {
@@ -212,19 +209,12 @@ function EditAssessment() {
     
     assessmentData.append("selected_resources", JSON.stringify(selectedResources));
     newFiles.forEach(f => assessmentData.append("files", f));
-    
-
-    console.log("DEBUG: Frontend EditAssessment - FormData contents:");
-    for (let [key, value] of assessmentData.entries()) {
-      console.log(`  ${key}: ${value}`);
-    }
 
     try {
       await updateAssessment(parseInt(id), assessmentData);
       setModal({ isOpen: true, type: "success", title: "Success!", message: "Assessment updated!" });
       setTimeout(() => navigate("/instructor/assessments"), 1500);
     } catch (err) {
-      console.error("DEBUG: Frontend EditAssessment - Update error:", err);
       setModal({ isOpen: true, type: "error", title: "Error", message: err.message || "Update failed" });
     } finally {
       setIsProcessing(false);

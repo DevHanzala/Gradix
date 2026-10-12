@@ -5,10 +5,10 @@ import useResourceStore from "../../../store/resourceStore.js";
 import { Card, CardHeader, CardContent } from "../../../components/ui/Card";
 import LoadingSpinner from "../../../components/ui/LoadingSpinner";
 import Modal from "../../../components/ui/Modal";
-import { createAssessmentSchema } from "../../../scheema/assessmentSchemas.js";
+import { createAssessmentSchema } from "../../../schemas/assessmentSchemas.js";
 function CreateAssessment() {
   const navigate = useNavigate();
-  const { createAssessment, loading, error } = useAssessmentStore();
+  const { createAssessment, loading } = useAssessmentStore();
   const { resources, fetchAllResources, loading: resourcesLoading } = useResourceStore();
   const [modal, setModal] = useState({ isOpen: false, type: "info", title: "", message: "" });
 const [isProcessing, setIsProcessing] = useState(false);

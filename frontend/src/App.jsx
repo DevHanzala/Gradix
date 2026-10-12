@@ -37,7 +37,7 @@ const SuperAdminDashboard = lazy(() =>
 
 /* Instructor */
 const InstructorDashboard = lazy(() =>
-  import("./Pages/Instructor/InstructorDashborad")
+  import("./Pages/Instructor/InstructorDashboard")
 );
 const CreateAssessment = lazy(() =>
   import("./Pages/Instructor/AssessmentManagement/CreateAssessment")
@@ -69,10 +69,10 @@ const AssessmentPreview = lazy(() =>
 
 /* Student */
 const StudentDashboard = lazy(() =>
-  import("./Pages/Student/StudentDashborad")
+  import("./Pages/Student/StudentDashboard")
 );
 const TakeAssessment = lazy(() =>
-  import("./Pages/Student/AssesmentManagement/TakeAssessment")
+  import("./Pages/Student/AssessmentManagement/TakeAssessment")
 );
 const StudentAnalytics = lazy(() =>
   import("./Pages/Student/StudentAnalytics")
@@ -82,6 +82,19 @@ const StudentAnalytics = lazy(() =>
 const ProtectedRoute = lazy(() =>
   import("./components/ProtectedRoutes")
 );
+
+const INSTRUCTOR_ROUTES = [
+  { path: "/instructor/resources", page: ResourceManagement },
+  { path: "/instructor/assessments", page: AssessmentList },
+  { path: "/instructor/assessments/create", page: CreateAssessment },
+  { path: "/instructor/assessments/:id", page: AssessmentDetail },
+  { path: "/instructor/assessments/:id/edit", page: EditAssessment },
+  { path: "/instructor/assessments/:assessmentId/enroll", page: EnrollStudents },
+  { path: "/instructor/assessments/:assessmentId/resources", page: ResourceManagement },
+  { path: "/instructor/assessments/:assessmentId/analytics", page: AssessmentAnalytics },
+  { path: "/instructor/assessments/:id/preview", page: AssessmentPreview },
+  { path: "/instructor/students", page: AddStudent },
+];
 
 /* Layouts */
 import MainLayout from "./layouts/MainLayout";
@@ -188,30 +201,22 @@ function App() {
             }
           />
 
-          {[
-            ["/instructor/resources", ResourceManagement],
-            ["/instructor/assessments", AssessmentList],
-            ["/instructor/assessments/create", CreateAssessment],
-            ["/instructor/assessments/:id", AssessmentDetail],
-            ["/instructor/assessments/:id/edit", EditAssessment],
-            ["/instructor/assessments/:assessmentId/enroll", EnrollStudents],
-            ["/instructor/assessments/:assessmentId/resources", ResourceManagement],
-            ["/instructor/assessments/:assessmentId/analytics", AssessmentAnalytics],
-            ["/instructor/assessments/:id/preview", AssessmentPreview],
-            ["/instructor/students", AddStudent],
-          ].map(([path, Component]) => (
-            <Route
-              key={path}
-              path={path}
-              element={
-                <ProtectedRoute allowedRoles={["instructor"]}>
-                  <MainLayout>
-                    <Component />
-                  </MainLayout>
-                </ProtectedRoute>
-              }
-            />
-          ))}
+          {INSTRUCTOR_ROUTES.map((route) => {
+            const Page = route.page;
+            return (
+              <Route
+                key={route.path}
+                path={route.path}
+                element={
+                  <ProtectedRoute allowedRoles={["instructor"]}>
+                    <MainLayout>
+                      <Page />
+                    </MainLayout>
+                  </ProtectedRoute>
+                }
+              />
+            );
+          })}
 
           {/* STUDENT */}
           <Route

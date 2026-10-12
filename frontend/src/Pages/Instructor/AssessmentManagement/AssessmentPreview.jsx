@@ -29,7 +29,7 @@ function AssessmentPreview() {
     if (tab === "assessment" && assessment) {
       loadPreviewQuestions();
     }
-  }, [tab, assessment]);
+  }, [tab, assessment, loadPreviewQuestions]);
 
   const handleCopyPrompt = () => {
     if (!assessment) return;

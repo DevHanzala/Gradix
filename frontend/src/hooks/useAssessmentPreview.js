@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { reportError } from "../utils/reportError.js";
 import useAssessmentStore from "../store/assessmentStore.js";
 
 function useAssessmentPreview(assessmentId) {
@@ -20,7 +21,7 @@ function useAssessmentPreview(assessmentId) {
         setAssessment(data);
         setError(null);
       } catch (err) {
-        setError("Failed to load assessment. Please try again.");
+        setError(reportError(err, "Failed to load assessment. Please try again.", { silent: true }));
       } finally {
         setLoading(false);
       }
@@ -29,7 +30,7 @@ function useAssessmentPreview(assessmentId) {
   }, [assessmentId, getAssessmentById]);
 
   // Load preview questions
-  const loadPreviewQuestions = async () => {
+  const loadPreviewQuestions = useCallback(async () => {
     if (!assessment || questions.length > 0 || questionError) return;
 
     setQuestionsLoading(true);
@@ -43,11 +44,11 @@ function useAssessmentPreview(assessmentId) {
 
       setQuestions(q);
     } catch (err) {
-      setQuestionError("Failed to generate sample questions. Please retry.");
+      setQuestionError(reportError(err, "Failed to generate sample questions. Please retry.", { silent: true }));
     } finally {
       setQuestionsLoading(false);
     }
-  };
+  }, [assessment, questions.length, questionError, assessmentId, fetchPreviewQuestions]);
 
   return {
     assessment,

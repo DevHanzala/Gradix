@@ -12,17 +12,9 @@ function EnrollStudents() {
   const [modal, setModal] = useState({ isOpen: false, type: "info", title: "", message: "" });
 
   useEffect(() => {
-    const fetch = async () => {
-      setIsLoading(true);
-      try {
-        await getEnrolledStudents(assessmentId);
-      } catch (err) {
-        showModal("error", "Error", err.message || "Failed to load students");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetch();
+    getEnrolledStudents(assessmentId).catch((err) =>
+      setModal({ isOpen: true, type: "error", title: "Error", message: err?.response?.data?.message || err.message || "Failed to load students" })
+    );
   }, [assessmentId, getEnrolledStudents]);
 
   const handleUnenroll = async (studentId) => {

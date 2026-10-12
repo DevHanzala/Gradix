@@ -5,7 +5,7 @@ import { Card, CardContent } from "../components/ui/Card.jsx";
 import LoadingSpinner from "../components/ui/LoadingSpinner.jsx";
 import Modal from "../components/ui/Modal.jsx";
 import { FaEnvelope, FaPaperPlane, FaArrowLeft, FaLock } from "react-icons/fa";
-import { resetPasswordSchema } from "../scheema/passwordSchemas.js";
+import { resetPasswordSchema } from "../schemas/passwordSchemas.js";
 function ResetPassword() {
   const navigate = useNavigate();
   const forgotPassword = useAuthStore((state) => state.forgotPassword);

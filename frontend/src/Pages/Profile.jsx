@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import useAuthStore from "../store/authStore.js";
-import { changePasswordSchema } from "../scheema/passwordSchemas.js";
+import { changePasswordSchema } from "../schemas/passwordSchemas.js";
 import { dashboardPathForRole } from "../utils/redirectByRole.js";
 import { ROLE_LABELS } from "../utils/rolePermissions.js";
 

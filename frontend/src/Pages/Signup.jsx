@@ -8,7 +8,7 @@ import {  getCaptchaToken } from "../config/captcha.js";
 import { FaUser, FaEnvelope, FaLock, FaUserPlus, FaGoogle, FaGraduationCap } from "react-icons/fa";
 import { redirectByRole } from "../utils/redirectByRole.js";
 import useRecaptchaInit from "../hooks/useRecaptchaInit.js";
-import { signupSchema } from "../scheema/authSchemas.js";
+import { signupSchema } from "../schemas/authSchemas.js";
 import { z } from "zod";
 
 function Signup() {

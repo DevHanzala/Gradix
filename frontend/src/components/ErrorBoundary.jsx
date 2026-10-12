@@ -76,7 +76,7 @@ class ErrorBoundary extends Component {
             </div>
 
             {/* Technical Details (Collapsible - Optional) */}
-            {process.env.NODE_ENV === 'development' && this.state.errorInfo && (
+            {import.meta.env.DEV && this.state.errorInfo && (
               <details className="mt-6 text-left">
                 <summary className="cursor-pointer text-sm font-semibold text-gray-700 hover:text-blue-600 transition-colors">
                   🔍 Show Technical Details (Dev Mode)
