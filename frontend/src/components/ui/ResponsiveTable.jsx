@@ -5,8 +5,16 @@
  *   - `primary` columns become the card title on mobile.
  * rows: array of objects; rowKey: (row) => key
  * actions?(row): node rendered in the last column / card footer.
+ * breakpoint: "md" (default) or "lg" — where the table replaces the cards.
+ *   Use "lg" for wide rows (e.g. inline form controls).
  */
-function ResponsiveTable({ columns, rows, rowKey = (row) => row.id, actions, caption }) {
+const BREAKPOINTS = {
+  md: { table: "hidden md:block", cards: "md:hidden" },
+  lg: { table: "hidden lg:block", cards: "lg:hidden" },
+};
+
+function ResponsiveTable({ columns, rows, rowKey = (row) => row.id, actions, caption, breakpoint = "md" }) {
+  const bp = BREAKPOINTS[breakpoint] || BREAKPOINTS.md;
   const cell = (column, row) => (column.render ? column.render(row) : row[column.key]);
   const primary = columns.filter((c) => c.primary);
   const secondary = columns.filter((c) => !c.primary);
@@ -14,7 +22,7 @@ function ResponsiveTable({ columns, rows, rowKey = (row) => row.id, actions, cap
   return (
     <>
       {/* Desktop / tablet */}
-      <div className="hidden overflow-x-auto md:block">
+      <div className={`${bp.table} overflow-x-auto`}>
         <table className="min-w-full divide-y divide-line text-sm">
           {caption && <caption className="sr-only">{caption}</caption>}
           <thead className="bg-gray-50">
@@ -51,7 +59,7 @@ function ResponsiveTable({ columns, rows, rowKey = (row) => row.id, actions, cap
       </div>
 
       {/* Mobile */}
-      <ul className="divide-y divide-line md:hidden">
+      <ul className={`divide-y divide-line ${bp.cards}`}>
         {rows.map((row) => (
           <li key={rowKey(row)} className="space-y-2 p-4">
             {primary.map((c) => (

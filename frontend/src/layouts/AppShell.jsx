@@ -178,7 +178,7 @@ function AppShell({ children }) {
             </div>
             <Link
               to="/profile"
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100 font-semibold text-primary-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary-200"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-primary-100 font-semibold text-primary-700 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary-200"
               aria-label="My profile"
             >
               {(user?.name || "?").trim().charAt(0).toUpperCase()}

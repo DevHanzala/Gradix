@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { FaCheckCircle, FaExclamationTriangle, FaInfoCircle, FaTimes, FaTimesCircle } from "react-icons/fa";
 
 const TYPE_STYLES = {
-  success: { icon: FaCheckCircle, color: "text-success-600", bg: "bg-success-50" },
+  success: { icon: FaCheckCircle, color: "text-success-700", bg: "bg-success-50" },
   error: { icon: FaTimesCircle, color: "text-danger-600", bg: "bg-danger-50" },
   warning: { icon: FaExclamationTriangle, color: "text-warning-600", bg: "bg-warning-50" },
   info: { icon: FaInfoCircle, color: "text-primary-600", bg: "bg-primary-50" },
@@ -15,7 +15,7 @@ const FOCUSABLE =
 /**
  * Accessible dialog.
  * - Focus moves into the dialog, Tab is trapped, Escape closes, focus returns on close.
- * - Full-screen sheet on mobile, centered card from `sm` up.
+ * - Full-screen on phones, centered card from `sm` up.
  * - Pass `onConfirm` for a confirm dialog (Cancel + Confirm buttons),
  *   or `footer` to render custom actions (e.g. a form dialog).
  */
@@ -90,7 +90,7 @@ function Modal({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-stretch justify-center sm:items-center sm:p-4">
       <div className="absolute inset-0 bg-gray-900/50" aria-hidden="true" onClick={() => onCloseRef.current?.()} />
       <div
         ref={panelRef}
@@ -98,7 +98,7 @@ function Modal({
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
         tabIndex={-1}
-        className={`relative flex max-h-[100dvh] w-full flex-col overflow-hidden rounded-t-2xl bg-surface shadow-xl focus:outline-none sm:max-h-[85vh] sm:rounded-2xl ${widths[size] || widths.md}`}
+        className={`relative flex h-[100dvh] w-full flex-col overflow-hidden bg-surface shadow-xl focus:outline-none sm:h-auto sm:max-h-[85vh] sm:rounded-2xl ${widths[size] || widths.md}`}
       >
         <div className="flex items-start gap-3 border-b border-line px-5 py-4">
           <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${style.bg} ${style.color}`}>

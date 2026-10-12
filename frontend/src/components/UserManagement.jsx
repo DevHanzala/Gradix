@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { FaChalkboardTeacher, FaCrown, FaSearch, FaTrash, FaUserGraduate, FaUserShield, FaUsers } from "react-icons/fa";
 import useAuthStore from "../store/authStore.js";
@@ -12,6 +12,8 @@ const ROLE_ICON = { student: FaUserGraduate, instructor: FaChalkboardTeacher, ad
 function RoleControl({ requester, target, busy, onChange }) {
   const options = assignableRoles(requester, target);
   const [value, setValue] = useState("");
+  // The table renders each row twice (desktop table + mobile card), so ids must be per instance.
+  const selectId = useId();
 
   if (options.length === 0) {
     return <span className="text-sm text-ink-subtle">{requester.id === target.id ? "This is you" : "No actions"}</span>;
@@ -19,11 +21,11 @@ function RoleControl({ requester, target, busy, onChange }) {
 
   return (
     <div className="flex items-center gap-2">
-      <label className="sr-only" htmlFor={`role-${target.id}`}>
+      <label className="sr-only" htmlFor={selectId}>
         New role for {target.name}
       </label>
       <select
-        id={`role-${target.id}`}
+        id={selectId}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         disabled={busy}
@@ -196,6 +198,7 @@ function UserManagement({ title, subtitle }) {
           <EmptyState icon={FaUsers} title={users.length ? "No users match your search" : "No users yet"} />
         ) : (
           <ResponsiveTable
+            breakpoint="lg"
             caption="Users"
             columns={columns}
             rows={filtered}

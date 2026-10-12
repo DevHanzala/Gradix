@@ -39,7 +39,7 @@ function ResetPassword() {
       title="Reset your password"
       subtitle="Enter your account email and we will send you a reset link."
       footer={
-        <Link to="/login" className="font-semibold text-primary-700 hover:underline">
+        <Link to="/login" className="inline-flex min-h-11 items-center font-semibold text-primary-700 hover:underline">
           Back to login
         </Link>
       }

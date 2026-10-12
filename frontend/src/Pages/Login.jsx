@@ -74,7 +74,7 @@ function Login() {
       footer={
         <>
           New to Gradix?{" "}
-          <Link to="/signup" className="font-semibold text-primary-700 hover:underline">
+          <Link to="/signup" className="inline-flex min-h-11 items-center font-semibold text-primary-700 hover:underline">
             Create an account
           </Link>
         </>

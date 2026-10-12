@@ -112,6 +112,7 @@ function ResourceManagement() {
             <input
               ref={inputRef}
               id="resource-files"
+              aria-label="Choose files to upload"
               type="file"
               multiple
               accept={ACCEPTED_FILE_TYPES}

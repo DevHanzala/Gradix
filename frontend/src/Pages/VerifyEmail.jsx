@@ -89,7 +89,7 @@ function VerifyEmail() {
           <PageSpinner label="Verifying your email…" />
         ) : result.ok ? (
           <>
-            <FaCheckCircle className="mx-auto text-5xl text-success-600" aria-hidden="true" />
+            <FaCheckCircle className="mx-auto text-5xl text-success-700" aria-hidden="true" />
             <h1 className="mt-4 text-2xl font-bold text-ink">Email verified</h1>
             <p className="mt-2 text-ink-muted">{result.message}</p>
             <Button to="/login" fullWidth className="mt-6">

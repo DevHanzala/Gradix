@@ -253,9 +253,9 @@ function TakeAssessment() {
       {/* Question */}
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 pb-32 pt-6 sm:pb-12">
         <div className="mb-4 flex flex-wrap gap-2 text-xs font-semibold">
-          <span className="rounded-full bg-success-50 px-3 py-1 text-success-700">+{question.positive_marks} correct</span>
+          <span dir="ltr" className="rounded-full bg-success-50 px-3 py-1 text-success-700">+{question.positive_marks} correct</span>
           {question.negative_marks > 0 && (
-            <span className="rounded-full bg-danger-50 px-3 py-1 text-danger-700">−{question.negative_marks} wrong</span>
+            <span dir="ltr" className="rounded-full bg-danger-50 px-3 py-1 text-danger-700">−{question.negative_marks} wrong</span>
           )}
         </div>
 
@@ -409,7 +409,7 @@ function ResultSummary({ result }) {
 
   return (
     <CenteredPanel>
-      <FaCheckCircle className="mx-auto text-5xl text-success-600" aria-hidden="true" />
+      <FaCheckCircle className="mx-auto text-5xl text-success-700" aria-hidden="true" />
       <h1 className="mt-4 text-2xl font-bold text-ink">Assessment submitted</h1>
       <p className="mt-1 text-ink-muted">Here is how you did.</p>
       <dl className="mt-6 grid grid-cols-2 gap-3 text-start sm:grid-cols-3">
