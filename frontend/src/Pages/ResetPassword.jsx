@@ -1,172 +1,75 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import useAuthStore from "../store/authStore.js";
-import { Card, CardContent } from "../components/ui/Card.jsx";
-import LoadingSpinner from "../components/ui/LoadingSpinner.jsx";
-import Modal from "../components/ui/Modal.jsx";
-import { FaEnvelope, FaPaperPlane, FaArrowLeft, FaLock } from "react-icons/fa";
 import { resetPasswordSchema } from "../schemas/passwordSchemas.js";
+import { validateWith, errorMessage } from "../utils/forms.js";
+import AuthLayout from "../layouts/AuthLayout.jsx";
+import { Alert, Button, Input } from "../components/ui";
+
+/** "Forgot password": request a reset link by email. */
 function ResetPassword() {
-  const navigate = useNavigate();
   const forgotPassword = useAuthStore((state) => state.forgotPassword);
-
-  const [formData, setFormData] = useState({
-    email: "",
-  });
-  const [errors, setErrors] = useState({});
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState(null);
+  const [formError, setFormError] = useState(null);
+  const [sentMessage, setSentMessage] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [modal, setModal] = useState({ isOpen: false, type: "info", title: "", message: "" });
 
-  const showModal = (type, title, message) => {
-    setModal({ isOpen: true, type, title, message });
-  };
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-    if (errors[name]) {
-      setErrors((prevErrors) => ({ ...prevErrors, [name]: undefined }));
-    }
-  };
-
-  
-
-  const handleForgotSubmit = async (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
-try {
-  resetPasswordSchema.parse(formData);
-  setErrors({});
-} catch (err) {
-  const fieldErrors = {};
-  err.errors.forEach((e) => {
-    fieldErrors[e.path[0]] = e.message;
-  });
-  setErrors(fieldErrors);
-  return;
-}
-
+    setFormError(null);
+    const { errors } = validateWith(resetPasswordSchema, { email });
+    if (errors) {
+      setError(errors.email);
+      return;
+    }
     setLoading(true);
-
     try {
-      await forgotPassword({ email: formData.email });
-      showModal(
-        "success",
-        "Reset Link Sent",
-        "If an account with that email exists, a password reset link has been sent. Please check your inbox and spam/junk folder. The link will take you to a page to set a new password."
-      );
-
-      setTimeout(() => navigate("/login"), 5000);
-    } catch (error) {
-      console.error("Forgot password error:", error);
-
-      showModal(
-        "error",
-        "Request Failed",
-        error.message || "Failed to send reset link."
-      );
+      const response = await forgotPassword({ email: email.trim() });
+      setSentMessage(response?.message || "If an account with that email exists, we have sent a reset link.");
+    } catch (err) {
+      setFormError(errorMessage(err, "Could not send the reset link. Please try again."));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex flex-col">
-      <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
-        <Card className="w-full max-w-md shadow-2xl border-2 border-gray-200 rounded-2xl sm:rounded-3xl overflow-hidden">
-          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6 sm:p-8">
-            <div className="text-center">
-              <div className="bg-white/20 backdrop-blur-sm w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-                <FaLock className="text-3xl sm:text-4xl" />
-              </div>
-              <h2 className="text-2xl sm:text-3xl font-bold mb-2">Forgot Password</h2>
-              <p className="text-blue-100 text-sm sm:text-base">Enter your email to receive a password reset link</p>
-            </div>
-          </div>
-
-          <CardContent className="p-6 sm:p-8">
-            <form onSubmit={handleForgotSubmit} className="space-y-6">
-              <div>
-                <label htmlFor="email" className="block text-sm font-bold text-gray-700 mb-2">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <FaEnvelope className="text-gray-400" />
-                  </div>
-                  <input
-                    type="email"
-                    id="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    className={`w-full pl-10 pr-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-4 transition-all duration-200 ${
-                      errors.email 
-                        ? "border-red-500 focus:ring-red-200" 
-                        : "border-gray-300 focus:border-blue-500 focus:ring-blue-200"
-                    }`}
-                    placeholder="Enter your email"
-                    required
-                  />
-                </div>
-                {errors.email && (
-                  <p className="text-red-600 text-sm mt-2 flex items-center gap-1">
-                    <span>⚠️</span>
-                    {errors.email}
-                  </p>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 sm:py-4 px-6 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-bold text-base sm:text-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 active:translate-y-0"
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <LoadingSpinner size="sm" color="white" type="dots" />
-                    <span>Sending Reset Link...</span>
-                  </>
-                ) : (
-                  <>
-                    <FaPaperPlane />
-                    <span>Send Reset Link</span>
-                  </>
-                )}
-              </button>
-            </form>
-
-            <div className="mt-6 pt-6 border-t-2 border-gray-200">
-              <div className="text-center">
-                <Link 
-                  to="/login" 
-                  className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700 font-bold hover:underline transition-colors"
-                >
-                  <FaArrowLeft />
-                  <span>Back to Login</span>
-                </Link>
-              </div>
-              
-              <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-4">
-                <p className="text-xs text-gray-700 leading-relaxed">
-                  <strong>💡 Note:</strong> The reset link will be sent to your email if an account exists. 
-                  Please check your spam folder if you don't see it in your inbox.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-
-      <Modal
-        isOpen={modal.isOpen}
-        onClose={() => setModal({ ...modal, isOpen: false })}
-        type={modal.type}
-        title={modal.title}
-      >
-        {modal.message}
-      </Modal>
-    </div>
+    <AuthLayout
+      title="Reset your password"
+      subtitle="Enter your account email and we will send you a reset link."
+      footer={
+        <Link to="/login" className="font-semibold text-primary-700 hover:underline">
+          Back to login
+        </Link>
+      }
+    >
+      {sentMessage ? (
+        <Alert tone="success" title="Check your inbox">
+          {sentMessage} The link expires in 1 hour. Check your spam folder if you do not see it.
+        </Alert>
+      ) : (
+        <form onSubmit={onSubmit} noValidate className="space-y-4">
+          {formError && <Alert tone="danger">{formError}</Alert>}
+          <Input
+            label="Email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setError(null);
+            }}
+            error={error}
+            required
+          />
+          <Button type="submit" fullWidth loading={loading}>
+            Send reset link
+          </Button>
+        </form>
+      )}
+    </AuthLayout>
   );
 }
 

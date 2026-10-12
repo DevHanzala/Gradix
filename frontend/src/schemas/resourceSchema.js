@@ -36,38 +36,11 @@ export const filesArraySchema = z.array(fileSchema)
   .min(1, "At least one file must be selected")
   .max(10, "Cannot upload more than 10 files at once");
 
-// Validation helper functions
+// Validation helper functions (zod 4 exposes problems as `issues`)
 export const validateFiles = (files) => {
-  try {
-    const fileObjects = Array.from(files).map(file => ({
-      name: file.name,
-      size: file.size,
-      type: file.type
-    }));
-    
-    filesArraySchema.parse(fileObjects);
-    return { success: true, data: files };
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      const errorMessages = error.errors.map(err => err.message).join(', ');
-      return { success: false, error: errorMessages };
-    }
-    return { success: false, error: "File validation failed" };
-  }
-};
-
-export const validateSingleFile = (file) => {
-  try {
-    fileSchema.parse({
-      name: file.name,
-      size: file.size,
-      type: file.type
-    });
-    return { success: true };
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return { success: false, error: error.errors[0].message };
-    }
-    return { success: false, error: "File validation failed" };
-  }
+  const fileObjects = Array.from(files).map((file) => ({ name: file.name, size: file.size, type: file.type }));
+  const result = filesArraySchema.safeParse(fileObjects);
+  if (result.success) return { success: true, data: files };
+  const messages = [...new Set(result.error.issues.map((issue) => issue.message))];
+  return { success: false, error: messages.join(" ") };
 };

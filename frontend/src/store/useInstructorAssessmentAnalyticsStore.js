@@ -42,7 +42,7 @@ const useInstructorAnalyticsStore = create((set) => ({
         loading: false,
       });
     } catch (err) {
-      const msg = err.message || "Failed to fetch overview";
+      const msg = err.response?.data?.message || err.message || "Failed to fetch overview";
       set({ error: msg, loading: false });
       toast.error(msg);
       throw err;
@@ -69,7 +69,7 @@ const useInstructorAnalyticsStore = create((set) => ({
         loading: false,
       });
     } catch (err) {
-      const msg = err.message || "Failed to fetch assessments";
+      const msg = err.response?.data?.message || err.message || "Failed to fetch assessments";
       set({ error: msg, loading: false });
       toast.error(msg);
     }
@@ -92,7 +92,7 @@ const useInstructorAnalyticsStore = create((set) => ({
         loading: false,
       });
     } catch (err) {
-      const msg = err.message || "Failed to fetch students";
+      const msg = err.response?.data?.message || err.message || "Failed to fetch students";
       set({ error: msg, loading: false });
       toast.error(msg);
     }
@@ -114,7 +114,7 @@ const useInstructorAnalyticsStore = create((set) => ({
         loading: false,
       });
     } catch (err) {
-      const msg = err.message || "Failed to load answers";
+      const msg = err.response?.data?.message || err.message || "Failed to load answers";
       set({
         error: msg,
         studentQuestions: [],

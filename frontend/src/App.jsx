@@ -98,17 +98,16 @@ const INSTRUCTOR_ROUTES = [
 
 /* Layouts */
 import MainLayout from "./layouts/MainLayout";
+import PublicLayout from "./layouts/PublicLayout";
+import { PageSpinner } from "./components/ui/Spinner.jsx";
 import ExamLayout from "./layouts/ExamLayout";
 
 /* =======================
    LOADING
    ======================= */
 const LoadingFallback = () => (
-  <div className="flex items-center justify-center min-h-screen bg-gray-50">
-    <div className="text-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-      <p className="mt-4 text-gray-600">Loading...</p>
-    </div>
+  <div className="flex min-h-screen items-center justify-center bg-canvas">
+    <PageSpinner />
   </div>
 );
 
@@ -147,9 +146,9 @@ function App() {
           <Route
             path="/"
             element={
-              <MainLayout>
+              <PublicLayout>
                 <Home />
-              </MainLayout>
+              </PublicLayout>
             }
           />
 
@@ -269,15 +268,11 @@ function App() {
       </Suspense>
 
       <Toaster
-        position="top-right"
+        position="top-center"
         toastOptions={{
-          duration: 4000,
-          style: {
-            background: "#1f2937",
-            color: "#fff",
-            borderRadius: "12px",
-            padding: "16px",
-          },
+          duration: 5000,
+          className: "rounded-card! text-sm!",
+          ariaProps: { role: "status", "aria-live": "polite" },
         }}
       />
     </Router>

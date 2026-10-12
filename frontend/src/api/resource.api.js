@@ -9,14 +9,12 @@ export const fetchAllResourcesAPI = () =>
 export const getResourceByIdAPI = (resourceId) =>
   apiClient.get(`/resources/${resourceId}`);
 
-export const uploadResourcesAPI = (files) => {
+export const uploadResourcesAPI = (files, { visibility = "private" } = {}) => {
   const formData = new FormData();
   files.forEach((file) => formData.append("files", file));
-
+  formData.append("visibility", visibility);
   return apiClient.post("/resources", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-    },
+    headers: { "Content-Type": "multipart/form-data" },
   });
 };
 

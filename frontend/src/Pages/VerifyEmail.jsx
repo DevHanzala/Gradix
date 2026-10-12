@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { FaCheckCircle, FaTimesCircle } from "react-icons/fa";
 import useAuthStore from "../store/authStore.js";
-import LoadingSpinner from "../components/ui/LoadingSpinner.jsx";
+import AuthLayout from "../layouts/AuthLayout.jsx";
+import { Button, Input, Alert, PageSpinner } from "../components/ui";
 
 function ResendVerification() {
   const resendVerification = useAuthStore((s) => s.resendVerification);
@@ -29,33 +30,27 @@ function ResendVerification() {
   };
 
   if (state === "sent") {
-    return <p className="mt-6 rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>;
+    return (
+      <Alert tone="success" className="mt-6 text-start">
+        {message}
+      </Alert>
+    );
   }
 
   return (
     <form onSubmit={onSubmit} noValidate className="mt-6 space-y-3 text-start">
-      <label htmlFor="resend-email" className="block text-sm font-semibold text-gray-800">
-        Send a new verification link
-      </label>
-      <input
-        id="resend-email"
+      <Input
+        label="Send a new verification link"
         type="email"
         autoComplete="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        aria-invalid={state === "error"}
-        aria-describedby={state === "error" ? "resend-error" : undefined}
-        className="min-h-11 w-full rounded-lg border border-gray-300 px-3 text-base focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+        error={state === "error" ? message : undefined}
         placeholder="you@example.com"
       />
-      {state === "error" && (
-        <p id="resend-error" className="text-sm text-red-600">
-          {message}
-        </p>
-      )}
-      <button type="submit" className="btn-secondary w-full" disabled={state === "sending"}>
-        {state === "sending" ? "Sending…" : "Resend verification email"}
-      </button>
+      <Button type="submit" variant="secondary" fullWidth loading={state === "sending"}>
+        Resend verification email
+      </Button>
     </form>
   );
 }
@@ -88,36 +83,33 @@ function VerifyEmail() {
   }, [token, verifyEmail]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-      <div className="w-full max-w-md rounded-2xl bg-white p-8 text-center shadow-sm ring-1 ring-gray-200">
+    <AuthLayout>
+      <div className="text-center">
         {!result ? (
-          <div role="status">
-            <LoadingSpinner size="lg" />
-            <p className="mt-4 text-gray-600">Verifying your email…</p>
-          </div>
+          <PageSpinner label="Verifying your email…" />
         ) : result.ok ? (
           <>
-            <FaCheckCircle className="mx-auto text-5xl text-emerald-500" aria-hidden="true" />
-            <h1 className="mt-4 text-2xl font-bold text-gray-900">Email verified</h1>
-            <p className="mt-2 text-gray-600">{result.message}</p>
-            <Link to="/login" className="btn-primary mt-6 w-full">
+            <FaCheckCircle className="mx-auto text-5xl text-success-600" aria-hidden="true" />
+            <h1 className="mt-4 text-2xl font-bold text-ink">Email verified</h1>
+            <p className="mt-2 text-ink-muted">{result.message}</p>
+            <Button to="/login" fullWidth className="mt-6">
               Log in
-            </Link>
+            </Button>
           </>
         ) : (
           <>
-            <FaTimesCircle className="mx-auto text-5xl text-red-500" aria-hidden="true" />
-            <h1 className="mt-4 text-2xl font-bold text-gray-900">Link not valid</h1>
-            <p className="mt-2 text-gray-600">{result.message}</p>
-            <p className="mt-2 text-sm text-gray-500">If you already verified your email, you can simply log in.</p>
+            <FaTimesCircle className="mx-auto text-5xl text-danger-600" aria-hidden="true" />
+            <h1 className="mt-4 text-2xl font-bold text-ink">Link not valid</h1>
+            <p className="mt-2 text-ink-muted">{result.message}</p>
+            <p className="mt-2 text-sm text-ink-subtle">If you already verified your email, you can simply log in.</p>
             <ResendVerification />
-            <Link to="/login" className="mt-4 inline-block text-sm font-semibold text-indigo-700 hover:underline">
+            <Link to="/login" className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-primary-700 hover:underline">
               Back to login
             </Link>
           </>
         )}
       </div>
-    </div>
+    </AuthLayout>
   );
 }
 

@@ -1,165 +1,133 @@
-import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
-import { FaArrowLeft } from "react-icons/fa";
-import LoadingSpinner from "../../../components/ui/LoadingSpinner.jsx";
-import AssessmentHeader from "../../../components/AssessmentHeader.jsx";
-import AssessmentInfoCard from "../../../components/AssessmentInfoCard.jsx";
-import PromptTab from "../../../components/PromptTab.jsx";
-import SampleQuestionsTab from "../../../components/SampleQuestionsTab.jsx";
-import useAssessmentPreview from "../../../hooks/useAssessmentPreview.js";
-import { generateAIPrompt } from "../../../utils/promptGenerator.js";
+import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+import { FaMagic, FaRedo } from "react-icons/fa";
+import useAssessmentStore from "../../../store/assessmentStore.js";
+import { Alert, Badge, Button, Card, CardBody, CardHeader, EmptyState, PageHeader, PageSpinner } from "../../../components/ui";
+import { textDirection } from "../../../utils/text.js";
+import { errorMessage } from "../../../utils/forms.js";
 
+const answerText = (q) => {
+  if (q.question_type === "true_false") return q.correct_answer ? "True" : "False";
+  if (q.correct_answer && typeof q.correct_answer === "object") return q.correct_answer.answer || "";
+  return String(q.correct_answer ?? "");
+};
+
+/**
+ * Instructor preview: generates ONE sample question set exactly as a student
+ * would receive it (each real student gets a different set).
+ */
 function AssessmentPreview() {
   const { id } = useParams();
-  const [tab, setTab] = useState("prompt");
-  const [copied, setCopied] = useState(false);
+  const { getAssessmentById, fetchPreviewQuestions } = useAssessmentStore();
+  const [assessment, setAssessment] = useState(null);
+  const [loadError, setLoadError] = useState(null);
+  const [questions, setQuestions] = useState(null);
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState(null);
 
-  const {
-    assessment,
-    questions,
-    loading,
-    error,
-    questionError,
-    questionsLoading,
-    loadPreviewQuestions
-  } = useAssessmentPreview(id);
-
-  // Load questions when switching to assessment tab
   useEffect(() => {
-    if (tab === "assessment" && assessment) {
-      loadPreviewQuestions();
-    }
-  }, [tab, assessment, loadPreviewQuestions]);
+    let active = true;
+    getAssessmentById(id)
+      .then((data) => active && setAssessment(data))
+      .catch((error) => active && setLoadError(errorMessage(error, "Could not load this assessment.")));
+    return () => {
+      active = false;
+    };
+  }, [id, getAssessmentById]);
 
-  const handleCopyPrompt = () => {
-    if (!assessment) return;
-    
-    const promptText = generateAIPrompt(assessment);
-    navigator.clipboard.writeText(promptText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 3000);
+  const generate = async () => {
+    setGenerating(true);
+    setGenerateError(null);
+    try {
+      setQuestions(await fetchPreviewQuestions(id));
+    } catch (error) {
+      setGenerateError(errorMessage(error, "Could not generate sample questions."));
+    } finally {
+      setGenerating(false);
+    }
   };
 
-  if (loading) {
+  if (loadError) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30 flex flex-col items-center justify-center">
-        <LoadingSpinner size="lg" color="blue" type="dots" />
-        <p className="mt-4 text-gray-600 font-medium">Loading assessment...</p>
-      </div>
+      <>
+        <PageHeader title="Preview" backTo="/instructor/assessments" backLabel="All assessments" />
+        <Alert tone="danger">{loadError}</Alert>
+      </>
     );
   }
-
-  if (error) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
-        <div className="bg-white border-2 border-red-200 rounded-2xl p-8 shadow-xl text-center max-w-md">
-          <div className="text-5xl mb-4">⚠️</div>
-          <h2 className="text-xl font-bold text-red-600 mb-2">Unable to Load Assessment</h2>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <Link
-            to="/instructor/assessments"
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
-          >
-            <FaArrowLeft />
-            Back to Assessments
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  if (!assessment) return <PageSpinner />;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12">
-        
-        <AssessmentHeader assessmentId={id} />
-        <AssessmentInfoCard assessment={assessment} />
-
-        {/* Tabs */}
-        <div className="bg-white rounded-2xl shadow-xl border-2 border-gray-200 overflow-hidden">
-          <div className="border-b border-gray-200 overflow-x-auto">
-            <div className="flex min-w-max">
-              <button
-                onClick={() => setTab("prompt")}
-                className={`flex-1 sm:flex-none px-6 sm:px-8 py-4 text-base sm:text-lg font-semibold transition-all whitespace-nowrap ${
-                  tab === "prompt"
-                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-              >
-                Full AI Prompt
-              </button>
-              <button
-                onClick={() => setTab("assessment")}
-                className={`flex-1 sm:flex-none px-6 sm:px-8 py-4 text-base sm:text-lg font-semibold transition-all whitespace-nowrap ${
-                  tab === "assessment"
-                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-              >
-                Sample Assessment
-              </button>
-            </div>
-          </div>
-
-          <div className="p-4 sm:p-6 lg:p-8">
-            {tab === "prompt" && (
-              <PromptTab 
-                assessment={assessment} 
-                copied={copied} 
-                onCopy={handleCopyPrompt} 
-              />
-            )}
-
-            {tab === "assessment" && (
-              <SampleQuestionsTab 
-                questions={questions} 
-                questionError={questionError} 
-                loading={questionsLoading || (questions.length === 0 && !questionError)}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Back Button */}
-        <div className="mt-6 sm:mt-8 text-center">
-          <Link
-            to="/instructor/assessments"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 text-white rounded-xl hover:from-gray-700 hover:to-gray-800 font-medium shadow-lg transform transition-all hover:-translate-y-0.5"
-          >
-            <FaArrowLeft />
-            <span>Back to Assessments</span>
-          </Link>
-        </div>
-      </div>
-
-      {/* Custom CSS for animations */}
-      <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
+    <>
+      <PageHeader
+        title={`Preview: ${assessment.title}`}
+        description="Generate a sample question set in English to check the topic and difficulty. Each student gets their own set."
+        backTo={`/instructor/assessments/${id}`}
+        backLabel="Back to assessment"
+        actions={
+          <Button icon={questions ? FaRedo : FaMagic} loading={generating} onClick={generate}>
+            {questions ? "Generate another sample" : "Generate sample questions"}
+          </Button>
         }
+      />
 
-        @keyframes slideInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
+      {generateError && (
+        <Alert tone="danger" className="mb-6">
+          {generateError}
+        </Alert>
+      )}
 
-        .animate-fadeIn {
-          animation: fadeIn 0.5s ease-out;
-        }
-
-        .animate-slideInUp {
-          animation: slideInUp 0.5s ease-out;
-        }
-      `}</style>
-    </div>
+      <Card>
+        <CardHeader title="Sample questions" description="Correct answers are highlighted. Students never see this view." />
+        {generating ? (
+          <PageSpinner label="Generating questions with AI. This can take up to a minute…" />
+        ) : !questions ? (
+          <EmptyState icon={FaMagic} title="No sample yet" description="Generating a sample uses the AI, so it runs only when you ask." />
+        ) : (
+          <CardBody>
+            <ol className="space-y-4">
+              {questions.map((q, i) => {
+                const dir = textDirection(q.question_text);
+                const answer = answerText(q);
+                return (
+                  <li key={`${i}-${q.question_text}`} className="rounded-card border border-line p-4">
+                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm font-semibold text-ink-muted">Question {i + 1}</span>
+                      <Badge>
+                        +{q.positive_marks}
+                        {Number(q.negative_marks) > 0 ? ` / −${q.negative_marks}` : ""} · {q.duration_per_question}s
+                      </Badge>
+                    </div>
+                    <p dir={dir} className="font-medium text-ink">
+                      {q.question_text}
+                    </p>
+                    {Array.isArray(q.options) && (
+                      <ul dir={dir} className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {q.options.map((opt, oi) => (
+                          <li
+                            key={opt}
+                            className={`flex gap-2 rounded-control border px-3 py-2 text-sm ${opt === answer ? "border-success-600 bg-success-50" : "border-line"}`}
+                          >
+                            <span className="font-semibold">{String.fromCharCode(65 + oi)}.</span>
+                            <span>{opt}</span>
+                            {opt === answer && <span className="sr-only">(correct answer)</span>}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    {!Array.isArray(q.options) && (
+                      <p className="mt-3 text-sm text-ink-muted">
+                        Correct answer: <span className="font-semibold text-ink">{answer}</span>
+                      </p>
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+          </CardBody>
+        )}
+      </Card>
+    </>
   );
 }
 

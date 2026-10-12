@@ -1,13 +1,11 @@
 import { useState } from "react";
 import { saveAs } from "file-saver";
-import Modal from "./ui/Modal"; //  use shared Modal instead of toast
-import LoadingSpinner from "./ui/LoadingSpinner";
-import { FaFilePdf, FaTimes, FaGlobe, FaArrowLeft, FaDownload } from "react-icons/fa";
+import toast from "react-hot-toast";
+import { FaArrowLeft, FaDownload } from "react-icons/fa";
 import { sanitizeFileName } from "../utils/paperUtils";
-import PaperFormFields from "./PaperFormFields";
-import FormattingOptions from "./FormattingOptions";
 import { LANGUAGE_OPTIONS, getTranslation, isRTLLanguage } from "../utils/translations";
 import useAssessmentStore from "../store/assessmentStore";
+import { Button, Input, Modal, Select, Textarea } from "./ui";
 
 const INITIAL_FORM = {
   instituteName: "",
@@ -22,204 +20,133 @@ const INITIAL_FORM = {
   optionFontSize: 9,
 };
 
-const INITIAL_NOTIFY = { isOpen: false, type: "info", title: "", message: "" };
+const PAGE_SIZES = ["A4", "A5", "Letter"].map((v) => ({ value: v, label: v }));
+const fontOptions = (min, max) => Array.from({ length: max - min + 1 }, (_, i) => ({ value: min + i, label: `${min + i} pt` }));
 
+/**
+ * Two-step dialog: choose the paper language, then the header and formatting.
+ * The server generates a fresh question set in that language and returns a PDF.
+ * The dialog itself is shown in the chosen language (RTL for ur/ar/fa).
+ */
 const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) => {
+  const { generatePhysicalPaper } = useAssessmentStore();
   const [step, setStep] = useState("language");
-  const [selectedLanguage, setSelectedLanguage] = useState("en");
+  const [language, setLanguage] = useState("en");
   const [form, setForm] = useState(INITIAL_FORM);
   const [loading, setLoading] = useState(false);
-  const [notify, setNotify] = useState(INITIAL_NOTIFY); //  replaces toast
 
-  const { generatePhysicalPaper } = useAssessmentStore();
+  const t = (key) => getTranslation(language, key);
+  const isRTL = isRTLLanguage(language);
 
-  const t = (key) => getTranslation(selectedLanguage, key);
-  const isRTL = isRTLLanguage(selectedLanguage);
-
-  const showNotify = (type, title, message) =>
-    setNotify({ isOpen: true, type, title, message });
-
-  const handleLanguageSelect = (lang) => {
-    setSelectedLanguage(lang);
-    setStep("form");
+  const reset = () => {
+    setStep("language");
+    setLanguage("en");
+    setForm(INITIAL_FORM);
   };
 
-  const handleChange = (e) => {
+  const close = () => {
+    if (loading) return;
+    reset();
+    onClose();
+  };
+
+  const onChange = (e) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setForm((f) => ({ ...f, [name]: name.endsWith("FontSize") ? Number(value) : value }));
   };
 
   const handleSubmit = async () => {
     if (!assessmentId) {
-      showNotify("error", "Error", t("noAssessment"));
+      toast.error(t("noAssessment"));
       return;
     }
-
     setLoading(true);
     try {
-      const blob = await generatePhysicalPaper(assessmentId, {
-        language: selectedLanguage,
-        ...form,
-      });
-
-      const fileName = `${sanitizeFileName(assessmentTitle)}_Paper_${selectedLanguage.toUpperCase()}.pdf`;
-      saveAs(blob, fileName);
-
-      // Show success — modal auto-closes after its 6s timer, then we close the paper modal too
-      showNotify("success", "Success", t("paperGenerated"));
-      setTimeout(() => {
-        resetModal();
-        onClose();
-      }, 1000);
-    } catch (err) {
-      console.error("[PhysicalPaperModal] Paper generation error:", err);
-      showNotify("error", "Error", t("generationFailed"));
+      const blob = await generatePhysicalPaper(assessmentId, { language, ...form });
+      saveAs(blob, `${sanitizeFileName(assessmentTitle)}_Paper_${language.toUpperCase()}.pdf`);
+      toast.success(t("paperGenerated"));
+      reset();
+      onClose();
+    } catch (error) {
+      toast.error(error?.message || t("generationFailed"));
     } finally {
       setLoading(false);
     }
   };
 
-  const resetModal = () => {
-    setStep("language");
-    setSelectedLanguage("en");
-    setForm(INITIAL_FORM);
-    setNotify(INITIAL_NOTIFY);
-  };
-
-  const handleClose = () => {
-    resetModal();
-    onClose();
-  };
-
-  if (!isOpen) return null;
+  const footer =
+    step === "language" ? (
+      <Button variant="secondary" onClick={close}>
+        {t("cancel")}
+      </Button>
+    ) : (
+      <>
+        <Button variant="secondary" onClick={close} disabled={loading}>
+          {t("cancel")}
+        </Button>
+        <Button icon={FaDownload} loading={loading} onClick={handleSubmit}>
+          {loading ? t("generating") : t("generateDownload")}
+        </Button>
+      </>
+    );
 
   return (
-    <>
-      {/* ── Notification (success / error) — same Modal used everywhere else ── */}
-      <Modal
-        isOpen={notify.isOpen}
-        onClose={() => setNotify(INITIAL_NOTIFY)}
-        type={notify.type}
-        title={notify.title}
-      >
-        {notify.message}
-      </Modal>
-
-      {/* ── Paper Modal ── */}
-      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-        <div
-          className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-4xl max-h-[95vh] overflow-y-auto animate-in fade-in zoom-in duration-300"
-          dir={isRTL ? "rtl" : "ltr"}
-        >
-          {/* Header */}
-          <div className="sticky top-0 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white px-5 sm:px-6 py-4 sm:py-5 rounded-t-2xl sm:rounded-t-3xl flex justify-between items-center shadow-lg z-10">
-            <div className="flex items-center gap-3">
-              <div className="bg-white/20 backdrop-blur-sm p-2 sm:p-3 rounded-xl">
-                {step === "language" ? (
-                  <FaGlobe className="text-2xl sm:text-3xl" />
-                ) : (
-                  <FaFilePdf className="text-2xl sm:text-3xl" />
-                )}
-              </div>
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold">{t("modalTitle")}</h2>
-                <p className="text-indigo-100 text-xs sm:text-sm truncate max-w-xs sm:max-w-md">
-                  {step === "language" ? t("modalSubtitle") : assessmentTitle}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleClose}
-              className="text-white hover:bg-white/20 rounded-full p-2 transition-all duration-200 hover:rotate-90 active:scale-90"
-            >
-              <FaTimes className="w-5 h-5 sm:w-6 sm:h-6" />
-            </button>
-          </div>
-
-          <div className="p-4 sm:p-6 space-y-5 sm:space-y-6">
-            {step === "language" ? (
-              /* ── LANGUAGE SELECTION ── */
-              <div className="space-y-6">
-                <div className="text-center">
-                  <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                    {t("selectLanguage")}
-                  </h3>
-                  <p className="text-gray-600">{t("selectLanguageDesc")}</p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {LANGUAGE_OPTIONS.map((lang) => (
-                    <button
-                      key={lang.value}
-                      onClick={() => handleLanguageSelect(lang.value)}
-                      className="p-6 rounded-2xl border-3 transition-all duration-300 border-gray-300 hover:border-indigo-400 hover:bg-gray-50 flex items-center justify-center gap-3 active:scale-95"
-                    >
-                      <span className="text-4xl">{lang.label.split(" ")[0]}</span>
-                      <span className="text-xl font-bold text-gray-800">
-                        {lang.label.split(" ").slice(1).join(" ")}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              /* ── FORM STEP ── */
-              <>
-                <button
-                  onClick={() => setStep("language")}
-                  className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 font-semibold transition-colors"
-                >
-                  <FaArrowLeft />
-                  <span>{t("back")}</span>
-                </button>
-
-                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 p-4 rounded-xl border-2 border-indigo-200">
-                  <div className="flex items-center gap-3">
-                    <FaGlobe className="text-2xl text-indigo-600" />
-                    <div>
-                      <p className="text-sm text-gray-600">{t("selectLanguage")}</p>
-                      <p className="text-lg font-bold text-gray-800">
-                        {LANGUAGE_OPTIONS.find((l) => l.value === selectedLanguage)?.label}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <PaperFormFields form={form} onChange={handleChange} language={selectedLanguage} />
-                <FormattingOptions form={form} onChange={handleChange} language={selectedLanguage} />
-
-                <div className="flex flex-col sm:flex-row items-center justify-end gap-3 sm:gap-4 pt-4 border-t-2 border-gray-200">
-                  <button
-                    onClick={handleClose}
-                    disabled={loading}
-                    className="px-6 py-3 w-full sm:w-auto border-2 border-gray-300 hover:border-gray-400 rounded-xl font-bold text-gray-700 hover:bg-gray-50 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
-                  >
-                    {t("cancel")}
-                  </button>
-                  <button
-                    onClick={handleSubmit}
-                    disabled={loading}
-                    className="px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 w-full sm:w-auto text-white rounded-xl font-bold text-sm sm:text-lg flex items-center justify-center gap-2 sm:gap-3 shadow-xl hover:shadow-2xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
-                  >
-                    {loading ? (
-                      <>
-                        <LoadingSpinner size="sm" color="white" type="dots" />
-                        <span>{t("generating")}</span>
-                      </>
-                    ) : (
-                      <>
-                        <FaDownload className="text-lg sm:text-xl" />
-                        <span>{t("generateDownload")}</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </>
-            )}
+    <Modal isOpen={isOpen} onClose={close} title={t("modalTitle")} size="lg" footer={footer} dir={isRTL ? "rtl" : "ltr"}>
+      {step === "language" ? (
+        <div>
+          <p className="mb-4 text-ink-muted">{t("selectLanguageDesc")}</p>
+          <div className="grid gap-3 sm:grid-cols-2" role="group" aria-label={t("selectLanguage")}>
+            {LANGUAGE_OPTIONS.map((lang) => (
+              <button
+                key={lang.value}
+                type="button"
+                onClick={() => {
+                  setLanguage(lang.value);
+                  setStep("form");
+                }}
+                className="flex min-h-14 items-center justify-center rounded-card border-2 border-line px-4 text-lg font-semibold text-ink transition hover:border-primary-300 hover:bg-primary-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary-200"
+              >
+                {lang.label}
+              </button>
+            ))}
           </div>
         </div>
-      </div>
-    </>
+      ) : (
+        <div className="space-y-5">
+          <button
+            type="button"
+            onClick={() => setStep("language")}
+            disabled={loading}
+            className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary-700 hover:underline"
+          >
+            <FaArrowLeft aria-hidden="true" className="rtl:rotate-180" />
+            {t("back")}
+          </button>
+          <p className="text-sm text-ink-muted">
+            {LANGUAGE_OPTIONS.find((l) => l.value === language)?.label} · {assessmentTitle}
+          </p>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input label={t("instituteName")} name="instituteName" placeholder={t("instituteNamePlaceholder")} value={form.instituteName} onChange={onChange} className="sm:col-span-2" />
+            <Input label={t("teacherName")} name="teacherName" placeholder={t("teacherNamePlaceholder")} value={form.teacherName} onChange={onChange} />
+            <Input label={t("subjectName")} name="subjectName" placeholder={t("subjectNamePlaceholder")} value={form.subjectName} onChange={onChange} />
+            <Input label={t("paperDate")} name="paperDate" type="date" value={form.paperDate} onChange={onChange} />
+            <Input label={t("paperTime")} name="paperTime" type="time" value={form.paperTime} onChange={onChange} />
+            <Textarea label={t("notes")} name="notes" rows={3} placeholder={t("notesPlaceholder")} value={form.notes} onChange={onChange} className="sm:col-span-2" />
+          </div>
+
+          <fieldset>
+            <legend className="mb-3 text-sm font-semibold text-ink">{t("formattingTitle")}</legend>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Select label={t("pageSize")} name="pageSize" value={form.pageSize} onChange={onChange} options={PAGE_SIZES} />
+              <Select label={t("headerSize")} name="headerFontSize" value={form.headerFontSize} onChange={onChange} options={fontOptions(14, 28)} />
+              <Select label={t("questionSize")} name="questionFontSize" value={form.questionFontSize} onChange={onChange} options={fontOptions(8, 16)} />
+              <Select label={t("optionSize")} name="optionFontSize" value={form.optionFontSize} onChange={onChange} options={fontOptions(7, 14)} />
+            </div>
+          </fieldset>
+        </div>
+      )}
+    </Modal>
   );
 };
 

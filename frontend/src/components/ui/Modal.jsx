@@ -16,7 +16,8 @@ const FOCUSABLE =
  * Accessible dialog.
  * - Focus moves into the dialog, Tab is trapped, Escape closes, focus returns on close.
  * - Full-screen sheet on mobile, centered card from `sm` up.
- * - Pass `onConfirm` for a confirm dialog (Cancel + Confirm buttons).
+ * - Pass `onConfirm` for a confirm dialog (Cancel + Confirm buttons),
+ *   or `footer` to render custom actions (e.g. a form dialog).
  */
 function Modal({
   isOpen,
@@ -29,6 +30,8 @@ function Modal({
   cancelText = "Cancel",
   confirmVariant,
   size = "md",
+  footer,
+  dir,
 }) {
   const titleId = useId();
   const panelRef = useRef(null);
@@ -116,10 +119,14 @@ function Modal({
           </button>
         </div>
 
-        <div className="overflow-y-auto px-5 py-4 text-ink-muted">{children}</div>
+        <div dir={dir} className="flex-1 overflow-y-auto px-5 py-4 text-ink-muted">
+          {children}
+        </div>
 
         <div className="flex flex-col-reverse gap-3 border-t border-line px-5 py-4 sm:flex-row sm:justify-end">
-          {isConfirm ? (
+          {footer ? (
+            footer
+          ) : isConfirm ? (
             <>
               <button type="button" className="btn-secondary" onClick={() => onCloseRef.current?.()}>
                 {cancelText}

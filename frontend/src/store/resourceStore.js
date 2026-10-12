@@ -45,13 +45,13 @@ const useResourceStore = create((set) => ({
     }
   },
 
-  uploadResources: async (files) => {
+  /** Returns { resources, skipped } so the UI can report files that could not be read. */
+  uploadResources: async (files, options) => {
     try {
       set({ loading: true, error: null });
-      const res = await uploadResourcesAPI(files);
-
+      const res = await uploadResourcesAPI(files, options);
       set({ loading: false });
-      return res.data.resources || [];
+      return { resources: res.data.resources || [], skipped: res.data.skipped || [] };
     } catch (err) {
       set({ loading: false });
       throw err;
