@@ -1,414 +1,433 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useParams, Link } from "react-router-dom";
+import { FaClock, FaCheckCircle, FaCloud, FaCloudUploadAlt, FaExclamationTriangle, FaWifi } from "react-icons/fa";
 import useStudentAssessmentStore from "../../../store/studentAssessmentStore.js";
-import { Card } from "../../../components/ui/Card";
 import LoadingSpinner from "../../../components/ui/LoadingSpinner";
-import Modal from "../../../components/ui/Modal";
-import toast from "react-hot-toast";
-import { 
-  FaClock, 
-  FaQuestionCircle, 
-  FaCheckCircle, 
-  FaArrowLeft, 
-  FaArrowRight, 
-  FaGraduationCap,
-  FaFileAlt,
-  FaLanguage
-} from "react-icons/fa";
+
+const RTL_LANGUAGES = ["ur", "ar", "fa"];
+const LANGUAGES = [
+  { value: "en", label: "English" },
+  { value: "ur", label: "اردو (Urdu)" },
+  { value: "ar", label: "العربية (Arabic)" },
+  { value: "fa", label: "فارسی (Persian)" },
+];
+
+const formatTime = (seconds) => {
+  const s = Math.max(0, seconds);
+  const m = Math.floor(s / 60);
+  return `${m}:${String(s % 60).padStart(2, "0")}`;
+};
+
+/** Re-render every 250 ms while active so countdowns stay smooth. */
+const useNow = (active) => {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return undefined;
+    const id = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(id);
+  }, [active]);
+  return now;
+};
+
+const SaveIndicator = ({ status }) => {
+  const map = {
+    saving: { icon: <FaCloudUploadAlt aria-hidden="true" />, text: "Saving…", cls: "text-amber-700 bg-amber-50" },
+    saved: { icon: <FaCloud aria-hidden="true" />, text: "Saved", cls: "text-emerald-700 bg-emerald-50" },
+    offline: { icon: <FaWifi aria-hidden="true" />, text: "Offline – will retry", cls: "text-red-700 bg-red-50" },
+    error: { icon: <FaExclamationTriangle aria-hidden="true" />, text: "Not saved", cls: "text-red-700 bg-red-50" },
+  };
+  const item = map[status];
+  if (!item) return null;
+  return (
+    <span role="status" aria-live="polite" className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${item.cls}`}>
+      {item.icon}
+      {item.text}
+    </span>
+  );
+};
 
 function TakeAssessment() {
   const { assessmentId } = useParams();
-  const navigate = useNavigate();
-
   const {
-    assessmentQuestions,
-    timeRemaining,
-    loading,
+    phase,
+    questions,
+    answers,
+    currentIndex,
+    questionDeadline,
+    overallDeadline,
+    language,
+    saveStatus,
+    result,
     error,
+    errorCode,
+    loadAttempt,
     startAssessment,
-    updateAnswer,
-    submitAssessment,
-    isSubmitted,
-    hasStarted,
-    clearError,
+    setAnswer,
+    advance,
+    submit,
+    flushPending,
+    reset,
   } = useStudentAssessmentStore();
 
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [modal, setModal] = useState({ isOpen: false, type: "", title: "", message: "" });
   const [selectedLanguage, setSelectedLanguage] = useState("en");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isRTL, setIsRTL] = useState(false);
+  const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const firedForIndex = useRef(null);
 
   useEffect(() => {
-    if (hasStarted) setIsRTL(["ur", "ar", "fa"].includes(selectedLanguage));
-  }, [hasStarted, selectedLanguage]);
+    reset();
+    loadAttempt(assessmentId);
+    return () => reset();
+  }, [assessmentId, loadAttempt, reset]);
 
-  const handleStart = async () => {
-    try {
-      await startAssessment(assessmentId, selectedLanguage);
-      toast.success("Assessment started!");
-    } catch (err) {
-      toast.error(err.message || "Failed to start");
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (isSubmitting || isSubmitted) return;
-    setIsSubmitting(true);
-    try {
-      await submitAssessment(assessmentId);
-      setModal({ 
-        isOpen: true, 
-        type: "success", 
-        title: "Submitted!", 
-        message: "Your assessment has been submitted successfully." 
-      });
-      toast.success("Submitted successfully!");
-    } catch (err) {
-      toast.error(err.message || "Submission failed");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
+  // Retry pending saves as soon as the connection returns.
   useEffect(() => {
-    if (timeRemaining > 0 && hasStarted && !isSubmitted) {
-      const timer = setInterval(() => {
-        useStudentAssessmentStore.setState((prev) => {
-          if (prev.timeRemaining <= 1) {
-            handleSubmit();
-            return { timeRemaining: 0 };
-          }
-          return { timeRemaining: prev.timeRemaining - 1 };
-        });
-      }, 1000);
-      return () => clearInterval(timer);
-    } else if (timeRemaining <= 0 && hasStarted && !isSubmitted) {
-      handleSubmit();
-    }
-  }, [timeRemaining, hasStarted, isSubmitted]);
+    const onOnline = () => flushPending();
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, [flushPending]);
 
-  const currentQuestion = assessmentQuestions[currentQuestionIndex];
-  const perQuestionTime = currentQuestion?.duration_per_question || 30;
-  const [questionTimeLeft, setQuestionTimeLeft] = useState(perQuestionTime);
+  const inProgress = phase === "in_progress";
+  const now = useNow(inProgress);
+  const questionRemaining = inProgress ? Math.ceil((questionDeadline - now) / 1000) : 0;
+  const overallRemaining = inProgress ? Math.ceil((overallDeadline - now) / 1000) : 0;
+  const isLast = currentIndex >= questions.length - 1;
 
-  useEffect(() => setQuestionTimeLeft(perQuestionTime), [currentQuestionIndex, perQuestionTime]);
-
+  // Per-question timeout auto-advances (last question auto-submits);
+  // overall timeout auto-submits. Fire once per question index.
   useEffect(() => {
-    if (!hasStarted || isSubmitted || questionTimeLeft <= 0) return;
-    const timer = setInterval(() => {
-      setQuestionTimeLeft((prev) => {
-        if (prev <= 1 && currentQuestionIndex < assessmentQuestions.length - 1) {
-          setCurrentQuestionIndex((i) => i + 1);
-          return perQuestionTime;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [questionTimeLeft, hasStarted, isSubmitted, currentQuestionIndex, assessmentQuestions.length, perQuestionTime]);
+    if (!inProgress || questions.length === 0) return;
+    if (overallRemaining <= 0) {
+      if (firedForIndex.current !== "overall") {
+        firedForIndex.current = "overall";
+        submit();
+      }
+      return;
+    }
+    if (questionRemaining <= 0 && firedForIndex.current !== currentIndex) {
+      firedForIndex.current = currentIndex;
+      advance();
+    }
+  }, [inProgress, questionRemaining, overallRemaining, currentIndex, questions.length, advance, submit]);
 
-  const goPrevious = () => currentQuestionIndex > 0 && setCurrentQuestionIndex(i => i - 1);
-  const goNext = () => currentQuestionIndex < assessmentQuestions.length - 1 && setCurrentQuestionIndex(i => i + 1);
+  const dir = RTL_LANGUAGES.includes(inProgress ? language : selectedLanguage) ? "rtl" : "ltr";
 
-  const handleAnswer = (qid, answer) => updateAnswer(qid, answer);
+  // ---------------------------------------------------------------- states
 
-  useEffect(() => { 
-    if (error) { 
-      setModal({ isOpen: true, type: "error", title: "Error", message: error }); 
-      clearError(); 
-    } 
-  }, [error, clearError]);
-
-  const answeredCount = assessmentQuestions.filter(q => q.answer !== undefined).length;
-  const formatTime = (s) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
-
-  if (loading && !hasStarted) {
+  if (phase === "idle" || phase === "loading") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-600 via-purple-600 to-blue-600 flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="bg-white/10 backdrop-blur-md rounded-3xl p-8 sm:p-12 shadow-2xl">
-            <LoadingSpinner size="lg" type="gradient" color="purple" />
-            <p className="mt-6 text-xl sm:text-2xl font-bold text-white">Loading Assessment...</p>
-            <p className="mt-2 text-sm text-blue-100">Please wait while we prepare your exam</p>
-          </div>
-        </div>
-      </div>
+      <CenteredPanel>
+        <LoadingSpinner size="lg" />
+        <p className="mt-4 text-gray-600">Loading assessment…</p>
+      </CenteredPanel>
     );
   }
 
+  if (phase === "error") {
+    return (
+      <CenteredPanel>
+        <FaExclamationTriangle className="mx-auto text-4xl text-red-500" aria-hidden="true" />
+        <h1 className="mt-4 text-xl font-bold text-gray-900">
+          {errorCode === "NOT_ENROLLED" ? "You are not enrolled in this assessment" : "Something went wrong"}
+        </h1>
+        <p className="mt-2 text-gray-600">{error}</p>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <button type="button" onClick={() => loadAttempt(assessmentId)} className="btn-secondary">
+            Try again
+          </button>
+          <Link to="/student/dashboard" className="btn-primary">
+            Back to dashboard
+          </Link>
+        </div>
+      </CenteredPanel>
+    );
+  }
+
+  if (phase === "completed" && result) {
+    return <ResultSummary result={result} />;
+  }
+
+  if (phase === "not_started" || phase === "starting") {
+    const starting = phase === "starting";
+    return (
+      <CenteredPanel dir={dir}>
+        <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Ready to begin?</h1>
+        <p className="mt-2 text-gray-600">Choose the language for your questions, then start.</p>
+
+        <div className="mt-6 text-start">
+          <label htmlFor="exam-language" className="mb-2 block text-sm font-semibold text-gray-800">
+            Question language
+          </label>
+          <select
+            id="exam-language"
+            value={selectedLanguage}
+            onChange={(e) => setSelectedLanguage(e.target.value)}
+            disabled={starting}
+            className="w-full min-h-11 rounded-lg border border-gray-300 bg-white px-3 py-2 text-base focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-200"
+          >
+            {LANGUAGES.map((l) => (
+              <option key={l.value} value={l.value}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <ul className="mt-6 space-y-2 rounded-lg bg-indigo-50 p-4 text-start text-sm text-indigo-900">
+          <li>• Each question has its own timer. When it runs out you move on automatically.</li>
+          <li>• You cannot go back to a previous question.</li>
+          <li>• Your answers are saved automatically as you choose them.</li>
+          <li>• You can take this assessment only once. If you refresh, you continue where you left off.</li>
+        </ul>
+
+        {error && (
+          <p role="alert" className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+            {error}
+          </p>
+        )}
+
+        <button
+          type="button"
+          onClick={() => startAssessment(assessmentId, selectedLanguage)}
+          disabled={starting}
+          className="btn-primary mt-6 w-full"
+        >
+          {starting ? (
+            <>
+              <LoadingSpinner size="sm" color="white" />
+              <span>Preparing your questions…</span>
+            </>
+          ) : (
+            "Start assessment"
+          )}
+        </button>
+      </CenteredPanel>
+    );
+  }
+
+  // ------------------------------------------------------------ exam view
+
+  const question = questions[currentIndex];
+  if (!question) {
+    return (
+      <CenteredPanel>
+        <LoadingSpinner size="lg" />
+      </CenteredPanel>
+    );
+  }
+  const answer = answers[question.id];
+  const submitting = phase === "submitting";
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-indigo-900 to-purple-900" dir={isRTL ? "rtl" : "ltr"}>
-      {/* START SCREEN */}
-      {!hasStarted && (
-        <div className="min-h-screen flex items-center justify-center p-4">
-          <Card className="w-full max-w-2xl shadow-2xl rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-indigo-500/50 animate-fade-in">
-            <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white p-6 sm:p-8 text-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-white/10 backdrop-blur-sm"></div>
-              <div className="relative z-10">
-                <FaGraduationCap className="text-5xl sm:text-6xl mx-auto mb-4 animate-bounce" />
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold mb-2">Welcome to Your Assessment</h1>
-                <p className="text-blue-100 text-sm sm:text-base">Select your preferred language and begin</p>
-              </div>
+    <div dir={dir} className="flex min-h-screen flex-col bg-gray-50">
+      {/* Top bar */}
+      <header className="sticky top-0 z-30 border-b border-gray-200 bg-white/95 backdrop-blur">
+        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2 px-4 py-3">
+          <span className="text-sm font-semibold text-gray-700">
+            Question {currentIndex + 1} / {questions.length}
+          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <SaveIndicator status={saveStatus} />
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-bold tabular-nums ${
+                questionRemaining <= 10 ? "bg-red-600 text-white" : "bg-indigo-600 text-white"
+              }`}
+              aria-label={`Time left for this question: ${formatTime(questionRemaining)}`}
+            >
+              <FaClock aria-hidden="true" />
+              {formatTime(questionRemaining)}
+            </span>
+            <span className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-semibold tabular-nums text-gray-700">
+              Total {formatTime(overallRemaining)}
+            </span>
+          </div>
+        </div>
+        <div className="h-1 bg-gray-100" aria-hidden="true">
+          <div
+            className="h-1 bg-indigo-600 transition-all"
+            style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
+          />
+        </div>
+      </header>
+
+      {/* Question */}
+      <main className="mx-auto w-full max-w-4xl flex-1 px-4 pb-32 pt-6 sm:pb-12">
+        <div className="mb-4 flex flex-wrap gap-2 text-xs font-semibold">
+          <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700">+{question.positive_marks} correct</span>
+          {question.negative_marks > 0 && (
+            <span className="rounded-full bg-red-50 px-3 py-1 text-red-700">−{question.negative_marks} wrong</span>
+          )}
+        </div>
+
+        <h1 className="text-xl font-semibold leading-relaxed text-gray-900 sm:text-2xl">{question.question_text}</h1>
+
+        <div className="mt-6">
+          {question.question_type === "multiple_choice" && (
+            <div role="radiogroup" aria-label="Answer options" className="grid gap-3 sm:grid-cols-2">
+              {question.options?.map((option, i) => {
+                const selected = answer === option;
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => setAnswer(question.id, option, question.question_type)}
+                    className={`flex min-h-14 items-start gap-3 rounded-xl border-2 p-4 text-start text-base transition focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-200 sm:text-lg ${
+                      selected ? "border-indigo-600 bg-indigo-50" : "border-gray-200 bg-white hover:border-indigo-300"
+                    }`}
+                  >
+                    <span
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold ${
+                        selected ? "bg-indigo-600 text-white" : "bg-gray-100 text-gray-700"
+                      }`}
+                    >
+                      {String.fromCharCode(65 + i)}
+                    </span>
+                    <span className="pt-0.5">{option}</span>
+                  </button>
+                );
+              })}
             </div>
-            
-            <div className="p-6 sm:p-10 space-y-6 sm:space-y-8 bg-white">
-              <div>
-                <label className="flex items-center gap-2 text-lg font-bold text-gray-800 mb-3">
-                  <FaLanguage className="text-indigo-600" />
-                  Select Language
-                </label>
-                <select
-                  value={selectedLanguage}
-                  onChange={(e) => setSelectedLanguage(e.target.value)}
-                  className="w-full p-4 text-base sm:text-lg border-2 border-indigo-200 rounded-xl focus:border-indigo-600 focus:ring-4 focus:ring-indigo-200 transition-all font-semibold"
-                >
-                  <option value="en">🇬🇧 English</option>
-                  <option value="ur">🇵🇰 Urdu</option>
-                  <option value="ar">🇸🇦 Arabic</option>
-                  <option value="fa">🇮🇷 Persian</option>
-                </select>
-              </div>
+          )}
 
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-indigo-200 rounded-xl p-4 sm:p-5">
-                <h3 className="font-bold text-indigo-900 mb-2 flex items-center gap-2">
-                  <FaFileAlt />
-                  Instructions
-                </h3>
-                <ul className="text-sm text-gray-700 space-y-1">
-                  <li>• Read each question carefully before answering</li>
-                  <li>• You can navigate between questions using Previous/Next buttons</li>
-                  <li>• Make sure to submit before time runs out</li>
-                  <li>• Your progress is automatically saved</li>
-                </ul>
-              </div>
+          {question.question_type === "true_false" && (
+            <div role="radiogroup" aria-label="True or false" className="grid grid-cols-2 gap-3">
+              {[true, false].map((value) => {
+                const selected = answer !== undefined && answer !== null && String(answer) === String(value);
+                return (
+                  <button
+                    key={String(value)}
+                    type="button"
+                    role="radio"
+                    aria-checked={selected}
+                    onClick={() => setAnswer(question.id, value, question.question_type)}
+                    className={`min-h-16 rounded-xl border-2 p-4 text-lg font-bold transition focus:outline-none focus-visible:ring-4 focus-visible:ring-indigo-200 ${
+                      selected ? "border-indigo-600 bg-indigo-50 text-indigo-800" : "border-gray-200 bg-white text-gray-800 hover:border-indigo-300"
+                    }`}
+                  >
+                    {value ? "True" : "False"}
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
+          {question.question_type === "short_answer" && (
+            <div>
+              <label htmlFor={`answer-${question.id}`} className="mb-2 block text-sm font-semibold text-gray-800">
+                Your answer
+              </label>
+              <textarea
+                id={`answer-${question.id}`}
+                value={answer ?? ""}
+                onChange={(e) => setAnswer(question.id, e.target.value, question.question_type)}
+                rows={5}
+                className="w-full rounded-xl border-2 border-gray-200 p-4 text-base focus:border-indigo-600 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+              />
+            </div>
+          )}
+        </div>
+
+        {error && (
+          <p role="alert" className="mt-6 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+            {error}
+          </p>
+        )}
+      </main>
+
+      {/* Navigation: sticky at the bottom on mobile */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white p-4 sm:static sm:border-0 sm:bg-transparent">
+        <div className="mx-auto flex max-w-4xl justify-end">
+          {isLast ? (
+            <button type="button" onClick={() => setConfirmSubmit(true)} disabled={submitting} className="btn-primary w-full sm:w-auto">
+              {submitting ? "Submitting…" : "Submit assessment"}
+            </button>
+          ) : (
+            <button type="button" onClick={() => advance()} disabled={submitting} className="btn-primary w-full sm:w-auto">
+              Next question
+            </button>
+          )}
+        </div>
+      </nav>
+
+      {confirmSubmit && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="confirm-submit-title">
+          <div className="w-full max-w-md rounded-t-2xl bg-white p-6 sm:rounded-2xl">
+            <h2 id="confirm-submit-title" className="text-lg font-bold text-gray-900">
+              Submit your assessment?
+            </h2>
+            <p className="mt-2 text-gray-600">You cannot change your answers after submitting.</p>
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button type="button" className="btn-secondary" onClick={() => setConfirmSubmit(false)}>
+                Keep working
+              </button>
               <button
-                onClick={handleStart}
-                disabled={loading}
-                className="w-full py-4 sm:py-5 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white text-lg sm:text-xl font-bold rounded-xl sm:rounded-2xl shadow-2xl hover:shadow-indigo-500/50 transition-all disabled:opacity-60 transform hover:-translate-y-1 active:translate-y-0 flex items-center justify-center gap-3"
+                type="button"
+                className="btn-primary"
+                onClick={() => {
+                  setConfirmSubmit(false);
+                  submit();
+                }}
               >
-                {loading ? (
-                  <>
-                    <LoadingSpinner size="sm" color="white" type="dots" />
-                    <span>Starting...</span>
-                  </>
-                ) : (
-                  <>
-                    <FaGraduationCap />
-                    <span>Start Assessment</span>
-                  </>
-                )}
+                Submit
               </button>
             </div>
-          </Card>
-        </div>
-      )}
-
-      {/* EXAM IN PROGRESS */}
-      {hasStarted && !isSubmitted && currentQuestion && (
-        <div className="min-h-screen flex flex-col">
-          {/* Top Status Bar */}
-          <div className="bg-gradient-to-r from-gray-900 to-indigo-900 shadow-2xl border-b-4 border-indigo-500 sticky top-0 z-50 backdrop-blur-md">
-            <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="flex items-center gap-3 sm:gap-6 text-sm sm:text-base">
-                  <div className="bg-indigo-600 text-white px-3 sm:px-4 py-2 rounded-lg font-bold flex items-center gap-2">
-                    <FaQuestionCircle />
-                    <span className="hidden xs:inline">Q</span> {currentQuestionIndex + 1}/{assessmentQuestions.length}
-                  </div>
-                  <div className="bg-green-600 text-white px-3 sm:px-4 py-2 rounded-lg font-bold flex items-center gap-2">
-                    <FaCheckCircle />
-                    <span className="hidden xs:inline">{answeredCount}</span>
-                  </div>
-                </div>
-                <div className="flex gap-2 sm:gap-3">
-                  <div className={`${questionTimeLeft <= 5 ? 'bg-red-600 animate-pulse' : 'bg-red-500'} text-white px-3 sm:px-5 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg`}>
-                    <FaClock />
-                    {formatTime(questionTimeLeft)}
-                  </div>
-                  <div className="bg-purple-600 text-white px-3 sm:px-5 py-2 rounded-lg font-bold flex items-center gap-2 shadow-lg">
-                    <span className="hidden xs:inline">Total:</span> {formatTime(timeRemaining)}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Question Card */}
-          <div className="flex-1 flex items-center justify-center p-3 sm:p-6">
-            <div className="w-full max-w-5xl">
-              <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border-2 border-indigo-500/30 animate-slide-in">
-                {/* Question Header */}
-                <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 text-white p-4 sm:p-6 text-center">
-                  <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold flex items-center justify-center gap-2 sm:gap-3">
-                    <FaQuestionCircle className="animate-pulse" />
-                    Question {currentQuestionIndex + 1} of {assessmentQuestions.length}
-                  </h2>
-                </div>
-
-                {/* Question Content */}
-                <div className="p-4 sm:p-8 lg:p-10 space-y-6 sm:space-y-8 animate-fade-in">
-                  {/* Question Text */}
-                  <div className="text-center bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-indigo-200 rounded-2xl p-5 sm:p-6 lg:p-8">
-                    <p className="text-lg sm:text-xl lg:text-2xl font-semibold leading-relaxed text-gray-900">
-                      {currentQuestion.question_text}
-                    </p>
-                  </div>
-
-                  {/* Marks Display */}
-                  <div className="flex justify-center gap-3 sm:gap-6">
-                    <span className="bg-green-100 text-green-800 px-4 sm:px-6 py-2 sm:py-3 rounded-xl text-base sm:text-lg font-bold border-2 border-green-300 shadow-md">
-                      +{currentQuestion.positive_marks || 1}
-                    </span>
-                    {currentQuestion.negative_marks > 0 && (
-                      <span className="bg-red-100 text-red-800 px-4 sm:px-6 py-2 sm:py-3 rounded-xl text-base sm:text-lg font-bold border-2 border-red-300 shadow-md">
-                        -{currentQuestion.negative_marks}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Multiple Choice */}
-                  {currentQuestion.question_type === "multiple_choice" && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                      {currentQuestion.options?.map((opt, i) => (
-                        <button
-                          key={i}
-                          onClick={() => handleAnswer(currentQuestion.id, opt)}
-                          className={`p-4 sm:p-6 rounded-xl sm:rounded-2xl text-base sm:text-lg lg:text-xl font-semibold transition-all border-4 shadow-lg hover:shadow-xl transform hover:-translate-y-1 active:translate-y-0 ${
-                            currentQuestion.answer === opt
-                              ? "border-indigo-600 bg-gradient-to-r from-indigo-100 to-purple-100 scale-105 shadow-indigo-300"
-                              : "border-gray-300 bg-white hover:border-indigo-400"
-                          }`}
-                        >
-                          <span className="font-bold text-indigo-600 mr-2">{String.fromCharCode(65 + i)}.</span>
-                          {opt}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* True/False */}
-                  {currentQuestion.question_type === "true_false" && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 max-w-3xl mx-auto">
-                      {["True", "False"].map((val) => (
-                        <button
-                          key={val}
-                          onClick={() => handleAnswer(currentQuestion.id, val === "True")}
-                          className={`p-8 sm:p-12 rounded-2xl sm:rounded-3xl text-2xl sm:text-3xl lg:text-4xl font-extrabold transition-all border-8 shadow-2xl hover:shadow-3xl transform hover:-translate-y-2 active:translate-y-0 ${
-                            currentQuestion.answer === (val === "True")
-                              ? val === "True" 
-                                ? "border-green-600 bg-gradient-to-br from-green-50 to-green-100 text-green-700 scale-105" 
-                                : "border-red-600 bg-gradient-to-br from-red-50 to-red-100 text-red-700 scale-105"
-                              : "border-gray-300 bg-white hover:border-gray-400"
-                          }`}
-                        >
-                          {val === "True" ? "✓ TRUE" : "✗ FALSE"}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Short Answer */}
-                  {currentQuestion.question_type === "short_answer" && (
-                    <textarea
-                      value={currentQuestion.answer || ""}
-                      onChange={(e) => handleAnswer(currentQuestion.id, e.target.value)}
-                      placeholder="Type your answer here..."
-                      rows={6}
-                      className="w-full p-4 sm:p-6 text-base sm:text-lg border-4 border-indigo-200 rounded-2xl focus:border-indigo-600 resize-none focus:ring-4 focus:ring-indigo-200 transition-all"
-                    />
-                  )}
-                </div>
-
-                {/* Navigation Footer */}
-                <div className="bg-gradient-to-r from-gray-50 to-blue-50 p-4 sm:p-6 flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-4 border-t-2 border-gray-200">
-                  <button
-                    onClick={goPrevious}
-                    disabled={currentQuestionIndex === 0}
-                    className="w-full sm:w-auto flex items-center justify-center gap-2 sm:gap-3 px-5 sm:px-6 py-3 bg-white border-2 border-gray-300 text-gray-800 rounded-xl font-bold disabled:opacity-50 hover:bg-gray-50 hover:border-gray-400 transition-all shadow-md"
-                  >
-                    <FaArrowLeft />
-                    <span>Previous</span>
-                  </button>
-
-                  {currentQuestionIndex === assessmentQuestions.length - 1 ? (
-                    <button
-                      onClick={handleSubmit}
-                      disabled={isSubmitting}
-                      className="w-full sm:w-auto flex items-center justify-center gap-2 sm:gap-3 px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-bold rounded-xl shadow-2xl hover:shadow-green-500/50 transition-all disabled:opacity-50 transform hover:-translate-y-1 active:translate-y-0"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <LoadingSpinner size="sm" color="white" type="dots" />
-                          <span>Submitting...</span>
-                        </>
-                      ) : (
-                        <>
-                          <FaCheckCircle />
-                          <span>Submit Exam</span>
-                        </>
-                      )}
-                    </button>
-                  ) : (
-                    <button
-                      onClick={goNext}
-                      className="w-full sm:w-auto flex items-center justify-center gap-2 sm:gap-3 px-6 sm:px-8 py-3 sm:py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold rounded-xl shadow-2xl hover:shadow-indigo-500/50 transition-all transform hover:-translate-y-1 active:translate-y-0"
-                    >
-                      <span>Next Question</span>
-                      <FaArrowRight />
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       )}
 
-      {/* Modal */}
-      <Modal 
-        isOpen={modal.isOpen} 
-        onClose={() => { 
-          setModal({ ...modal, isOpen: false }); 
-          if (modal.type === "success") navigate("/student/dashboard"); 
-        }} 
-        type={modal.type} 
-        title={modal.title}
-      >
-        <p className="text-lg sm:text-xl text-center">{modal.message}</p>
-      </Modal>
-
-      {/* Animations */}
-      <style jsx>{`
-        @keyframes slide-in {
-          from {
-            opacity: 0;
-            transform: translateX(${isRTL ? "-100%" : "100%"}) scale(0.95);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0) scale(1);
-          }
-        }
-        @keyframes fade-in {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-slide-in {
-          animation: slide-in 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-        .animate-fade-in {
-          animation: fade-in 0.6s ease-out;
-        }
-      `}</style>
+      {submitting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/80" role="status">
+          <LoadingSpinner size="lg" />
+          <span className="ms-3 font-semibold text-gray-700">Submitting…</span>
+        </div>
+      )}
     </div>
+  );
+}
+
+function CenteredPanel({ children, dir = "ltr" }) {
+  return (
+    <div dir={dir} className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+      <div className="w-full max-w-lg rounded-2xl bg-white p-6 text-center shadow-sm ring-1 ring-gray-200 sm:p-8">{children}</div>
+    </div>
+  );
+}
+
+function ResultSummary({ result }) {
+  const minutes = Math.floor((result.timeTakenSeconds || 0) / 60);
+  const seconds = (result.timeTakenSeconds || 0) % 60;
+  const stats = [
+    { label: "Score", value: `${result.score} / ${result.totalMarks}` },
+    { label: "Percentage", value: `${result.percentage}%` },
+    { label: "Correct", value: result.correctCount },
+    { label: "Incorrect", value: result.incorrectCount },
+    { label: "Unanswered", value: result.unansweredCount },
+    { label: "Time taken", value: `${minutes}m ${seconds}s` },
+  ];
+
+  return (
+    <CenteredPanel>
+      <FaCheckCircle className="mx-auto text-5xl text-emerald-500" aria-hidden="true" />
+      <h1 className="mt-4 text-2xl font-bold text-gray-900">Assessment submitted</h1>
+      <p className="mt-1 text-gray-600">Here is how you did.</p>
+      <dl className="mt-6 grid grid-cols-2 gap-3 text-start sm:grid-cols-3">
+        {stats.map((s) => (
+          <div key={s.label} className="rounded-xl bg-gray-50 p-3">
+            <dt className="text-xs font-medium text-gray-500">{s.label}</dt>
+            <dd className="mt-1 text-lg font-bold text-gray-900">{s.value}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
+        <Link to={`/student/analytics?assessment=${result.assessmentId}`} className="btn-primary">
+          Review answers
+        </Link>
+        <Link to="/student/dashboard" className="btn-secondary">
+          Back to dashboard
+        </Link>
+      </div>
+    </CenteredPanel>
   );
 }
 

@@ -31,6 +31,9 @@ const StudentAnalytics = () => {
     questionsLoading,
 
   } = useStudentAnalyticsStore();
+  const completedAssessments = (Array.isArray(assessments) ? assessments : []).filter(
+    (a) => a.status === "completed"
+  );
 
   const [showType, setShowType] = useState(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -142,8 +145,8 @@ const StudentAnalytics = () => {
 
         {/* Assessment List */}
         <div ref={assessmentsRef} className="space-y-4 sm:space-y-6 max-w-5xl mx-auto scroll-mt-24">
-       {Array.isArray(assessments) && assessments.length > 0 ? (
-            assessments.map((a) => (
+       {completedAssessments.length > 0 ? (
+            completedAssessments.map((a) => (
               <Card
                 key={a.id}
                 className={`w-full shadow-xl hover:shadow-2xl transition-all duration-300 border-2 transform hover:-translate-y-1 ${selectedAssessment === a.id

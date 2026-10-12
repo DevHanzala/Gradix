@@ -8,34 +8,16 @@ import {
   fetchEnrolledStudentsApi,
   enrollStudentApi,
   unenrollStudentApi,
-  fetchStudentAssessmentsApi,
   fetchPreviewQuestionsApi,
   generatePhysicalPaperApi,
 } from "../api/assessment.api";
 
 const useAssessmentStore = create((set) => ({
   assessments: [],
-  studentAssessments: [],
   currentAssessment: null,
   enrolledStudents: [],
   loading: false,
   error: null,
-
-  /* =========================
-     Student
-  ========================= */
-
-  getStudentAssessments: async () => {
-    set({ loading: true, error: null });
-    try {
-      const response = await fetchStudentAssessmentsApi();
-      set({ studentAssessments: response.data.data || [], loading: false });
-    } catch (error) {
-      const message = error.response?.data?.message || "Failed to fetch assessments";
-      set({ error: message, loading: false });
-      throw error;
-    }
-  },
 
   /* =========================
      Instructor

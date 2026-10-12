@@ -45,13 +45,6 @@ export const unenrollStudentApi = (assessmentId, studentId) =>
   );
 
 /* =========================
-   Student Side
-========================= */
-
-export const fetchStudentAssessmentsApi = () =>
-  apiClient.get("/taking/assessments");
-
-/* =========================
    Preview / AI
 ========================= */
 
