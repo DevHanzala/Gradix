@@ -247,3 +247,28 @@ export const canonicalStudentAnswer = (question, answer) => {
       return String(answer).trim();
   }
 };
+
+// ---------------------------------------------------------------- Review
+
+/**
+ * Shape one question for a review screen (student or instructor) using the
+ * same grading function as submission, so the screens always agree with the score.
+ * `row` needs question_type, options, correct_answer, student_answer and marks.
+ */
+export const toReviewItem = (row) => {
+  const { answered, correct, score } = gradeAnswer(row, row.student_answer);
+  const options = row.question_type === "multiple_choice" ? normalizeOptions(row.options) : null;
+  return {
+    question_order: row.question_order,
+    question_type: row.question_type,
+    question_text: row.question_text,
+    options,
+    correct_answer: decodeStoredValue(row.correct_answer),
+    student_answer: row.student_answer ?? null,
+    answered,
+    is_correct: correct,
+    score,
+    positive_marks: Number(row.positive_marks),
+    negative_marks: Number(row.negative_marks),
+  };
+};

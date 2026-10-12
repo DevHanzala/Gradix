@@ -6,7 +6,7 @@ import {
   getAssessmentQuestions as modelGetAssessmentQuestions,
 } from "../models/studentAnalyticsModel.js";
 import { findEnrolledAssessmentsWithStatusQuery } from "../repositories/studentAnalyticsRepository.js";
-import { getCheckingModel } from "./ai/aiProviders.js";
+import { generateContent } from "./ai/generateContent.js";
 
 // ==================== SERVICE FUNCTIONS ====================
 
@@ -172,9 +172,7 @@ export const getStudentReportService = async (studentId, userRole, format = "jso
  * Generate AI recommendations for assessment
  */
 const generateAIRecommendations = async (details) => {
-  const checkingClient = await getCheckingModel();
   const weakQuestionsJson = JSON.stringify(details.weak_questions || []);
-
   const prompt = `
 You are an educational AI assistant.
 
@@ -209,19 +207,12 @@ Expected JSON format:
 `;
 
   try {
-    const response = await checkingClient.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: {
-        maxOutputTokens: 1000,
-        temperature: 0.4,
-      },
+    let responseText = await generateContent(prompt, {
+      purpose: "checking",
+      maxOutputTokens: 1000,
+      temperature: 0.4,
+      responseMimeType: "application/json",
     });
-
-    let responseText =
-      response.text ||
-      response?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "";
 
     responseText = responseText
       .replace(/^```json\s*/i, "")

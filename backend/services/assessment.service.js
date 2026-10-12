@@ -1,137 +1,76 @@
+import { getAssessmentsByInstructor, getAssessmentById, getEnrolledStudents, generateAssessmentQuestions } from "../models/assessmentModel.js";
+import { generateContent } from "./ai/generateContent.js";
+import { findUserByEmail, getUserById } from "../models/userModel.js";
+import { sendAssessmentEnrollmentEmail } from "../helper/emailService.js";
+import { prepareUploadedFiles, insertPreparedResource } from "../helper/resourceIngest.js";
+import { withTransaction } from "../DB/db.js";
+import * as assessmentRepo from "../repositories/assessmentRepository.js";
+import { requireAssessmentAccess } from "./assessmentAccess.js";
+import { assertResourcesUsable } from "./resource.service.js";
+import { AppError } from "../utils/AppError.js";
 import {
-  createAssessment,
-  storeQuestionBlocks,
-  getAssessmentsByInstructor,
-  getAssessmentById,
-  updateAssessment,
-  deleteAssessment,
-  enrollStudent,
-  unenrollStudent,
-  getEnrolledStudents,
-  generateAssessmentQuestions,
-  storeResourceChunk,
-} from '../models/assessmentModel.js';
-import { generateContent } from './ai/generateContent.js';
-import { findUserByEmail } from '../models/userModel.js';
-import { createResource, linkResourceToAssessment } from '../models/resourceModel.js';
-import { uploadResource } from '../controllers/resourceController.js';
-import { sendAssessmentEnrollmentEmail } from '../helper/emailService.js';
-import { extractTextFromFile, chunkText } from '../helper/textProcessor.js';
-import { generateEmbedding } from '../helper/embeddingGenerator.js';
-import pool from '../DB/db.js';
-import { requireAssessmentAccess } from './assessmentAccess.js';
-import { assertResourcesUsable } from './resource.service.js';
-import { findAssessmentByIdForInstructorQuery } from '../repositories/assessmentRepository.js';
+  parseJsonField,
+  normalizeQuestionBlocks,
+  normalizeLinks,
+  normalizeResourceIds,
+  normalizeAssessmentInput,
+} from "../validator/assessmentInput.js";
 
-// ==================== SERVICE FUNCTIONS ====================
+// ==================== CREATE ====================
 
-// 1. CREATE ASSESSMENT BASIC SERVICE
-export const createAssessmentBasicService = async (payload, userId, files, userRole = "instructor") => {
-  await assertResourcesUsable(Array.isArray(payload.selected_resources) ? payload.selected_resources : [], {
-    id: userId,
-    role: userRole,
+/**
+ * Create an assessment from title + (prompt | links | resources | files).
+ * Uploaded files are extracted and embedded BEFORE anything is written, then
+ * the assessment, its blocks, links and new resources are inserted in one
+ * transaction, so a failure never leaves half-written data.
+ */
+export const createAssessmentService = async (body, user, files = []) => {
+  const links = normalizeLinks(parseJsonField(body.external_links ?? body.externalLinks, []));
+  const resourceIds = normalizeResourceIds(parseJsonField(body.selected_resources, []));
+  const blocks = normalizeQuestionBlocks(parseJsonField(body.question_blocks, []));
+  const { title, prompt } = normalizeAssessmentInput({
+    title: body.title,
+    prompt: body.prompt,
+    links,
+    resourceIds,
+    fileCount: files.length,
   });
-  const assessment = await createAssessmentRecord(payload, userId);
 
-  await processQuestionBlocks(
-    assessment.id,
-    payload.question_blocks,
-    userId
-  );
+  await assertResourcesUsable(resourceIds, user);
+  const prepared = await prepareUploadedFiles(files);
 
-  if (Array.isArray(payload.selected_resources)) {
-    for (const resourceId of payload.selected_resources) {
-      await linkResourceToAssessment(assessment.id, resourceId);
+  return withTransaction(async (client) => {
+    const assessment = await assessmentRepo.createAssessmentQuery(
+      { title, prompt, external_links: links, instructor_id: user.id, is_executed: false },
+      client
+    );
+
+    for (const block of blocks) {
+      await assessmentRepo.createQuestionBlockQuery({ assessmentId: assessment.id, ...block, instructorId: user.id }, client);
     }
-  }
+    for (const resourceId of resourceIds) {
+      await assessmentRepo.linkResourceToAssessmentQuery(assessment.id, resourceId, client);
+    }
+    for (const file of prepared) {
+      const resource = await insertPreparedResource(client, file, { userId: user.id });
+      await assessmentRepo.linkResourceToAssessmentQuery(assessment.id, resource.id, client);
+    }
 
-  await processResourcesService(files, assessment.id, userId);
-
-  return assessment;
+    return assessment;
+  });
 };
 
-// 2. CREATE NEW ASSESSMENT SERVICE
-export const createNewAssessmentService = async (data, userId, files) => {
-  const {
-    title,
-    prompt,
-    externalLinks,
-    question_blocks,
-    selected_resources = [],
-  } = data;
+// ==================== READ ====================
 
-  const new_files = files?.new_files || [];
-
-  if (!title || !title.trim()) {
-    throw new Error('Assessment Title is required');
-  }
-
-  const hasFiles = new_files.length > 0;
-  const hasLinks = Array.isArray(externalLinks) && externalLinks.some(l => l && l.trim());
-  const hasSelectedResources = selected_resources.length > 0;
-  const hasAnySource = hasFiles || hasLinks || hasSelectedResources;
-
-  if (!hasAnySource && (!prompt || !prompt.trim())) {
-    throw new Error('Prompt is required when no resources or links are provided');
-  }
-
-  if (question_blocks && Array.isArray(question_blocks) && question_blocks.length > 0) {
-    for (const block of question_blocks) {
-      if (!block.question_count || block.question_count < 1) {
-        throw new Error('Question count must be at least 1');
-      }
-      if (!block.duration_per_question || block.duration_per_question < 30) {
-        throw new Error('Duration per question must be at least 30 seconds');
-      }
-      if (block.question_type === 'multiple_choice' && (!block.num_options || block.num_options < 2)) {
-        throw new Error('Multiple choice needs at least 2 options');
-      }
-    }
-  }
-
-  const assessmentData = {
-    title: title.trim(),
-    prompt: hasAnySource ? (prompt?.trim() || null) : prompt.trim(),
-    external_links: hasLinks ? externalLinks.filter(link => link && link.trim()) : null,
-    instructor_id: userId,
-    is_executed: false,
-  };
-
-  const newAssessment = await createAssessment(assessmentData);
-
-  if (question_blocks?.length > 0) {
-    await storeQuestionBlocks(newAssessment.id, question_blocks, userId);
-  }
-
-  let newResourceIds = [];
-  if (hasFiles) {
-    const uploaded = await uploadResource({ files: new_files });
-    newResourceIds = uploaded.map(r => r.id);
-  }
-
-  const allResourceIds = [...selected_resources.map(id => parseInt(id)), ...newResourceIds];
-  for (const id of allResourceIds) {
-    if (!isNaN(id)) await linkResourceToAssessment(newAssessment.id, id);
-  }
-
-  return newAssessment;
-};
-
-// 3. GET INSTRUCTOR ASSESSMENTS SERVICE — Redis removed, always hits DB
 export const getInstructorAssessmentsService = async (instructorId) => {
   const assessments = await getAssessmentsByInstructor(instructorId);
-  return { data: assessments, fromCache: false };
+  return { data: assessments };
 };
 
-// 4. GET SINGLE ASSESSMENT SERVICE — Redis removed, always hits DB
 export const getAssessmentService = async (assessmentId, user) => {
-  if (isNaN(assessmentId)) {
-    throw new Error('Invalid assessment ID');
-  }
-
-  if (user.role !== 'student') {
+  if (user.role !== "student") {
     const owned = await requireAssessmentAccess(assessmentId, user);
-    const full = await findAssessmentByIdForInstructorQuery(owned.id, owned.instructor_id);
+    const full = await assessmentRepo.findAssessmentByIdForInstructorQuery(owned.id, owned.instructor_id);
     return {
       data: {
         ...full,
@@ -139,226 +78,190 @@ export const getAssessmentService = async (assessmentId, user) => {
         question_blocks: full.question_blocks || [],
         resources: full.resources || [],
       },
-      fromCache: false,
     };
   }
 
-  const assessment = await getAssessmentById(assessmentId, user.id, user.role);
-  if (!assessment) {
-    throw new Error('Assessment not found or access denied');
-  }
-
-  return { data: assessment, fromCache: false };
+  const id = Number.parseInt(assessmentId, 10);
+  if (!Number.isInteger(id)) throw new AppError("INVALID_ASSESSMENT_ID", 400, "Invalid assessment ID");
+  const assessment = await getAssessmentById(id, user.id, user.role);
+  if (!assessment) throw new AppError("ASSESSMENT_NOT_FOUND", 404, "Assessment not found");
+  return { data: assessment };
 };
 
-// 5. UPDATE ASSESSMENT SERVICE
-export const updateAssessmentService = async (assessmentId, updateData, user, files) => {
-  await requireAssessmentAccess(assessmentId, user, { lockAfterExecution: true });
-  const userId = user.id;
-  const { title, prompt, externalLinks, question_blocks, selected_resources } = updateData;
-  await assertResourcesUsable(selected_resources, user);
-  const new_files = files || [];
+// ==================== UPDATE ====================
 
-  if (!title?.trim()) {
-    throw new Error('Assessment Title is required');
-  }
+/**
+ * Update an assessment that no student has started yet (owner or super_admin).
+ * Question blocks are replaced only when sent. Resource links are replaced by
+ * `selected_resources` plus any newly uploaded files. All writes are atomic.
+ */
+export const updateAssessmentService = async (assessmentId, body, user, files = []) => {
+  const existing = await requireAssessmentAccess(assessmentId, user, { lockAfterExecution: true });
 
-  const hasPrompt = prompt?.trim();
-  const hasLinks = Array.isArray(externalLinks) && externalLinks.some(l => l?.trim());
-  const hasResources = selected_resources.length > 0 || new_files.length > 0;
+  const links = normalizeLinks(parseJsonField(body.external_links ?? body.externalLinks, []));
+  const resourceIds = normalizeResourceIds(parseJsonField(body.selected_resources, []));
+  const rawBlocks = parseJsonField(body.question_blocks, undefined);
+  const blocks = rawBlocks === undefined ? null : normalizeQuestionBlocks(rawBlocks);
+  const { title, prompt } = normalizeAssessmentInput({
+    title: body.title,
+    prompt: body.prompt,
+    links,
+    resourceIds,
+    fileCount: files.length,
+  });
 
-  if (!hasPrompt && !hasLinks && !hasResources) {
-    throw new Error('You must provide either a Prompt, Resources, or External Links');
-  }
+  await assertResourcesUsable(resourceIds, user);
+  const prepared = await prepareUploadedFiles(files);
 
-  const updatePayload = {
-    title: title.trim(),
-    prompt: hasPrompt ? prompt.trim() : null,
-    external_links: hasLinks ? externalLinks.filter(l => l?.trim()) : null,
-  };
+  return withTransaction(async (client) => {
+    const updated = await assessmentRepo.updateAssessmentQuery(existing.id, { title, prompt, external_links: links }, client);
 
-  const updatedAssessment = await updateAssessment(parseInt(assessmentId), updatePayload);
-
-  if (question_blocks.length > 0) {
-    await storeQuestionBlocks(parseInt(assessmentId), question_blocks, userId);
-  }
-
-  await pool.query(`DELETE FROM assessment_resources WHERE assessment_id = $1`, [assessmentId]);
-
-  for (const resourceId of selected_resources) {
-    if (!isNaN(parseInt(resourceId))) {
-      await linkResourceToAssessment(assessmentId, parseInt(resourceId));
-    }
-  }
-
-  for (const file of new_files) {
-    const text = await extractTextFromFile(file.buffer, file.mimetype);
-    const chunks = chunkText(text, 500);
-
-    const resource = await createResource({
-      name: file.originalname,
-      file_type: file.mimetype,
-      file_size: file.size,
-      content_type: 'file',
-      visibility: 'private',
-      uploaded_by: userId,
-    });
-
-    for (let i = 0; i < chunks.length; i++) {
-      const embedding = await generateEmbedding(chunks[i]);
-      await storeResourceChunk(resource.id, chunks[i], embedding, { chunk_index: i });
+    if (blocks) {
+      await assessmentRepo.deleteQuestionBlocksByAssessmentQuery(existing.id, client);
+      for (const block of blocks) {
+        await assessmentRepo.createQuestionBlockQuery({ assessmentId: existing.id, ...block, instructorId: user.id }, client);
+      }
     }
 
-    await linkResourceToAssessment(assessmentId, resource.id);
-  }
+    await assessmentRepo.deleteAssessmentResourceLinksQuery(existing.id, client);
+    for (const resourceId of resourceIds) {
+      await assessmentRepo.linkResourceToAssessmentQuery(existing.id, resourceId, client);
+    }
+    for (const file of prepared) {
+      const resource = await insertPreparedResource(client, file, { userId: user.id });
+      await assessmentRepo.linkResourceToAssessmentQuery(existing.id, resource.id, client);
+    }
 
-  return updatedAssessment;
+    return updated;
+  });
 };
 
-// 6. DELETE ASSESSMENT SERVICE
+// ==================== DELETE ====================
+
 export const deleteAssessmentService = async (assessmentId, user) => {
-  await requireAssessmentAccess(assessmentId, user, { lockAfterExecution: true });
-
-  await deleteAssessment(parseInt(assessmentId));
+  const assessment = await requireAssessmentAccess(assessmentId, user, { lockAfterExecution: true });
+  await assessmentRepo.deleteAssessmentQuery(assessment.id);
   return { success: true };
 };
 
-// 7. ENROLL STUDENT SERVICE
-export const enrollStudentService = async (assessmentId, email, userId, userRole) => {
-  if (!assessmentId || isNaN(parseInt(assessmentId))) {
-    throw new Error('Invalid assessment ID');
+// ==================== ENROLLMENT ====================
+
+export const enrollStudentService = async (assessmentId, email, user) => {
+  const assessment = await requireAssessmentAccess(assessmentId, user);
+
+  const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+  if (!normalizedEmail) throw new AppError("EMAIL_REQUIRED", 400, "Student email is required.");
+
+  const student = await findUserByEmail(normalizedEmail);
+  if (!student) throw new AppError("STUDENT_NOT_FOUND", 404, "No account exists with that email.");
+  if (student.role !== "student") throw new AppError("NOT_A_STUDENT", 400, "That account is not a student account.");
+
+  let enrollment;
+  try {
+    enrollment = await assessmentRepo.createEnrollmentQuery(assessment.id, student.id);
+  } catch (error) {
+    if (error.code === "23505") throw new AppError("ALREADY_ENROLLED", 409, "This student is already enrolled.");
+    throw error;
   }
 
-  if (!email || typeof email !== 'string' || !email.trim()) {
-    throw new Error('Student email is required and must be a valid string');
-  }
+  // After the insert has committed; failures are logged, never thrown.
+  const instructor = await getUserById(user.id);
+  sendAssessmentEnrollmentEmail(student.email, student.name, assessment.title, instructor?.name);
 
-  const assessment = await requireAssessmentAccess(assessmentId, { id: userId, role: userRole });
-
-  const student = await findUserByEmail(email);
-  if (!student) {
-    throw new Error('Student not found');
-  }
-
-  if (student.role !== 'student') {
-    throw new Error(`User is not a student (role: ${student.role})`);
-  }
-
-  const enrollment = await enrollStudent(parseInt(assessmentId), email);
-  await sendAssessmentEnrollmentEmail(email, assessment.title, assessmentId);
-
-  return { enrollment, student };
+  return { enrollment, student: { id: student.id, name: student.name, email: student.email } };
 };
 
-// 8. UNENROLL STUDENT SERVICE
-export const unenrollStudentService = async (assessmentId, studentId, userId, userRole) => {
-  if (!assessmentId || isNaN(parseInt(assessmentId))) {
-    throw new Error('Invalid assessment ID');
-  }
+export const unenrollStudentService = async (assessmentId, studentId, user) => {
+  const assessment = await requireAssessmentAccess(assessmentId, user);
+  const sid = Number.parseInt(studentId, 10);
+  if (!Number.isInteger(sid)) throw new AppError("INVALID_STUDENT_ID", 400, "Invalid student ID.");
 
-  if (!studentId || isNaN(parseInt(studentId))) {
-    throw new Error('Invalid student ID');
-  }
-
-  const assessment = await requireAssessmentAccess(assessmentId, { id: userId, role: userRole });
-
-  const result = await unenrollStudent(parseInt(assessmentId), parseInt(studentId));
-  return result;
+  const removed = await assessmentRepo.deleteEnrollmentQuery(assessment.id, sid);
+  if (!removed) throw new AppError("ENROLLMENT_NOT_FOUND", 404, "This student is not enrolled.");
+  return removed;
 };
 
-// 9. GET ENROLLED STUDENTS SERVICE
-export const getEnrolledStudentsService = async (assessmentId, userId, userRole) => {
-  if (!assessmentId || isNaN(parseInt(assessmentId))) {
-    throw new Error('Invalid assessment ID');
-  }
-
-  const assessment = await requireAssessmentAccess(assessmentId, { id: userId, role: userRole });
-
-  const students = await getEnrolledStudents(parseInt(assessmentId));
-  return students;
+export const getEnrolledStudentsService = async (assessmentId, user) => {
+  const assessment = await requireAssessmentAccess(assessmentId, user);
+  return getEnrolledStudents(assessment.id);
 };
 
-// 10. PREVIEW QUESTIONS SERVICE
-export const previewQuestionsService = async (assessmentId, instructorId, userRole) => {
-  const assessment = await requireAssessmentAccess(assessmentId, { id: instructorId, role: userRole });
+// ==================== AI PREVIEW / PRINT ====================
 
-  const { questions } = await generateAssessmentQuestions(assessmentId, 'en', assessment);
+export const previewQuestionsService = async (assessmentId, user) => {
+  const assessment = await requireAssessmentAccess(assessmentId, user);
+  const { questions } = await generateAssessmentQuestions(assessment.id, "en", assessment);
   return questions;
 };
 
-// 11. GENERATE PHYSICAL PAPER SERVICE
-export const generatePhysicalPaperService = async (assessmentId, instructorId, userRole, paperData) => {
+const PAPER_LANGUAGES = { en: "English", ar: "Arabic", ur: "Urdu", fa: "Persian" };
+const PAPER_LABELS = {
+  en: { institute: "Institute Name", teacher: "Teacher Name", subject: "Subject Name", date: "Paper Date", time: "Paper Time", notes: "Notes" },
+  ar: { institute: "اسم المعهد", teacher: "اسم المعلم", subject: "اسم المادة", date: "تاريخ الامتحان", time: "وقت الامتحان", notes: "ملاحظات" },
+  ur: { institute: "ادارے کا نام", teacher: "استاد کا نام", subject: "مضمون کا نام", date: "امتحان کی تاریخ", time: "امتحان کا وقت", notes: "نوٹس" },
+  fa: { institute: "نام موسسه", teacher: "نام معلم", subject: "نام درس", date: "تاریخ امتحان", time: "زمان امتحان", notes: "یادداشت ها" },
+};
+
+const extractValue = (lines, label) => {
+  const line = lines.find((l) => l.includes(label));
+  if (!line) return null;
+  const parts = line.split(":");
+  return parts.length < 2 ? null : parts.slice(1).join(":").trim();
+};
+
+const extractNotes = (lines, notesLabel) => {
+  const index = lines.findIndex((l) => l.includes(notesLabel));
+  return index === -1 ? null : lines.slice(index + 1).join("\n").trim();
+};
+
+/**
+ * Generate a fresh question set in `language` for a printed paper. Nothing is
+ * written to the database (no fake attempts).
+ */
+export const generatePhysicalPaperService = async (assessmentId, user, paperData) => {
   const {
-    language = 'en',
-    instituteName = '',
-    teacherName = '',
-    subjectName = '',
-    paperDate = '',
-    paperTime = '',
-    notes = '',
+    language = "en",
+    instituteName = "",
+    teacherName = "",
+    subjectName = "",
+    paperDate = "",
+    paperTime = "",
+    notes = "",
   } = paperData;
 
-  const assessment = await requireAssessmentAccess(assessmentId, { id: instructorId, role: userRole });
+  if (!PAPER_LANGUAGES[language]) throw new AppError("UNSUPPORTED_LANGUAGE", 400, "Unsupported language.");
 
-  const { questions } = await generateAssessmentQuestions(assessmentId, language, assessment);
-
+  const assessment = await requireAssessmentAccess(assessmentId, user);
+  const { questions } = await generateAssessmentQuestions(assessment.id, language, assessment);
   if (!questions || questions.length === 0) {
-    throw new Error('No questions generated');
+    throw new AppError("GENERATION_FAILED", 503, "Could not generate questions for the paper. Please try again.");
   }
 
-  const langMap = {
-    en: 'English',
-    ar: 'Arabic',
-    ur: 'Urdu',
-    fa: 'Persian',
-  };
-  const langName = langMap[language] || 'English';
+  const labels = PAPER_LABELS[language];
+  let headers = { instituteName, teacherName, subjectName, paperDate, paperTime, notes };
 
-  const labels = {
-    en: { institute: 'Institute Name', teacher: 'Teacher Name', subject: 'Subject Name', date: 'Paper Date', time: 'Paper Time', notes: 'Notes' },
-    ar: { institute: 'اسم المعهد', teacher: 'اسم المعلم', subject: 'اسم المادة', date: 'تاريخ الامتحان', time: 'وقت الامتحان', notes: 'ملاحظات' },
-    ur: { institute: 'ادارے کا نام', teacher: 'استاد کا نام', subject: 'مضمون کا نام', date: 'امتحان کی تاریخ', time: 'امتحان کا وقت', notes: 'نوٹس' },
-    fa: { institute: 'نام موسسه', teacher: 'نام معلم', subject: 'نام درس', date: 'تاریخ امتحان', time: 'زمان امتحان', notes: 'یادداشت ها' },
-  }[language] || { institute: 'Institute Name', teacher: 'Teacher Name', subject: 'Subject Name', date: 'Paper Date', time: 'Paper Time', notes: 'Notes' };
+  if (language !== "en") {
+    const langName = PAPER_LANGUAGES[language];
+    const headerText = [
+      `${labels.institute}: ${instituteName || "Not provided"}`,
+      `${labels.teacher}: ${teacherName || "Not provided"}`,
+      `${labels.subject}: ${subjectName || "Not provided"}`,
+      `${labels.date}: ${paperDate || "Not provided"}`,
+      `${labels.time}: ${paperTime || "Not provided"}`,
+      `${labels.notes}:`,
+      notes || "No additional notes",
+    ].join("\n");
 
-  let translatedHeaders = { instituteName, teacherName, subjectName, paperDate, paperTime, notes };
+    const translationPrompt = `You are a professional translator. Translate the following exam paper header into natural, fluent ${langName}.
+Rules: keep the labels before each colon exactly as given; translate only the values after the colons;
+keep the same lines and format; output only the translated text.
 
-  if (language !== 'en') {
-    const headerText = `
-${labels.institute}: ${instituteName || 'Not provided'}
-${labels.teacher}: ${teacherName || 'Not provided'}
-${labels.subject}: ${subjectName || 'Not provided'}
-${labels.date}: ${paperDate || 'Not provided'}
-${labels.time}: ${paperTime || 'Not provided'}
-${labels.notes}:
-${notes || 'No additional notes'}
-`.trim();
-
-    const translationPrompt = `You are a professional translator. Translate the following exam paper header information into natural, fluent ${langName}.
-
-IMPORTANT RULES:
-1. Keep the labels (before colons) in ${langName} as they are
-2. Translate ONLY the values (after colons) into natural ${langName}
-3. Maintain the exact same format with labels and colons
-4. If a value is "Not provided", translate it appropriately
-5. For dates, keep the format but translate "Not provided" if needed
-6. For times, keep the format but translate "Not provided" if needed
-7. Preserve line breaks and structure
-
-Text to translate:
-${headerText}
-
-Output ONLY the translated text in the same format. No explanations, no extra text.`;
+${headerText}`;
 
     try {
-      const translatedAI = await generateContent(translationPrompt, {
-        maxOutputTokens: 1000,
-        temperature: 0.3
-      });
-
-      const lines = translatedAI.split('\n').map(l => l.trim()).filter(Boolean);
-
-      translatedHeaders = {
+      const translated = await generateContent(translationPrompt, { maxOutputTokens: 1000, temperature: 0.3 });
+      const lines = translated.split("\n").map((l) => l.trim()).filter(Boolean);
+      headers = {
         instituteName: extractValue(lines, labels.institute) || instituteName,
         teacherName: extractValue(lines, labels.teacher) || teacherName,
         subjectName: extractValue(lines, labels.subject) || subjectName,
@@ -366,71 +269,10 @@ Output ONLY the translated text in the same format. No explanations, no extra te
         paperTime: extractValue(lines, labels.time) || paperTime,
         notes: extractNotes(lines, labels.notes) || notes,
       };
-    } catch (err) {
-      console.error(`[PAPER SERVICE] Translation failed, using original text:`, err.message);
+    } catch (error) {
+      console.error(`[PAPER] Header translation failed, using original text: ${error.message}`);
     }
   }
 
-  const isRTL = ['ar', 'ur', 'he', 'fa'].includes(language);
-
-  return { questions, headers: translatedHeaders, isRTL };
-};
-
-// ==================== HELPER FUNCTIONS ====================
-
-const createAssessmentRecord = async (payload, userId) => {
-  const assessmentData = {
-    title: payload.title,
-    prompt: payload.prompt,
-    external_links: payload.external_links,
-    instructor_id: userId,
-    is_executed: false,
-  };
-  return await createAssessment(assessmentData);
-};
-
-const processQuestionBlocks = async (assessmentId, questionBlocks, userId) => {
-  if (questionBlocks && questionBlocks.length > 0) {
-    await storeQuestionBlocks(assessmentId, questionBlocks, userId);
-  }
-};
-
-const processResourcesService = async (files, assessmentId, userId) => {
-  if (!files || files.length === 0) return;
-
-  for (const file of files) {
-    const text = await extractTextFromFile(file.buffer, file.mimetype);
-    const chunks = chunkText(text, 500);
-
-    const resource = await createResource({
-      name: file.originalname,
-      file_type: file.mimetype,
-      file_size: file.size,
-      content_type: 'file',
-      visibility: 'private',
-      uploaded_by: userId,
-    });
-
-    for (let i = 0; i < chunks.length; i++) {
-      const embedding = await generateEmbedding(chunks[i]);
-      await storeResourceChunk(resource.id, chunks[i], embedding, { chunk_index: i });
-    }
-
-    await linkResourceToAssessment(assessmentId, resource.id);
-  }
-};
-
-const extractValue = (lines, label) => {
-  const line = lines.find(l => l.includes(label));
-  if (!line) return null;
-  const parts = line.split(':');
-  if (parts.length < 2) return null;
-  return parts.slice(1).join(':').trim();
-};
-
-const extractNotes = (lines, notesLabel) => {
-  const notesIndex = lines.findIndex(l => l.includes(notesLabel));
-  if (notesIndex === -1) return null;
-  const notesLines = lines.slice(notesIndex + 1);
-  return notesLines.join('\n').trim();
+  return { questions, headers, isRTL: ["ar", "ur", "fa"].includes(language) };
 };

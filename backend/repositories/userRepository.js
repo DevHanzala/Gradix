@@ -44,8 +44,9 @@ export const linkGoogleAccountQuery = async (userId, uid) => {
 
 // ==================== USER LOOKUP ====================
 
+// Case-insensitive: older accounts were stored with mixed-case emails.
 export const findUserByEmailQuery = async (email) => {
-  const query = "SELECT * FROM users WHERE email = $1";
+  const query = "SELECT * FROM users WHERE LOWER(email) = LOWER($1) ORDER BY id LIMIT 1";
   const result = await pool.query(query, [email]);
   return result.rows[0] || null;
 };
@@ -81,7 +82,7 @@ export const findUserByResetTokenQuery = async (resetId) => {
 };
 
 export const checkUserExistsByEmailQuery = async (email) => {
-  const query = "SELECT id FROM users WHERE email = $1";
+  const query = "SELECT id FROM users WHERE LOWER(email) = LOWER($1)";
   const result = await pool.query(query, [email]);
   return result.rows.length > 0;
 };
@@ -103,7 +104,7 @@ export const updateResetTokenQuery = async (email, resetId, expiresAt) => {
   const query = `
     UPDATE users 
     SET reset_token = $1, reset_token_expires = $2, updated_at = NOW() 
-    WHERE email = $3 
+    WHERE LOWER(email) = LOWER($3) 
     RETURNING id, name, email
   `;
   const result = await pool.query(query, [resetId, expiresAt, email]);

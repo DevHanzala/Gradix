@@ -1,7 +1,5 @@
-import { isAppError } from "../utils/AppError.js";
 import {
-  createAssessmentBasicService,
-  createNewAssessmentService,
+  createAssessmentService,
   getInstructorAssessmentsService,
   getAssessmentService,
   updateAssessmentService,
@@ -11,382 +9,125 @@ import {
   getEnrolledStudentsService,
   previewQuestionsService,
   generatePhysicalPaperService,
-} from '../services/assessment.service.js';
-import { generatePhysicalPaperPDF } from '../helper/Pdfkitgenerator.js';
+} from "../services/assessment.service.js";
+import { generatePhysicalPaperPDF } from "../helper/Pdfkitgenerator.js";
 
+// Errors (AppError with code/status, or unexpected ones) go to the error middleware.
 
-// ==================== CONTROLLER FUNCTIONS ====================
-
-// 1. CREATE ASSESSMENT BASIC
-export const createAssessmentBasic = async (req, res, next) => {
+export const createAssessment = async (req, res, next) => {
   try {
-    //  NORMALIZE FormData JSON fields FIRST
-    const parseIfString = (v) => {
-      if (typeof v === "string") {
-        try { return JSON.parse(v); } catch { return v; }
-      }
-      return v;
-    };
-
-    req.body.external_links = parseIfString(req.body.external_links);
-    req.body.selected_resources = parseIfString(req.body.selected_resources);
-    req.body.question_blocks = parseIfString(req.body.question_blocks);
-
-    const assessment = await createAssessmentBasicService(
-      req.body,
-      req.user.id,
-      req.files,
-      req.user.role
-    )
-
-    res.status(201).json({ success: true, data: assessment });
+    const assessment = await createAssessmentService(req.body, req.user, req.files || []);
+    res.status(201).json({ success: true, message: "Assessment created successfully", data: assessment });
   } catch (error) {
-    if (isAppError(error)) return next(error);
-    res.status(500).json({ success: false, message: error.message });
+    next(error);
   }
 };
 
-// 2. CREATE NEW ASSESSMENT  //hold this function for future use
-export const createNewAssessment = async (req, res, next) => {
-  try {
-    const newAssessment = await createNewAssessmentService(req.body, req.user.id, req.files);
-
-    res.status(201).json({
-      success: true,
-      message: 'Assessment created successfully',
-      data: newAssessment,
-    });
-  } catch (error) {
-    if (isAppError(error)) return next(error);
-    console.error('Create assessment error:', error);
-    res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to create assessment',
-    });
-  }
-};
-
-// 3. GET ASSESSMENTS FOR INSTRUCTOR 
 export const getInstructorAssessments = async (req, res, next) => {
   try {
     const { data } = await getInstructorAssessmentsService(req.user.id);
-
-    res.status(200).json({
-      success: true,
-      message: 'Assessments retrieved successfully',
-      data,
-    });
+    res.status(200).json({ success: true, data });
   } catch (error) {
-    if (isAppError(error)) return next(error);
-    console.error('Get assessments error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve assessments',
-    });
+    next(error);
   }
 };
 
-// 4. GET SINGLE ASSESSMENT
 export const getAssessment = async (req, res, next) => {
   try {
-    const assessment_id = parseInt(req.params.id);
-    const { data } = await getAssessmentService(assessment_id, req.user);
-
-    res.status(200).json({
-      success: true,
-      message: 'Assessment retrieved successfully',
-      data,
-    });
+    const { data } = await getAssessmentService(req.params.id, req.user);
+    res.status(200).json({ success: true, data });
   } catch (error) {
-    if (isAppError(error)) return next(error);
-    console.error('Get assessment error:', error);
-    
-    if (error.message === 'Invalid assessment ID') {
-      return res.status(400).json({ success: false, message: error.message });
-    }
-    if (error.message === 'Assessment not found or access denied') {
-      return res.status(404).json({ success: false, message: error.message });
-    }
-    
-    res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve assessment',
-    });
+    next(error);
   }
 };
 
-// 5. UPDATE ASSESSMENT DATA
 export const updateAssessmentData = async (req, res, next) => {
   try {
-    const assessment_id = req.params.id;
-    
-    const updateData = {
-      title: req.body.title,
-      prompt: req.body.prompt,
-      externalLinks: req.body.externalLinks ? JSON.parse(req.body.externalLinks) : [],
-      question_blocks: req.body.question_blocks ? JSON.parse(req.body.question_blocks) : [],
-      selected_resources: req.body.selected_resources ? JSON.parse(req.body.selected_resources) : [],
-    };
-
-    const updatedAssessment = await updateAssessmentService(
-      assessment_id,
-      updateData,
-      req.user,
-      req.files
-    );
-
-    res.status(200).json({
-      success: true,
-      message: 'Assessment updated successfully',
-      data: updatedAssessment,
-    });
+    const updated = await updateAssessmentService(req.params.id, req.body, req.user, req.files || []);
+    res.status(200).json({ success: true, message: "Assessment updated successfully", data: updated });
   } catch (error) {
-    if (isAppError(error)) return next(error);
-    console.error('Update assessment error:', error);
-    
-    if (error.message.includes('required') || error.message.includes('must provide')) {
-      return res.status(400).json({ success: false, message: error.message });
-    }
-    
-    res.status(500).json({ 
-      success: false, 
-      message: error.message || 'Server error' 
-    });
+    next(error);
   }
 };
 
-// 6. DELETE ASSESSMENT DATA
 export const deleteAssessmentData = async (req, res, next) => {
   try {
-    const assessment_id = req.params.id;
-    
-    await deleteAssessmentService(assessment_id, req.user);
-
-    res.status(200).json({
-      success: true,
-      message: 'Assessment deleted successfully',
-    });
+    await deleteAssessmentService(req.params.id, req.user);
+    res.status(200).json({ success: true, message: "Assessment deleted successfully" });
   } catch (error) {
-    if (isAppError(error)) return next(error);
-    console.error('❌ Delete assessment error:', error);
-    
-    if (error.message === 'Invalid assessment ID') {
-      return res.status(400).json({ success: false, message: error.message });
-    }
-    if (error.message === 'Assessment not found or access denied') {
-      return res.status(404).json({ success: false, message: error.message });
-    }
-    
-    res.status(500).json({
-      success: false,
-      message: 'Failed to delete assessment',
-      error: error.message,
-    });
+    next(error);
   }
 };
 
-// 7. ENROLL STUDENT TO ASSESSMENT
 export const enrollStudentController = async (req, res, next) => {
   try {
-    const assessmentId = req.params.id;
-    const { email } = req.body;
-
-    const { enrollment } = await enrollStudentService(
-      assessmentId,
-      email,
-      req.user.id,
-      req.user.role
-    );
-
-    res.status(200).json({
-      success: true,
-      message: 'Student enrolled successfully',
-      data: enrollment,
-    });
+    const { enrollment, student } = await enrollStudentService(req.params.id, req.body?.email, req.user);
+    res.status(200).json({ success: true, message: "Student enrolled successfully", data: { ...enrollment, ...student } });
   } catch (error) {
-    if (isAppError(error)) return next(error);
-    console.error('❌ Error enrolling student:', error.message, error.stack);
-    
-    if (error.message === 'Student already enrolled') {
-      return res.status(409).json({ 
-        success: false, 
-        message: 'Student is already enrolled in this assessment' 
-      });
-    }
-    if (error.message === 'Invalid assessment ID' || error.message.includes('required')) {
-      return res.status(400).json({ success: false, message: error.message });
-    }
-    if (error.message.includes('not found') || error.message.includes('access denied')) {
-      return res.status(404).json({ success: false, message: error.message });
-    }
-    
-    res.status(500).json({ 
-      success: false, 
-      message: error.message || 'Failed to enroll student' 
-    });
+    next(error);
   }
 };
 
-// 8. UNENROLL STUDENT FROM ASSESSMENT
 export const unenrollStudentController = async (req, res, next) => {
   try {
-    const assessmentId = req.params.id;
-    const studentId = req.params.studentId;
-
-    const result = await unenrollStudentService(
-      assessmentId,
-      studentId,
-      req.user.id,
-      req.user.role
-    );
-
-    res.status(200).json({
-      success: true,
-      message: 'Student unenrolled successfully',
-      data: result,
-    });
+    const result = await unenrollStudentService(req.params.id, req.params.studentId, req.user);
+    res.status(200).json({ success: true, message: "Student unenrolled successfully", data: result });
   } catch (error) {
-    if (isAppError(error)) return next(error);
-    console.error('❌ Unenroll student error:', error);
-    
-    if (error.message.includes('Invalid')) {
-      return res.status(400).json({ success: false, message: error.message });
-    }
-    if (error.message.includes('not found') || error.message.includes('access denied')) {
-      return res.status(404).json({ success: false, message: error.message });
-    }
-    
-    res.status(500).json({
-      success: false,
-      message: 'Failed to unenroll student',
-      error: error.message,
-    });
+    next(error);
   }
 };
 
-// 9. GET ENROLLED STUDENTS FOR ASSESSMENT
 export const getEnrolledStudentsController = async (req, res, next) => {
   try {
-    const assessmentId = req.params.id;
-
-    const students = await getEnrolledStudentsService(
-      assessmentId,
-      req.user.id,
-      req.user.role
-    );
-
-    res.status(200).json({
-      success: true,
-      message: 'Enrolled students retrieved successfully',
-      data: students,
-    });
+    const students = await getEnrolledStudentsService(req.params.id, req.user);
+    res.status(200).json({ success: true, data: students });
   } catch (error) {
-    if (isAppError(error)) return next(error);
-    console.error('❌ Get enrolled students error:', error);
-    
-    if (error.message === 'Invalid assessment ID') {
-      return res.status(400).json({ success: false, message: error.message });
-    }
-    if (error.message.includes('not found') || error.message.includes('access denied')) {
-      return res.status(404).json({ success: false, message: error.message });
-    }
-    
-    res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve enrolled students',
-      error: error.message,
-    });
+    next(error);
   }
 };
 
-// 10. PREVIEW QUESTIONS FOR ASSESSMENT
 export const previewQuestions = async (req, res, next) => {
   try {
-    const assessmentId = parseInt(req.params.id);
-    const instructorId = req.user.id;
-
-    const questions = await previewQuestionsService(
-      assessmentId,
-      instructorId,
-      req.user.role
-    );
-
-    res.json({ 
-      success: true, 
-      questions 
-    });
+    const questions = await previewQuestionsService(req.params.id, req.user);
+    res.json({ success: true, questions });
   } catch (error) {
-    if (isAppError(error)) return next(error);
-    console.error('[PREVIEW] ERROR:', error.message);
-    
-    if (error.message === 'Assessment not found') {
-      return res.status(404).json({ success: false, message: error.message });
-    }
-    
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to generate preview questions' 
-    });
+    next(error);
   }
 };
 
-// 11. GENERATE PHYSICAL PAPER FOR ASSESSMENT
-// UPDATED CONTROLLER - Generate PDF on Backend
+const PAGE_SIZES = ["A4", "Letter", "Legal"];
+const clampFont = (value, fallback, min, max) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
+};
+
 export const generatePhysicalPaper = async (req, res, next) => {
   try {
-    const assessmentId = parseInt(req.params.id);
-    const instructorId = req.user.id;
-    
+    const body = req.body || {};
     const paperData = {
-      language: req.body.language || 'en',
-      instituteName: req.body.instituteName || '',
-      teacherName: req.body.teacherName || '',
-      subjectName: req.body.subjectName || '',
-      paperDate: req.body.paperDate || '',
-      paperTime: req.body.paperTime || '',
-      notes: req.body.notes || '',
+      language: body.language || "en",
+      instituteName: String(body.instituteName || "").slice(0, 200),
+      teacherName: String(body.teacherName || "").slice(0, 200),
+      subjectName: String(body.subjectName || "").slice(0, 200),
+      paperDate: String(body.paperDate || "").slice(0, 50),
+      paperTime: String(body.paperTime || "").slice(0, 50),
+      notes: String(body.notes || "").slice(0, 2000),
     };
-
     const formOptions = {
-      pageSize: req.body.pageSize || 'A4',
-      headerFontSize: req.body.headerFontSize || 18,
-      questionFontSize: req.body.questionFontSize || 10,
-      optionFontSize: req.body.optionFontSize || 9,
+      pageSize: PAGE_SIZES.includes(body.pageSize) ? body.pageSize : "A4",
+      headerFontSize: clampFont(body.headerFontSize, 18, 10, 36),
+      questionFontSize: clampFont(body.questionFontSize, 10, 8, 20),
+      optionFontSize: clampFont(body.optionFontSize, 9, 7, 18),
     };
 
-    const result = await generatePhysicalPaperService(
-      assessmentId,
-      instructorId,
-      req.user.role,
-      paperData
-    );
+    const { questions, headers, isRTL } = await generatePhysicalPaperService(req.params.id, req.user, paperData);
+    const pdfBuffer = await generatePhysicalPaperPDF(questions, headers, formOptions, isRTL, paperData.language);
 
-    const { questions, headers, isRTL } = result;
-
-    const pdfBuffer = await generatePhysicalPaperPDF(
-      questions,
-      headers,
-      formOptions,
-      isRTL,
-      paperData.language
-    );
-
-
-    // Send PDF
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="Paper_${paperData.language.toUpperCase()}.pdf"`);
-    res.setHeader('Content-Length', pdfBuffer.length);
-
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="Paper_${paperData.language.toUpperCase()}.pdf"`);
+    res.setHeader("Content-Length", pdfBuffer.length);
     res.end(pdfBuffer);
-
   } catch (error) {
-    if (isAppError(error)) return next(error);
-    console.error('[CONTROLLER] ERROR:', error);
-
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to generate paper PDF',
-      error: error.message 
-    });
+    next(error);
   }
 };

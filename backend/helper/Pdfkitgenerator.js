@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { escapeHtml, escapeHtmlMultiline } from "../utils/escapeHtml.js";
+import { normalizeOptions, canonicalOptionIndex, parseBoolean, decodeStoredValue } from "../utils/grading.js";
 
 // Works correctly in both ESM and CJS, dev and production
 const __filename = fileURLToPath(import.meta.url);
@@ -58,23 +59,39 @@ export const generatePhysicalPaperPDF = async (
     // ── Helper: letter label for option index ─────────────────────────────────
     const optionLetter = (index) => String.fromCharCode(65 + index);
 
+    const trueFalseLabels = {
+      en: ["True", "False"],
+      ar: ["صحيح", "خطأ"],
+      ur: ["درست", "غلط"],
+      fa: ["درست", "نادرست"],
+    }[language] || ["True", "False"];
+
+    const optionRow = (letter, text) => `
+            <div class="option-row">
+              <span class="option-circle">${letter}</span>
+              <span class="option-text">${escapeHtml(text)}</span>
+            </div>`;
+
     // ── Build question rows ───────────────────────────────────────────────────
+    // Options are plain texts (labels were stripped at generation), so the
+    // letter is printed once, in the circle.
     const questionsHTML = questions
       .map((q, i) => {
-        const optionsHTML = (q.options || [])
-          .map(
-            (opt, oi) => `
-            <div class="option-row">
-              <span class="option-circle">${optionLetter(oi)}</span>
-              <span class="option-text">${escapeHtml(opt)}</span>
-            </div>`
-          )
-          .join("");
+        let body = "";
+        if (q.question_type === "multiple_choice") {
+          body = `<div class="options-grid">${normalizeOptions(q.options)
+            .map((opt, oi) => optionRow(optionLetter(oi), opt))
+            .join("")}</div>`;
+        } else if (q.question_type === "true_false") {
+          body = `<div class="options-grid">${trueFalseLabels.map((label, oi) => optionRow(optionLetter(oi), label)).join("")}</div>`;
+        } else {
+          body = `<div class="answer-lines"><div></div><div></div><div></div></div>`;
+        }
 
         return `
           <div class="question-block">
-            <p class="question-text"><strong>Q${i + 1}. ${escapeHtml(q.question_text)}</strong></p>
-            <div class="options-grid">${optionsHTML}</div>
+            <p class="question-text"><strong><bdi>Q${i + 1}.</bdi> <bdi>${escapeHtml(q.question_text)}</bdi></strong></p>
+            ${body}
           </div>`;
       })
       .join("");
@@ -82,11 +99,20 @@ export const generatePhysicalPaperPDF = async (
     // ── Build answer key rows ─────────────────────────────────────────────────
     const answerKeyHTML = questions
       .map((q, i) => {
-        const correctIndex = (q.options || []).findIndex(
-          (opt) => opt === q.correct_answer
-        );
-        const letter = correctIndex >= 0 ? optionLetter(correctIndex) : "?";
-        return `<p class="answer-row"><strong>Q${i + 1}:</strong> ${letter}. ${escapeHtml(q.correct_answer ?? "N/A")}</p>`;
+        let answer;
+        if (q.question_type === "multiple_choice") {
+          const options = normalizeOptions(q.options);
+          const index = canonicalOptionIndex(q.correct_answer, options);
+          answer = index === null ? escapeHtml(decodeStoredValue(q.correct_answer)) : `<bdi>${optionLetter(index)}</bdi> – <bdi>${escapeHtml(options[index])}</bdi>`;
+        } else if (q.question_type === "true_false") {
+          const value = parseBoolean(q.correct_answer);
+          answer = value === null ? "" : `<bdi>${optionLetter(value ? 0 : 1)}</bdi> – <bdi>${escapeHtml(trueFalseLabels[value ? 0 : 1])}</bdi>`;
+        } else {
+          const rule = decodeStoredValue(q.correct_answer);
+          const text = rule && typeof rule === "object" ? rule.answer || (rule.required_keywords || []).join(", ") : rule;
+          answer = escapeHtml(text || "");
+        }
+        return `<p class="answer-row"><strong><bdi>Q${i + 1}:</bdi></strong> ${answer}</p>`;
       })
       .join("");
 
@@ -133,7 +159,7 @@ export const generatePhysicalPaperPDF = async (
         }
 
         body::after {
-          content: "Gradewise-AI";
+          content: "Gradix";
           position: fixed;
           top: 50%;
           left: 50%;
@@ -231,6 +257,12 @@ export const generatePhysicalPaperPDF = async (
           font-size: ${form.optionFontSize || 9}pt;
           line-height: 1.4;
           color: #222;
+        }
+
+        .answer-lines div {
+          border-bottom: 1px solid #999;
+          height: 22px;
+          margin-${isRTL ? "right" : "left"}: 18px;
         }
 
         .answer-key-page {

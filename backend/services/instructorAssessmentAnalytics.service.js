@@ -17,7 +17,7 @@ export const getInstructorExecutedAssessmentsService = async (instructorId, user
   return assessments || [];
 };
 
-// 2. GET ASSESSMENT STUDENTS SERVICE — Redis removed, always hits DB
+// 2. GET ASSESSMENT STUDENTS SERVICE
 export const getAssessmentStudentsService = async (assessmentId, instructorId, userRole) => {
   if (!instructorId || userRole !== "instructor" || isNaN(assessmentId)) {
     throw new Error("INVALID_REQUEST");
@@ -51,7 +51,7 @@ export const getStudentAttemptQuestionsService = async (
   return questions || [];
 };
 
-// 4. GET INSTRUCTOR OVERVIEW SERVICE — direct DB queries, no Redis
+// 4. GET INSTRUCTOR OVERVIEW SERVICE
 export const getInstructorOverviewService = async (instructorId) => {
   const assessmentResult = await pool.query(
     `SELECT COUNT(*) as assessment_count FROM assessments WHERE instructor_id = $1`,

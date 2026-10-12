@@ -3,7 +3,7 @@ import { protect, authorizeRoles } from '../middleware/authMiddleware.js';
 import { uploadFiles } from '../middleware/uploadMiddleware.js';
 import { aiLimiter } from '../middleware/rateLimiters.js';
 import {
-  createAssessmentBasic,
+  createAssessment,
   getInstructorAssessments,
   getAssessment,
   updateAssessmentData,
@@ -22,7 +22,7 @@ router.post(
   protect,
   authorizeRoles('instructor', 'admin', 'super_admin'),
   uploadFiles.array("files", 10),
-  createAssessmentBasic
+  createAssessment
 );
 
 router.get(

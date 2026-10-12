@@ -4,8 +4,8 @@ import {
   validatePerformanceTimeRange,
   validateAssessmentAnalyticsQuery,
 } from "../validator/studentAnalytics.validator.js";
-import { getCheckingModel } from "../services/ai/aiProviders.js";
 import { generateContent } from "../services/ai/generateContent.js";
+import { toReviewItem } from "../utils/grading.js";
 
 // ==================== STUDENT OVERVIEW ANALYTICS ====================
 
@@ -186,12 +186,13 @@ export const getLearningRecommendations = async (studentId) => {
     if (weakAreas.length === 0) return recommendations;
 
     try {
-      const client = await getCheckingModel();
       const prompt = `You are an educational AI assistant. Generate learning recommendations for a student with the following weak areas: ${JSON.stringify(weakAreas)}. Respond ONLY with a valid JSON object in this exact format: { "weak_areas": [{ "topic": "string", "performance": number, "suggestion": "string" }], "study_plan": { "daily_practice": [{ "topic": "string", "focus": "string", "time_allocation": "string" }], "weekly_review": [{ "topic": "string", "activity": "string", "goal": "string" }] } }. Ensure the JSON is parseable and matches the structure exactly.`;
       
-      let responseText = await generateContent(client, prompt, {
-        generationConfig: { maxOutputTokens: 1000, temperature: 0.7, response_mime_type: 'application/json' },
-        thinkingConfig: { thinkingBudget: 0 },
+      let responseText = await generateContent(prompt, {
+        purpose: "checking",
+        maxOutputTokens: 1000,
+        temperature: 0.7,
+        responseMimeType: "application/json",
       });
 
       responseText = responseText.replace(/^```json\n/, '').replace(/\n```$/, '').trim();
@@ -247,32 +248,8 @@ export const getAssessmentQuestions = async (studentId, assessmentId) => {
     const attemptId = attempt.attempt_id;
     const questions = await analyticsRepo.findAttemptQuestionsQuery(attemptId);
 
-    return questions.map(q => {
-      let expected = "";
-      if (q.question_type === 'short_answer' && typeof q.correct_answer === 'object') {
-        expected = q.correct_answer.required_keywords?.[0] || "";
-      } else {
-        expected = String(q.correct_answer).trim().toLowerCase();
-      }
-
-      const student = String(q.student_answer || "").trim().toLowerCase();
-      const isCorrect = student === expected;
-      const score = isCorrect ? q.positive_marks : (q.student_answer ? -q.negative_marks : 0);
-
-      return {
-        question_id: q.id,
-        question_order: q.question_order,
-        question: q.question_text,
-        type: q.question_type,
-        options: q.options,
-        max_marks: q.positive_marks,
-        correct_answer: q.correct_answer,
-        student_answer: q.student_answer,
-        score,
-        is_correct: isCorrect,
-        negative_marks: q.negative_marks
-      };
-    });
+    // Same grading function as submission (Unicode-safe).
+    return questions.map((q) => ({ question_id: q.id, ...toReviewItem(q), max_marks: Number(q.positive_marks) }));
   } catch (error) {
     console.error("❌ Error getting assessment questions:", error);
     throw error;

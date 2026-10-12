@@ -2,16 +2,16 @@ import pool from "../DB/db.js";
 
 // ==================== RESOURCE CRUD ====================
 
-export const createResourceQuery = async (resourceData) => {
-  const { name, file_size, content_type, visibility, uploaded_by } = resourceData;
-  
+export const createResourceQuery = async (resourceData, client = pool) => {
+  const { name, url = null, file_type = null, file_size = null, content_type, visibility, uploaded_by } = resourceData;
+
   const query = `
-    INSERT INTO resources (name, file_size, content_type, visibility, uploaded_by)
-    VALUES ($1, $2, $3, $4, $5)
+    INSERT INTO resources (name, url, file_type, file_size, content_type, visibility, uploaded_by)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
     RETURNING *
   `;
-  
-  const { rows } = await pool.query(query, [name, file_size, content_type, visibility, uploaded_by]);
+
+  const { rows } = await client.query(query, [name, url, file_type, file_size, content_type, visibility, uploaded_by]);
   return rows[0];
 };
 
@@ -30,11 +30,6 @@ export const findResourcesByUploaderQuery = async (uploadedBy, visibility = null
   }
   
   query += ` ORDER BY r.created_at DESC`;
-  
-  console.log("[DB QUERY] findResourcesByUploader", {
-  uploadedBy,
-  visibility
-});
 
   const { rows } = await pool.query(query, params);
   return rows;
@@ -56,7 +51,6 @@ export const findAllResourcesQuery = async (userId) => {
 };
 
 export const findResourceByIdQuery = async (resourceId) => {
-  console.log(`Fetching resource with ID: ${resourceId}`);
   const { rows } = await pool.query("SELECT * FROM resources WHERE id = $1", [resourceId]);
   return rows[0] || null;
 };

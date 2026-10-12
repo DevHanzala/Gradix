@@ -1,4 +1,5 @@
 import * as analyticsRepo from "../repositories/instructorAnalyticsRepository.js";
+import { toReviewItem } from "../utils/grading.js";
 import {
   validateAnalyticsQuery,
   validateAssessmentStudentsQuery,
@@ -37,15 +38,6 @@ export const getAssessmentStudentsModel = async (assessmentId, instructorId) => 
     // Fetch basic student info
     const students = await analyticsRepo.findAssessmentStudentsBasicQuery(assessmentId, instructorId);
 
-    // Fetch correct answer counts
-    const correctAnswers = await analyticsRepo.findStudentCorrectAnswersQuery(assessmentId);
-
-    // Create map for quick lookup
-    const correctMap = {};
-    correctAnswers.forEach((row) => {
-      correctMap[row.student_id] = Number(row.correct_answers || 0);
-    });
-
     // Process and calculate analytics for each student
     return students.map((row) => {
       // Calculate time taken
@@ -59,14 +51,14 @@ export const getAssessmentStudentsModel = async (assessmentId, instructorId) => 
       // Calculate percentage
       const percentage =
         row.max_possible_score > 0
-          ? Math.round((row.obtained_score / row.max_possible_score) * 100)
+          ? Math.round((Number(row.obtained_score) / Number(row.max_possible_score)) * 100)
           : 0;
 
       return {
         student_id: row.student_id,
         name: row.name,
         total_questions: Number(row.total_questions),
-        correct_answers: correctMap[row.student_id] || 0,
+        correct_answers: Number(row.correct_answers) || 0,
         percentage,
         time_used: `${minutes}m ${seconds}s`,
         time_taken: timeDiff,
@@ -108,37 +100,10 @@ export const getStudentAttemptQuestionsModel = async (assessmentId, studentId, i
     // Get all questions with answers
     const questions = await analyticsRepo.findAttemptQuestionsWithAnswersQuery(attemptId);
 
-    // Process each question to determine correctness
-    return questions.map((q) => {
-      const studentClean = cleanAnswer(q.student_answer);
-      const correctClean = cleanAnswer(q.correct_answer);
-
-      const isCorrect = studentClean === correctClean;
-
-      return {
-        ...q,
-        is_correct: isCorrect,
-        score: isCorrect ? q.positive_marks : q.score || -Math.abs(q.negative_marks || 0),
-      };
-    });
+    // Same grading function as submission (Unicode-safe).
+    return questions.map(toReviewItem);
   } catch (error) {
     console.error("Analytics model error:", error);
     throw error;
   }
-};
-
-// ==================== HELPER FUNCTIONS ====================
-
-/**
- * Clean and normalize answer for comparison
- */
-const cleanAnswer = (answer) => {
-  if (answer === null || answer === undefined) return "";
-  
-  return String(answer)
-    .replace(/\\"/g, '"')
-    .replace(/^["'\s]+|["'\s]+$/g, "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "");
 };

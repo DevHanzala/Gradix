@@ -9,100 +9,76 @@ import {
   unlinkResourceFromAssessment,
   findAllResources,
 } from "../models/resourceModel.js";
-import { storeResourceChunk } from "../models/assessmentModel.js";
 import { requireAssessmentAccess } from "./assessmentAccess.js";
 import { AppError } from "../utils/AppError.js";
-import { extractTextFromFile, chunkText } from "../helper/textProcessor.js";
-import { generateEmbedding } from "../helper/embeddingGenerator.js";
-import { getRedis } from "../DB/redis.js";
+import { prepareUploadedFile, insertPreparedResource, decodeFilename } from "../helper/resourceIngest.js";
+import { withTransaction } from "../DB/db.js";
 
 // ==================== SERVICE FUNCTIONS ====================
 
 // 1. UPLOAD RESOURCE SERVICE
+// Each file is prepared (text, chunks, embeddings) before any write and then
+// inserted in its own transaction. Unreadable files are reported, not fatal.
 export const uploadResourceService = async (data, userId, files) => {
-  const { name, url, visibility } = data;
+  const { name, url, visibility = "private" } = data || {};
   const uploadedFiles = files || [];
   const skippedFiles = [];
 
+  if (!["private", "public"].includes(visibility)) {
+    throw new AppError("INVALID_VISIBILITY", 400, "Visibility must be private or public.");
+  }
   if (!uploadedFiles.length && !url) {
     throw new Error("NO_FILES_OR_URL");
   }
 
   const uploadedResources = [];
 
-  // Process files
   for (const file of uploadedFiles) {
-    const resourceData = {
-      name: name || file.originalname,
-      file_type: file.mimetype,
-      file_size: file.size,
-      content_type: "file",
-      visibility: visibility || "private",
-      uploaded_by: userId,
-    };
-
-    let text;
+    let prepared;
     try {
-      text = await extractTextFromFile(file.buffer, file.mimetype);
-    } catch (err) {
-      skippedFiles.push({
-        file: file.originalname,
-        reason: err.message,
-        stage: "ocr",
-      });
+      prepared = await prepareUploadedFile(file);
+    } catch (error) {
+      if (!(error instanceof AppError)) throw error;
+      skippedFiles.push({ file: decodeFilename(file.originalname), reason: error.message });
       continue;
     }
-
-    const chunks = chunkText(text, 500);
-    if (!chunks.length) continue;
-
-    // Pre-flight check: ensure embedding works
-    let testEmbedding;
-    try {
-      testEmbedding = await generateEmbedding(chunks[0]);
-    } catch (err) {
-      console.warn(`Embedding failed for ${file.originalname}: ${err.message}`);
-      skippedFiles.push(file.originalname);
-      continue;
-    }
-
-    // Only now create resource
-    const newResource = await createResource(resourceData);
-
-    // Store first chunk
-    await storeResourceChunk(newResource.id, chunks[0], testEmbedding, {
-      chunk_index: 0,
-    });
-
-    // Store remaining chunks
-    for (let i = 1; i < chunks.length; i++) {
-      const embedding = await generateEmbedding(chunks[i]);
-      await storeResourceChunk(newResource.id, chunks[i], embedding, {
-        chunk_index: i,
-      });
-    }
-
-    uploadedResources.push(newResource);
+    const resource = await withTransaction((client) =>
+      insertPreparedResource(client, prepared, {
+        userId,
+        visibility,
+        name: uploadedFiles.length === 1 ? name : undefined,
+      })
+    );
+    uploadedResources.push(resource);
   }
 
-  // Process URL
   if (url) {
-    const newResource = await createResource({
-      name,
-      url,
+    let parsed;
+    try {
+      parsed = new URL(String(url).trim());
+    } catch {
+      throw new AppError("INVALID_URL", 400, "Please enter a valid link.");
+    }
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      throw new AppError("INVALID_URL", 400, "Links must start with http:// or https://.");
+    }
+    const resource = await createResource({
+      name: (name && String(name).trim()) || parsed.hostname,
+      url: parsed.toString(),
       content_type: "link",
-      visibility: visibility || "private",
+      visibility,
       uploaded_by: userId,
     });
-    uploadedResources.push(newResource);
+    uploadedResources.push(resource);
   }
 
   if (!uploadedResources.length) {
-    throw new Error("ALL_FILES_FAILED");
+    throw new AppError(
+      "ALL_FILES_FAILED",
+      422,
+      skippedFiles.map((f) => f.reason).join(" ") || "None of the files could be processed."
+    );
   }
-
-  // Invalidate Redis cache for this instructor
-  await clearResourceCache(userId);
 
   return { uploadedResources, skippedFiles };
 };
@@ -161,9 +137,6 @@ export const updateResourceService = async (resourceId, updateData, userId, user
   }
 
   const updated = await updateResource(resourceId, updateData);
-  
-  // Clear cache
-  await clearResourceCache(userId);
 
   return updated;
 };
@@ -181,9 +154,6 @@ export const deleteResourceService = async (resourceId, userId, userRole) => {
   }
 
   await deleteResource(resourceId);
-  
-  // Clear cache
-  await clearResourceCache(userId);
 
   return { success: true };
 };
@@ -239,12 +209,4 @@ export const assertResourcesUsable = async (resourceIds, user) => {
       throw new AppError("RESOURCE_FORBIDDEN", 403, `You cannot use resource ${rawId}`);
     }
   }
-};
-
-// ==================== HELPER FUNCTIONS ====================
-
-const clearResourceCache = async (userId) => {
-  await getRedis().del(`resources:instructor:${userId}:visibility:all`);
-  await getRedis().del(`resources:instructor:${userId}:visibility:private`);
-  await getRedis().del(`resources:instructor:${userId}:visibility:public`);
 };

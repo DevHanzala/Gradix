@@ -2,7 +2,7 @@ import db from "../DB/db.js";
 
 // ==================== ASSESSMENT CRUD ====================
 
-export const createAssessmentQuery = async (assessmentData) => {
+export const createAssessmentQuery = async (assessmentData, client = db) => {
   const { title, prompt, external_links, instructor_id, is_executed = false } = assessmentData;
   
   const query = `
@@ -15,7 +15,7 @@ export const createAssessmentQuery = async (assessmentData) => {
     ? external_links.filter(link => link && typeof link === "string" && link.trim() !== "") 
     : [];
   
-  const { rows } = await db.query(query, [
+  const { rows } = await client.query(query, [
     title || null, 
     prompt, 
     JSON.stringify(validExternalLinks), 
@@ -167,7 +167,7 @@ export const findAssessmentByIdForStudentQuery = async (assessmentId, studentId)
   return rows[0] || null;
 };
 
-export const updateAssessmentQuery = async (assessmentId, updateData) => {
+export const updateAssessmentQuery = async (assessmentId, updateData, client = db) => {
   const { title, prompt, external_links } = updateData;
   
   const validExternalLinks = Array.isArray(external_links) 
@@ -181,7 +181,7 @@ export const updateAssessmentQuery = async (assessmentId, updateData) => {
     RETURNING *
   `;
   
-  const { rows } = await db.query(query, [
+  const { rows } = await client.query(query, [
     title || null,
     prompt,
     JSON.stringify(validExternalLinks),
@@ -212,11 +212,11 @@ export const updateAssessmentExecutionStatusQuery = async (assessmentId, isExecu
 
 // ==================== QUESTION BLOCKS ====================
 
-export const deleteQuestionBlocksByAssessmentQuery = async (assessmentId) => {
-  await db.query("DELETE FROM question_blocks WHERE assessment_id = $1", [assessmentId]);
+export const deleteQuestionBlocksByAssessmentQuery = async (assessmentId, client = db) => {
+  await client.query("DELETE FROM question_blocks WHERE assessment_id = $1", [assessmentId]);
 };
 
-export const createQuestionBlockQuery = async (blockData) => {
+export const createQuestionBlockQuery = async (blockData, client = db) => {
   const {
     assessmentId,
     question_type,
@@ -243,7 +243,7 @@ export const createQuestionBlockQuery = async (blockData) => {
     RETURNING *
   `;
   
-  const { rows } = await db.query(query, [
+  const { rows } = await client.query(query, [
     assessmentId,
     question_type,
     question_count,
@@ -272,7 +272,7 @@ export const findQuestionBlocksByAssessmentQuery = async (assessmentId) => {
 
 export const findUserByEmailQuery = async (email) => {
   const { rows } = await db.query(
-    "SELECT id, role FROM users WHERE email = $1", 
+    "SELECT id, role FROM users WHERE LOWER(email) = LOWER($1) ORDER BY id LIMIT 1", 
     [email]
   );
   return rows[0] || null;
@@ -286,13 +286,13 @@ export const findEnrollmentQuery = async (assessmentId, studentId) => {
   return rows[0] || null;
 };
 
-export const createEnrollmentQuery = async (assessmentId, studentId) => {
+export const createEnrollmentQuery = async (assessmentId, studentId, client = db) => {
   const query = `
     INSERT INTO enrollments (assessment_id, student_id)
     VALUES ($1, $2)
     RETURNING *
   `;
-  const { rows } = await db.query(query, [assessmentId, studentId]);
+  const { rows } = await client.query(query, [assessmentId, studentId]);
   return rows[0];
 };
 
@@ -317,7 +317,7 @@ export const findEnrolledStudentsQuery = async (assessmentId) => {
 
 // ==================== RESOURCE CHUNKS ====================
 
-export const createResourceChunkQuery = async (chunkData) => {
+export const createResourceChunkQuery = async (chunkData, client = db) => {
   const { resourceId, chunkText, embedding, chunkIndex } = chunkData;
   
   if (!Array.isArray(embedding) || embedding.length !== 384) {
@@ -333,7 +333,7 @@ export const createResourceChunkQuery = async (chunkData) => {
   `;
   
   const values = [resourceId, chunkText, embeddingString, chunkIndex];
-  const { rows } = await db.query(query, values);
+  const { rows } = await client.query(query, values);
   return rows[0];
 };
 
@@ -352,14 +352,14 @@ export const findResourceChunksByAssessmentQuery = async (assessmentId) => {
 
 // ==================== ASSESSMENT RESOURCES ====================
 
-export const linkResourceToAssessmentQuery = async (assessmentId, resourceId) => {
+export const linkResourceToAssessmentQuery = async (assessmentId, resourceId, client = db) => {
   const query = `
     INSERT INTO assessment_resources (assessment_id, resource_id)
     VALUES ($1, $2)
     ON CONFLICT (assessment_id, resource_id) DO NOTHING
     RETURNING *
   `;
-  const { rows } = await db.query(query, [assessmentId, resourceId]);
+  const { rows } = await client.query(query, [assessmentId, resourceId]);
   return rows[0];
 };
 
@@ -424,4 +424,8 @@ export const findAssessmentByIdQuery = async (assessmentId) => {
   `;
   const { rows } = await db.query(query, [assessmentId]);
   return rows[0] || null;
+};
+
+export const deleteAssessmentResourceLinksQuery = async (assessmentId, client = db) => {
+  await client.query(`DELETE FROM assessment_resources WHERE assessment_id = $1`, [assessmentId]);
 };

@@ -1,65 +1,35 @@
 import { pipeline } from "@xenova/transformers";
 
-let model = null;
+export const EMBEDDING_DIMENSIONS = 384;
 
-const loadModel = async () => {
-  if (!model) {
-    model = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
+let modelPromise = null;
+const loadModel = () => {
+  if (!modelPromise) {
+    modelPromise = pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2").catch((error) => {
+      modelPromise = null; // allow a retry after a failed download
+      throw error;
+    });
   }
-  return model;
+  return modelPromise;
 };
 
-/**
- * Generate embedding for a text chunk
- */
-export const generateEmbedding = async (text, options = {}) => {
-  const {
-    socket,
-    totalChunks = 1,
-    currentChunk = 1,
-    fileIndex = 1,
-    totalFiles = 1,
-  } = options;
+const embedWithModel = async (text) => {
+  const model = await loadModel();
+  const output = await model(text, { pooling: "mean", normalize: true });
+  return Array.from(output.data);
+};
 
-  //  HARD GUARD — prevents bad embeddings
-  if (!text || text.length < 120) {
-    throw new Error("Text chunk too small or noisy for embedding");
+/** Indirection so tests can avoid downloading the model. */
+export const embeddingAdapter = { embed: embedWithModel };
+
+/** 384-dimensional sentence embedding for a text chunk. */
+export const generateEmbedding = async (text) => {
+  if (!text || !String(text).trim()) {
+    throw new Error("Cannot embed empty text");
   }
-
-  try {
-    const model = await loadModel();
-
-    const fileBase = 70 + ((fileIndex - 1) / totalFiles) * 20;
-    const chunkBase = fileBase + ((currentChunk - 1) / totalChunks) * 20;
-
-    if (socket) {
-      socket.emit("assessment-progress", {
-        percent: chunkBase,
-        message: `AI processing chunk ${currentChunk}/${totalChunks} (File ${fileIndex}/${totalFiles})`,
-      });
-    }
-
-    const output = await model(text, {
-      pooling: "mean",
-      normalize: true,
-    });
-
-    if (socket) {
-      socket.emit("assessment-progress", {
-        percent: chunkBase + (20 / totalChunks),
-        message: `Chunk ${currentChunk}/${totalChunks} embedded`,
-      });
-    }
-
-    return Array.from(output.data);
-  } catch (error) {
-    console.error("Error generating embedding:", error);
-    if (socket) {
-      socket.emit("assessment-progress", {
-        percent: 0,
-        message: `Embedding failed: ${error.message}`,
-      });
-    }
-    throw error;
+  const vector = await embeddingAdapter.embed(String(text));
+  if (!Array.isArray(vector) || vector.length !== EMBEDDING_DIMENSIONS) {
+    throw new Error(`Embedding has ${vector?.length} dimensions, expected ${EMBEDDING_DIMENSIONS}`);
   }
+  return vector;
 };

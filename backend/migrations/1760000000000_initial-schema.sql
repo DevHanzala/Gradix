@@ -27,6 +27,8 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at                  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 ALTER TABLE users ADD COLUMN IF NOT EXISTS verification_token_expires TIMESTAMPTZ;
+-- Emails are matched case-insensitively (legacy rows may be mixed case).
+CREATE INDEX IF NOT EXISTS idx_users_email_lower ON users (LOWER(email));
 CREATE INDEX IF NOT EXISTS idx_users_verification_token ON users (verification_token);
 CREATE INDEX IF NOT EXISTS idx_users_reset_token ON users (reset_token);
 CREATE INDEX IF NOT EXISTS idx_users_uid ON users (uid);
