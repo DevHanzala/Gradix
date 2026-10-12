@@ -15,7 +15,9 @@ import {
   deleteUser,
   getRecentlyVerifiedUsers,
   findUserByResetToken,
+  linkGoogleAccount,
 } from "../models/userModel.js";
+import { firebaseVerifier } from "../config/firebaseAdmin.js";
 import { 
   sendVerificationEmail, 
   sendPasswordResetEmail, 
@@ -56,27 +58,40 @@ export const signupService = async (userData) => {
 };
 
 // 2. GOOGLE AUTH SERVICE
-export const googleAuthService = async (googleData) => {
-  const { name, email, uid, captchaToken } = googleData;
+export const googleAuthService = async ({ idToken }) => {
+  if (!idToken || typeof idToken !== "string") {
+    throw new Error("INVALID_GOOGLE_TOKEN");
+  }
+
+  // Identity comes ONLY from the verified Firebase token, never the request body.
+  let decoded;
+  try {
+    decoded = await firebaseVerifier.verifyIdToken(idToken);
+  } catch {
+    throw new Error("INVALID_GOOGLE_TOKEN");
+  }
+
+  const { uid, email, email_verified: emailVerified, name } = decoded || {};
+  if (!uid || !email || !emailVerified) {
+    throw new Error("INVALID_GOOGLE_TOKEN");
+  }
 
   let user = await findUserByEmail(email);
 
   if (user) {
-    if (user.provider === "google") {
-      if (user.uid !== uid) {
-        console.log(`Updating UID for existing Google user: ${email}`);
-      }
-    } else if (user.provider === "manual") {
-      console.log(`Manual user exists, linking with Google: ${email}`);
+    if (user.uid && user.uid !== uid) {
+      throw new Error("GOOGLE_ACCOUNT_LINKED");
+    }
+    if (!user.uid || !user.verified) {
+      // Google has proven ownership of this address, so link and verify.
+      user = { ...user, ...(await linkGoogleAccount(user.id, uid)) };
     }
   } else {
     const userByUID = await findUserByUID(uid);
     if (userByUID) {
-      console.warn(`User found by UID but different email: ${email}`);
       throw new Error("GOOGLE_ACCOUNT_LINKED");
     }
-
-    user = await createGoogleUser(name, email, uid, "student");
+    user = await createGoogleUser(name || email.split("@")[0], email, uid, "student");
   }
 
   const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: "24h" });

@@ -6,7 +6,7 @@ import {
   getAssessmentAnalytics,
   getAssessmentQuestions as modelGetAssessmentQuestions,
 } from "../models/studentAnalyticsModel.js";
-import { redis } from "../DB/redis.js";
+import { getRedis } from "../DB/redis.js";
 import db from "../DB/db.js";
 import { getCheckingModel } from "./ai/aiProviders.js";
 
@@ -58,7 +58,7 @@ export const getStudentAssessmentsService = async (studentId, userRole) => {
   const cacheKey = `student:assessments:list:${studentId}`;
 
   // Check Redis cache first
-  const cached = await redis.get(cacheKey);
+  const cached = await getRedis().get(cacheKey);
   if (cached) {
     console.log(`Student assessments from Redis for student ${studentId}`);
     return { data: cached, fromCache: true };
@@ -67,7 +67,7 @@ export const getStudentAssessmentsService = async (studentId, userRole) => {
   const assessments = await getStudentAssessmentsList(studentId);
 
   // Cache for 10 minutes
-  await redis.set(cacheKey, assessments, { ex: 600 });
+  await getRedis().set(cacheKey, assessments, { ex: 600 });
 
   return { data: assessments, fromCache: false };
 };

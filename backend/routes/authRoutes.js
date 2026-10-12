@@ -13,6 +13,7 @@ import {
 } from "../controllers/authController.js";
 import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
 import verifyCaptcha from "../validator/verifyCaptcha.js";
+import { authLimiter } from "../middleware/rateLimiters.js";
 
 const router = express.Router();
 
@@ -20,8 +21,8 @@ const router = express.Router();
 router.post("/signup", verifyCaptcha, signup);
 router.post("/login", verifyCaptcha, login);
 
-// Google Auth — NO CAPTCHA (trusted by Google)
-router.post("/google-auth", googleAuth);  // ← REMOVED verifyCaptcha
+// Google Auth: identity is proven by a Firebase ID token verified server-side.
+router.post("/google-auth", authLimiter, googleAuth);
 
 router.get("/verify/:token", verifyEmail);
 router.post("/forgot-password", forgotPassword);

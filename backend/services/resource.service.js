@@ -12,7 +12,7 @@ import {
 import { getAssessmentById, storeResourceChunk } from "../models/assessmentModel.js";
 import { extractTextFromFile, chunkText } from "../helper/textProcessor.js";
 import { generateEmbedding } from "../helper/embeddingGenerator.js";
-import { redis } from "../DB/redis.js";
+import { getRedis } from "../DB/redis.js";
 
 // ==================== SERVICE FUNCTIONS ====================
 
@@ -236,7 +236,7 @@ export const unlinkResourceFromAssessmentService = async (resourceId, assessment
 // ==================== HELPER FUNCTIONS ====================
 
 const clearResourceCache = async (userId) => {
-  await redis.del(`resources:instructor:${userId}:visibility:all`);
-  await redis.del(`resources:instructor:${userId}:visibility:private`);
-  await redis.del(`resources:instructor:${userId}:visibility:public`);
+  await getRedis().del(`resources:instructor:${userId}:visibility:all`);
+  await getRedis().del(`resources:instructor:${userId}:visibility:private`);
+  await getRedis().del(`resources:instructor:${userId}:visibility:public`);
 };

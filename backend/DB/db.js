@@ -1,33 +1,45 @@
-import { Pool } from "pg";
+import pg from "pg";
 import dotenv from "dotenv";
 
-// Load environment variables
 dotenv.config();
 
-// Create a new pool instance
+const { Pool } = pg;
+
+// PGSSLMODE=disable is used for local/test databases; everything else uses TLS.
+const ssl = process.env.PGSSLMODE === "disable" ? false : { rejectUnauthorized: true };
+
 const pool = new Pool({
   host: process.env.PGHOST,
   database: process.env.PGDATABASE,
   user: process.env.PGUSER,
   password: process.env.PGPASSWORD,
-  port: 5432,
-  ssl: {
-    require: true,
-  },
+  port: Number(process.env.PGPORT) || 5432,
+  ssl,
+  max: Number(process.env.PGPOOL_MAX) || 10,
 });
 
-/**
- * Function to connect to the database
- */
 export const connectDB = async () => {
+  const client = await pool.connect();
+  client.release();
+};
+
+/**
+ * Run `fn` inside a transaction. `fn` receives a dedicated client and must use
+ * it (not the pool) for every query that belongs to the transaction.
+ */
+export const withTransaction = async (fn) => {
+  const client = await pool.connect();
   try {
-    const client = await pool.connect();
-    client.release();
+    await client.query("BEGIN");
+    const result = await fn(client);
+    await client.query("COMMIT");
+    return result;
   } catch (error) {
-    console.error("❌ Database connection error:", error);
+    await client.query("ROLLBACK").catch(() => {});
     throw error;
+  } finally {
+    client.release();
   }
 };
 
-// Export the pool
 export default pool;

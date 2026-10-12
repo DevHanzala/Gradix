@@ -53,10 +53,10 @@ export const signup = async (req, res) => {
 
 // 2. GOOGLE AUTH
 export const googleAuth = async (req, res) => {
-  const { name, email, uid, captchaToken } = req.body;
+  const { idToken } = req.body || {};
 
   try {
-    const { user, token } = await googleAuthService({ name, email, uid, captchaToken });
+    const { user, token } = await googleAuthService({ idToken });
 
     res.status(200).json({
       success: true,
@@ -65,7 +65,15 @@ export const googleAuth = async (req, res) => {
       token,
     });
   } catch (error) {
-    console.error("Google auth error:", error.message, error.stack);
+    if (error.message === "INVALID_GOOGLE_TOKEN") {
+      return res.status(401).json({
+        success: false,
+        code: "INVALID_GOOGLE_TOKEN",
+        message: "Google sign-in could not be verified. Please try again.",
+      });
+    }
+
+    console.error("Google auth error:", error.message);
 
     if (error.message === "GOOGLE_ACCOUNT_LINKED") {
       return res.status(400).json({

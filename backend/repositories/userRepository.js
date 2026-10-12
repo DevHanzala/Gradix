@@ -30,6 +30,17 @@ export const createGoogleUserQuery = async (userData) => {
   return result.rows[0];
 };
 
+export const linkGoogleAccountQuery = async (userId, uid) => {
+  const query = `
+    UPDATE users
+    SET uid = $2, verified = true, verification_token = NULL, updated_at = NOW()
+    WHERE id = $1
+    RETURNING id, name, email, role, verified, provider, uid
+  `;
+  const result = await pool.query(query, [userId, uid]);
+  return result.rows[0];
+};
+
 // ==================== USER LOOKUP ====================
 
 export const findUserByEmailQuery = async (email) => {

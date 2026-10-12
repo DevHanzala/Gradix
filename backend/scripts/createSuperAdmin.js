@@ -1,133 +1,55 @@
-import bcrypt from "bcrypt"
-import pool from "../DB/db.js"
-import dotenv from "dotenv"
-
-dotenv.config()
+import bcrypt from "bcrypt";
+import pool from "../DB/db.js";
+import { requireEnv } from "../config/env.js";
 
 /**
- * Creates the first and only Super Admin user in the system.
- * This script should be run once only to bootstrap the system.
+ * Bootstraps the single Super Admin account.
+ * Credentials come from SUPERADMIN_EMAIL / SUPERADMIN_PASSWORD (and optional
+ * SUPERADMIN_NAME). The password is never printed. Run migrations first.
  */
+const MIN_PASSWORD_LENGTH = 12;
+
 const createSuperAdmin = async () => {
-  let client;
+  let email;
+  let password;
   try {
-    console.log("🔄 Starting Super Admin creation...");
+    email = requireEnv("SUPERADMIN_EMAIL").trim().toLowerCase();
+    password = requireEnv("SUPERADMIN_PASSWORD");
+  } catch (error) {
+    console.error(`Refusing to run: ${error.message}`);
+    process.exit(1);
+  }
 
-    // Connect to the database
-    client = await pool.connect();
-    console.log("✅ Connected to PostgreSQL database");
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    console.error(`Refusing to run: SUPERADMIN_PASSWORD must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+    process.exit(1);
+  }
 
-    // Start a transaction
-    await client.query("BEGIN");
-    console.log("🔄 Started database transaction");
+  const name = process.env.SUPERADMIN_NAME?.trim() || "Super Administrator";
 
-    // Ensure users table exists
-    console.log("🔄 Ensuring 'users' table exists...");
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        email VARCHAR(255) UNIQUE NOT NULL,
-        password VARCHAR(255),
-        role VARCHAR(50) NOT NULL DEFAULT 'student',
-        verified BOOLEAN DEFAULT FALSE,
-        verification_token TEXT,
-        provider VARCHAR(50) DEFAULT 'manual',
-        uid TEXT,
-        reset_token TEXT,
-        reset_token_expires TIMESTAMP,
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
-      );
-    `);
-    console.log("✅ 'users' table ensured");
-
-    // Check if Super Admin already exists
-    console.log("🔄 Checking for existing Super Admin...");
-    const existingQuery = "SELECT * FROM users WHERE role = 'super_admin'";
-    const { rows: existing } = await client.query(existingQuery);
-
+  try {
+    const { rows: existing } = await pool.query("SELECT id FROM users WHERE role = 'super_admin' LIMIT 1");
     if (existing.length > 0) {
-      console.log("❌ Super Admin already exists!");
-      console.log("Existing Super Admin:", {
-        id: existing[0].id,
-        name: existing[0].name,
-        email: existing[0].email,
-        role: existing[0].role,
-      });
-      await client.query("ROLLBACK");
-      client.release();
+      console.error("A Super Admin already exists. Nothing was changed.");
       process.exit(1);
     }
 
-    // Super Admin details
-    const superAdminData = {
-      name: "Super Administrator",
-      email: "superadmin@gmail.com",
-      password: "***REMOVED***",
-      role: "super_admin",
-    };
+    const hashedPassword = await bcrypt.hash(password, 12);
+    const { rows } = await pool.query(
+      `INSERT INTO users (name, email, password, role, verified, provider)
+       VALUES ($1, $2, $3, 'super_admin', TRUE, 'manual')
+       RETURNING id, email`,
+      [name, email, hashedPassword]
+    );
 
-    console.log("🔄 Creating Super Admin with email:", superAdminData.email);
-
-    // Hash the password
-    const hashedPassword = await bcrypt.hash(superAdminData.password, 10);
-    console.log("✅ Password hashed successfully");
-
-    // Insert Super Admin into database
-    const insertQuery = `
-      INSERT INTO users (name, email, password, role, verified, provider) 
-      VALUES ($1, $2, $3, $4, TRUE, 'manual') 
-      RETURNING id, name, email, role, verified, created_at
-    `;
-
-    const { rows } = await client.query(insertQuery, [
-      superAdminData.name,
-      superAdminData.email,
-      hashedPassword,
-      superAdminData.role,
-    ]);
-
-    // Commit the transaction
-    await client.query("COMMIT");
-    console.log("✅ Transaction committed");
-
-    const newSuperAdmin = rows[0];
-
-    console.log("✅ Super Admin created successfully!");
-    console.log("Super Admin Details:", {
-      id: newSuperAdmin.id,
-      name: newSuperAdmin.name,
-      email: newSuperAdmin.email,
-      role: newSuperAdmin.role,
-      verified: newSuperAdmin.verified,
-      created_at: newSuperAdmin.created_at,
-    });
-
-    console.log("\n🔐 Login Credentials:");
-    console.log(`Email: ${superAdminData.email}`);
-    console.log(`Password: ${superAdminData.password}`);
-    console.log("\n⚠️ IMPORTANT: Change these credentials after first login!");
-
-    client.release();
+    console.log(`Super Admin created (id ${rows[0].id}, ${rows[0].email}).`);
     process.exit(0);
   } catch (error) {
-    if (client) {
-      await client.query("ROLLBACK").catch((rollbackErr) => {
-        console.error("❌ Error during rollback:", rollbackErr.message);
-      });
-      client.release();
-    }
-    console.error("❌ Error creating Super Admin:", error.message);
-    console.error("Error details:", {
-      code: error.code,
-      detail: error.detail,
-      hint: error.hint,
-      position: error.position,
-    });
+    console.error(`Failed to create Super Admin: ${error.message}`);
     process.exit(1);
+  } finally {
+    await pool.end().catch(() => {});
   }
-}
+};
 
-// Run the script
 createSuperAdmin();

@@ -90,7 +90,7 @@ export const startAssessmentForStudentService = async (studentId, assessmentId, 
 
   // Fetch generated questions
   const { rows: questionRows } = await db.query(
-    `SELECT id, question_type, question_text, options, correct_answer, positive_marks, negative_marks, duration_per_question
+    `SELECT id, question_type, question_text, options, positive_marks, negative_marks, duration_per_question
      FROM generated_questions WHERE attempt_id = $1 ORDER BY question_order`,
     [attemptId]
   );
@@ -214,7 +214,7 @@ export const getSubmissionDetailsForStudentService = async (studentId, submissio
     `SELECT aa.*, a.title AS assessment_title
      FROM assessment_attempts aa
      JOIN assessments a ON aa.assessment_id = a.id
-     WHERE aa.id = $1 AND aa.student_id = $2`,
+     WHERE aa.id = $1 AND aa.student_id = $2 AND aa.status = 'completed'`,
     [submissionId, studentId]
   );
   

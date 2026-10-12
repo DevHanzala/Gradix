@@ -1,17 +1,18 @@
-import { Redis } from '@upstash/redis';
+import { Redis } from "@upstash/redis";
+import { requireEnv } from "../config/env.js";
 
-// This connects to your Upstash Redis (100% working with your credentials)
-export const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL || 'https://REMOVED.upstash.io',
-  token: process.env.UPSTASH_REDIS_REST_TOKEN || '***REMOVED***',
-});
+let client = null;
 
-// Optional: Test connection on startup (remove later if you want)
-(async () => {
-  try {
-    await redis.set('test', 'Gradewise-AI Redis Connected!');
-    const test = await redis.get('test');
-  } catch (err) {
-    console.error('Redis Connection Failed:', err.message);
+/**
+ * Lazily create the Upstash client. Credentials come only from the
+ * environment; a missing variable is a hard error, never a silent fallback.
+ */
+export const getRedis = () => {
+  if (!client) {
+    client = new Redis({
+      url: requireEnv("UPSTASH_REDIS_REST_URL"),
+      token: requireEnv("UPSTASH_REDIS_REST_TOKEN"),
+    });
   }
-})();
+  return client;
+};

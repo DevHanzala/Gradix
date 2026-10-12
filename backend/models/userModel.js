@@ -49,6 +49,8 @@ export const createGoogleUser = async (name, email, uid, role) => {
   }
 };
 
+export const linkGoogleAccount = async (userId, uid) => userRepo.linkGoogleAccountQuery(userId, uid);
+
 // ==================== USER LOOKUP ====================
 
 export const findUserByEmail = async (email) => {
