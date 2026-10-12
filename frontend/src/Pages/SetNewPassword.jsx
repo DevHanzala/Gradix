@@ -10,7 +10,7 @@ import { setNewPasswordSchema } from "../scheema/passwordSchemas.js";
 function SetNewPassword() {
   const navigate = useNavigate();
   const { resetId } = useParams();
-  const changePassword = useAuthStore((state) => state.changePassword);
+  const resetPassword = useAuthStore((state) => state.resetPassword);
 
   const [formData, setFormData] = useState({
     newPassword: "",
@@ -50,7 +50,7 @@ try {
     setLoading(true);
 
     try {
-      await changePassword({ newPassword: formData.newPassword, resetId });
+      await resetPassword({ newPassword: formData.newPassword, resetId });
       showModal(
         "success",
         "Password Reset",
@@ -62,7 +62,7 @@ try {
       showModal(
         "error",
         "Reset Failed",
-        error.response?.data?.message || "Failed to reset password. The link may be invalid or expired. Please request a new reset link."
+        error?.message || "Failed to reset password. The link may be invalid or expired. Please request a new reset link."
       );
     } finally {
       setLoading(false);

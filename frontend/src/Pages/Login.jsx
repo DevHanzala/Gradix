@@ -4,12 +4,12 @@ import useAuthStore from "../store/authStore.js";
 import { Card, CardHeader, CardContent } from "../components/ui/Card.jsx";
 import LoadingSpinner from "../components/ui/LoadingSpinner.jsx";
 import Modal from "../components/ui/Modal.jsx";
-import axios from "axios";
 import {  getCaptchaToken } from "../config/captcha.js";
 import { FaEnvelope, FaLock, FaSignInAlt, FaGoogle, FaUserCircle } from "react-icons/fa";
 import { redirectByRole } from "../utils/redirectByRole.js";
 import useRecaptchaInit from "../hooks/useRecaptchaInit.js";
 import { loginSchema } from "../scheema/authSchemas.js";
+import { ZodError } from "zod";
 
 function Login() {
   const navigate = useNavigate();
@@ -47,9 +47,6 @@ function Login() {
       loginSchema.parse(formData);
       const captchaToken = await getCaptchaToken(siteKey, "login");
       const response = await login({ ...formData, captchaToken });
-      const token = useAuthStore.getState().token;
-      localStorage.setItem("token", token);
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
       showModal("success", "Login Successful!", `Welcome back, ${response.name}!`);
 
       setTimeout(() => {
@@ -58,13 +55,14 @@ function Login() {
     } catch (error) {
       if (error instanceof ZodError) {
         const fieldErrors = {};
-        error.errors.forEach((err) => { 
-          fieldErrors[err.path[0]] = err.message;
+        error.issues.forEach((issue) => {
+          fieldErrors[issue.path[0]] = issue.message;
         });
         setErrors(fieldErrors);
       } else {
-        const errorMessage = error.response?.data?.message || "Login failed. Please try again.";
-        showModal("error", "Login Failed", errorMessage);
+        // The store rethrows the API body ({ code, message }) or a network error.
+        const errorMessage = error?.message || "Login failed. Please try again.";
+        showModal("error", "Login failed", errorMessage);
       }
     } finally {
       setLoading(false);
@@ -75,17 +73,13 @@ function Login() {
     setGoogleLoading(true);
     try {
       const response = await googleAuth();
-      const token = useAuthStore.getState().token;
-      localStorage.setItem("token", token);
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
       showModal("success", "Welcome!", `Successfully signed in with Google! Welcome back, ${response.name}!`);
 
       setTimeout(() => {
         redirectByRole(response.role, navigate);
       }, 1500);
     } catch (error) {
-      console.error("Google login error:", error);
-      const errorMessage = error.response?.data?.message || error.message || "Google login failed. Please try again.";
+      const errorMessage = error?.message || "Google login failed. Please try again.";
       showModal("error", "Google Login Failed", errorMessage);
     } finally {
       setGoogleLoading(false);

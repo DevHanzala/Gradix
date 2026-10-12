@@ -23,6 +23,7 @@ const SetNewPassword = lazy(() => import("./Pages/SetNewPassword"));
 const VerifyEmail = lazy(() => import("./Pages/VerifyEmail"));
 const Profile = lazy(() => import("./Pages/Profile"));
 const NotFound = lazy(() => import("./Pages/NotFound"));
+const Forbidden = lazy(() => import("./Pages/Forbidden"));
 
 /* Admin */
 const AdminDashboard = lazy(() =>
@@ -155,7 +156,7 @@ function App() {
           <Route
             path="/super-admin/dashboard"
             element={
-              <ProtectedRoute requiredRole="super_admin">
+              <ProtectedRoute allowedRoles={["super_admin"]}>
                 <MainLayout>
                   <SuperAdminDashboard />
                 </MainLayout>
@@ -167,7 +168,7 @@ function App() {
           <Route
             path="/admin/dashboard"
             element={
-              <ProtectedRoute requiredRole="admin">
+              <ProtectedRoute allowedRoles={["admin"]}>
                 <MainLayout>
                   <AdminDashboard />
                 </MainLayout>
@@ -179,7 +180,7 @@ function App() {
           <Route
             path="/instructor/dashboard"
             element={
-              <ProtectedRoute requiredRole="instructor">
+              <ProtectedRoute allowedRoles={["instructor"]}>
                 <MainLayout>
                   <InstructorDashboard />
                 </MainLayout>
@@ -203,7 +204,7 @@ function App() {
               key={path}
               path={path}
               element={
-                <ProtectedRoute requiredRole="instructor">
+                <ProtectedRoute allowedRoles={["instructor"]}>
                   <MainLayout>
                     <Component />
                   </MainLayout>
@@ -216,7 +217,7 @@ function App() {
           <Route
             path="/student/dashboard"
             element={
-              <ProtectedRoute requiredRole="student">
+              <ProtectedRoute allowedRoles={["student"]}>
                 <MainLayout>
                   <StudentDashboard />
                 </MainLayout>
@@ -227,7 +228,7 @@ function App() {
           <Route
             path="/student/analytics"
             element={
-              <ProtectedRoute requiredRole="student">
+              <ProtectedRoute allowedRoles={["student"]}>
                 <MainLayout>
                   <StudentAnalytics />
                 </MainLayout>
@@ -239,11 +240,21 @@ function App() {
           <Route
             path="/student/assessments/:assessmentId/take"
             element={
-              <ProtectedRoute requiredRole="student">
+              <ProtectedRoute allowedRoles={["student"]}>
                 <ExamLayout>
                   <TakeAssessment />
                 </ExamLayout>
               </ProtectedRoute>
+            }
+          />
+
+          {/* 403 */}
+          <Route
+            path="/forbidden"
+            element={
+              <MainLayout>
+                <Forbidden />
+              </MainLayout>
             }
           />
 

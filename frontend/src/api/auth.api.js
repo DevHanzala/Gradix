@@ -22,6 +22,12 @@ export const forgotPasswordApi = (data) =>
 export const changePasswordApi = (data) =>
   apiClient.post("/auth/change-password", data);
 
+export const resetPasswordApi = (data) =>
+  apiClient.post("/auth/reset-password", data);
+
+export const resendVerificationApi = (email) =>
+  apiClient.post("/auth/resend-verification", { email });
+
 /* =========================
    Admin / Instructor
 ========================= */

@@ -10,6 +10,8 @@ import {
   verifyEmailApi,
   forgotPasswordApi,
   changePasswordApi,
+  resetPasswordApi,
+  resendVerificationApi,
   registerStudentApi,
   fetchUsersApi,
   changeUserRoleApi,
@@ -114,9 +116,29 @@ const useAuthStore = create(
         }
       },
 
-      changePassword: async (payload) => {
+      // Logged-in user: requires the current password.
+      changePassword: async ({ currentPassword, newPassword }) => {
         try {
-          const response = await changePasswordApi(payload);
+          const response = await changePasswordApi({ currentPassword, newPassword });
+          return response.data;
+        } catch (error) {
+          throw error.response?.data || error;
+        }
+      },
+
+      // From the emailed reset link.
+      resetPassword: async ({ resetId, newPassword }) => {
+        try {
+          const response = await resetPasswordApi({ resetId, newPassword });
+          return response.data;
+        } catch (error) {
+          throw error.response?.data || error;
+        }
+      },
+
+      resendVerification: async (email) => {
+        try {
+          const response = await resendVerificationApi(email);
           return response.data;
         } catch (error) {
           throw error.response?.data || error;

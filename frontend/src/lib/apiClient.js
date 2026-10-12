@@ -36,7 +36,8 @@ apiClient.interceptors.response.use(
       "/auth/google-auth",
       "/auth/verify",
       "/auth/forgot-password",
-      "/auth/change-password",
+      "/auth/reset-password",
+      "/auth/resend-verification",
     ];
 
     const isAuthFree = authFreeEndpoints.some((endpoint) =>
