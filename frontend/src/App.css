@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+/*
+ * Gradix design tokens — the single source of truth for colors, radius,
+ * shadows and type scale. Use these utilities (bg-primary-600, text-ink,
+ * border-line, rounded-card, shadow-card …) instead of raw palette colors.
+ */
+@theme {
+  /* One primary color (indigo) */
+  --color-primary-50: #eef2ff;
+  --color-primary-100: #e0e7ff;
+  --color-primary-200: #c7d2fe;
+  --color-primary-300: #a5b4fc;
+  --color-primary-500: #6366f1;
+  --color-primary-600: #4f46e5;
+  --color-primary-700: #4338ca;
+  --color-primary-800: #3730a3;
+
+  /* Semantic colors */
+  --color-success-50: #ecfdf5;
+  --color-success-100: #d1fae5;
+  --color-success-600: #059669;
+  --color-success-700: #047857;
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+  --color-danger-50: #fef2f2;
+  --color-danger-100: #fee2e2;
+  --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+
+  /* Neutrals */
+  --color-canvas: #f8fafc;
+  --color-surface: #ffffff;
+  --color-line: #e5e7eb;
+  --color-line-strong: #d1d5db;
+  --color-ink: #111827;
+  --color-ink-muted: #4b5563;
+  --color-ink-subtle: #6b7280;
+
+  /* Shape and depth */
+  --radius-card: 0.75rem;
+  --radius-control: 0.5rem;
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.05), 0 0 0 1px rgb(17 24 39 / 0.06);
+  --shadow-raised: 0 10px 25px -5px rgb(0 0 0 / 0.1), 0 4px 10px -6px rgb(0 0 0 / 0.08);
+}
+
+/* reCAPTCHA v3 badge is hidden; the required notice is shown on the auth forms. */
+.grecaptcha-badge { visibility: hidden !important; }
+
+@layer base {
+  body {
+    @apply bg-canvas text-ink antialiased;
+  }
+  /* Visible keyboard focus everywhere, never on mouse click. */
+  :focus-visible {
+    outline: 3px solid var(--color-primary-300);
+    outline-offset: 2px;
+  }
+}
+
+/* Base button shape; variants below compose it. */
+@utility btn {
+  @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-control px-5 py-2.5 text-sm font-semibold shadow-sm transition focus:outline-none focus-visible:ring-4 disabled:cursor-not-allowed disabled:opacity-60;
+}
+
+@layer components {
+  .btn-primary {
+    @apply btn bg-primary-600 text-white hover:bg-primary-700 focus-visible:ring-primary-200;
+  }
+  .btn-secondary {
+    @apply btn border border-line-strong bg-surface text-ink hover:bg-gray-50 focus-visible:ring-primary-200;
+  }
+  .btn-ghost {
+    @apply btn bg-transparent text-ink-muted shadow-none hover:bg-gray-100 focus-visible:ring-primary-200;
+  }
+  .btn-danger {
+    @apply btn bg-danger-600 text-white hover:bg-danger-700 focus-visible:ring-danger-100;
+  }
+}

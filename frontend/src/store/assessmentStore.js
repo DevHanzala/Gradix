@@ -1,0 +1,221 @@
+import { create } from "zustand";
+import {
+  fetchInstructorAssessments,
+  fetchAssessmentById,
+  createAssessmentApi,
+  updateAssessmentApi,
+  deleteAssessmentApi,
+  fetchEnrolledStudentsApi,
+  enrollStudentApi,
+  unenrollStudentApi,
+  fetchPreviewQuestionsApi,
+  generatePhysicalPaperApi,
+} from "../api/assessment.api";
+
+const useAssessmentStore = create((set) => ({
+  assessments: [],
+  currentAssessment: null,
+  enrolledStudents: [],
+  loading: false,
+  error: null,
+
+  /* =========================
+     Instructor
+  ========================= */
+
+  getInstructorAssessments: async () => {
+    set({ loading: true, error: null });
+    try {
+      const response = await fetchInstructorAssessments();
+      set({
+        assessments: response.data.data.map((a) => ({
+          ...a,
+          is_executed: a.is_executed || false,
+        })),
+        loading: false,
+      });
+    } catch (error) {
+      const message = error.response?.data?.message || "Failed to fetch assessments";
+      set({ error: message, loading: false });
+      throw error;
+    }
+  },
+
+  getAssessmentById: async (assessmentId) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await fetchAssessmentById(assessmentId);
+      set({ currentAssessment: response.data.data, loading: false });
+      return response.data.data;
+    } catch (error) {
+      const message = error.response?.data?.message || "Failed to fetch assessment";
+      set({ error: message, loading: false });
+      throw error;
+    }
+  },
+
+  createAssessment: async (formData) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await createAssessmentApi(formData);
+      set((state) => ({
+        assessments: [{ ...response.data.data, is_executed: false }, ...state.assessments],
+        loading: false,
+      }));
+      return response.data.data;
+    } catch (error) {
+      const message = error.response?.data?.message || "Failed to create assessment";
+      set({ error: message, loading: false });
+      throw error;
+    }
+  },
+
+  updateAssessment: async (assessmentId, formData) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await updateAssessmentApi(assessmentId, formData);
+      set((state) => ({
+        assessments: state.assessments.map((a) =>
+          a.id === assessmentId
+            ? { ...response.data.data, is_executed: a.is_executed }
+            : a
+        ),
+        currentAssessment: response.data.data,
+        loading: false,
+      }));
+      return response.data.data;
+    } catch (error) {
+      const message = error.response?.data?.message || "Failed to update assessment";
+      set({ error: message, loading: false });
+      throw error;
+    }
+  },
+
+  deleteAssessment: async (assessmentId) => {
+    set({ loading: true, error: null });
+    try {
+      await deleteAssessmentApi(assessmentId);
+      set((state) => ({
+        assessments: state.assessments.filter((a) => a.id !== assessmentId),
+        loading: false,
+      }));
+    } catch (error) {
+      const message = error.response?.data?.message || "Failed to delete assessment";
+      set({ error: message, loading: false });
+      throw error;
+    }
+  },
+
+  /* =========================
+     Physical Paper
+  ========================= */
+
+  generatePhysicalPaper: async (assessmentId, payload) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await generatePhysicalPaperApi(assessmentId, payload, {
+        responseType: "blob",
+        // Do NOT pass a custom headers object here — the axios interceptor
+        // already attaches Authorization: Bearer <token> automatically.
+        // Passing headers: {} would wipe the Authorization header in production.
+      });
+
+      set({ loading: false });
+      return new Blob([response.data], { type: "application/pdf" });
+
+    } catch (error) {
+      // When responseType is "blob" and the server returns a JSON error,
+      // axios gives us a Blob instead of a plain object — we must read it as text first.
+      let message = "Failed to generate physical paper";
+
+      if (error.response?.data instanceof Blob) {
+        try {
+          const text = await error.response.data.text();
+          const parsed = JSON.parse(text);
+          message = parsed?.message || message;
+        } catch {
+          // blob wasn't JSON — keep default message
+        }
+      } else {
+        message = error.response?.data?.message || error.message || message;
+      }
+
+      set({ error: message, loading: false });
+      throw new Error(message);
+    }
+  },
+
+  /* =========================
+     Enrollment
+  ========================= */
+
+  getEnrolledStudents: async (assessmentId) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await fetchEnrolledStudentsApi(assessmentId);
+      set({ enrolledStudents: response.data.data, loading: false });
+      return response.data.data;
+    } catch (error) {
+      const message = error.response?.data?.message || "Failed to fetch enrolled students";
+      set({ error: message, loading: false });
+      throw error;
+    }
+  },
+
+  enrollStudent: async (assessmentId, email) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await enrollStudentApi(assessmentId, email);
+      set((state) => ({
+        enrolledStudents: [...state.enrolledStudents, response.data.data],
+        loading: false,
+      }));
+      return response.data.data;
+    } catch (error) {
+      const message = error.response?.data?.message || "Failed to enroll student";
+      set({ error: message, loading: false });
+      throw error;
+    }
+  },
+
+  unenrollStudent: async (assessmentId, studentId) => {
+    set({ loading: true, error: null });
+    try {
+      await unenrollStudentApi(assessmentId, studentId);
+      set((state) => ({
+        enrolledStudents: state.enrolledStudents.filter((s) => s.id !== studentId),
+        loading: false,
+      }));
+    } catch (error) {
+      const message = error.response?.data?.message || "Failed to unenroll student";
+      set({ error: message, loading: false });
+      throw error;
+    }
+  },
+
+  /* =========================
+     AI Preview
+  ========================= */
+
+  fetchPreviewQuestions: async (assessmentId) => {
+    set({ loading: true, error: null });
+    try {
+      const response = await fetchPreviewQuestionsApi(assessmentId);
+      set({ loading: false });
+      return response.data.questions;
+    } catch (error) {
+      const message = error.response?.data?.message || "Failed to generate preview questions";
+      set({ error: message, loading: false });
+      throw error;
+    }
+  },
+
+  /* =========================
+     Utilities
+  ========================= */
+
+  clearError: () => set({ error: null }),
+  clearCurrentAssessment: () => set({ currentAssessment: null }),
+}));
+
+export default useAssessmentStore;
