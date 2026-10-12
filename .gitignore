@@ -1,0 +1,6 @@
+# Root repo tracks only top-level docs; the apps are their own git repos.
+backend_temp/
+frontend_temp/
+screenshots/
+node_modules/
+.env
