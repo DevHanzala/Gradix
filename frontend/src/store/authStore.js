@@ -45,13 +45,11 @@ const useAuthStore = create(
       googleAuth: async () => {
         try {
           const result = await signInWithPopup(auth, googleProvider);
-          const firebaseUser = result.user;
+          // The backend verifies this token with Firebase Admin and derives
+          // the user's identity from it; nothing else is trusted.
+          const idToken = await result.user.getIdToken();
 
-          const response = await googleAuthApi({
-            name: firebaseUser.displayName,
-            email: firebaseUser.email,
-            uid: firebaseUser.uid,
-          });
+          const response = await googleAuthApi({ idToken });
 
           const { token, user } = response.data;
           set({ token, user });
