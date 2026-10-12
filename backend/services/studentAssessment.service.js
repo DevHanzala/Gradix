@@ -1,347 +1,440 @@
-import db from "../DB/db.js";
+import { withTransaction } from "../DB/db.js";
 import { generateAssessmentQuestions } from "../models/assessmentModel.js";
+import * as attemptRepo from "../repositories/attemptRepository.js";
+import { AppError } from "../utils/AppError.js";
+import {
+  gradeAnswer,
+  canonicalStudentAnswer,
+  normalizeOptions,
+  decodeStoredValue,
+} from "../utils/grading.js";
 
-// ==================== SERVICE FUNCTIONS ====================
+/** Network/clock tolerance applied to every time window. */
+export const GRACE_MS = 2000;
+export const SUPPORTED_LANGUAGES = ["en", "ur", "ar", "fa"];
 
-// 1. START ASSESSMENT FOR STUDENT SERVICE
-export const startAssessmentForStudentService = async (studentId, assessmentId, language = "en") => {
-  // Check if assessment exists
-  const { rows: assessRows } = await db.query(
-    `SELECT id, title, prompt, external_links, is_executed
-     FROM assessments WHERE id = $1`,
-    [assessmentId]
-  );
-  
-  if (assessRows.length === 0) {
-    console.warn(`⚠️ Assessment ${assessmentId} not found in database`);
-    throw new Error("ASSESSMENT_NOT_FOUND");
-  }
-  
-  const assessment = assessRows[0];
+// ------------------------------------------------------------------ timing
 
-  // Fetch question blocks to determine types, counts, durations, and marks
-  const { rows: blockRows } = await db.query(
-    `SELECT question_type, question_count, duration_per_question, num_options, positive_marks, negative_marks
-     FROM question_blocks WHERE assessment_id = $1`,
-    [assessmentId]
-  );
-  
-  if (blockRows.length === 0) {
-    console.warn(`⚠️ No question blocks defined for assessment ${assessmentId}. Using defaults.`);
-    blockRows.push({
-      question_type: "multiple_choice",
-      question_count: 5,
-      duration_per_question: 120,
-      positive_marks: 1,
-      negative_marks: 0,
-    });
-  }
+const durationsOf = (questions) => questions.map((q) => Number(q.duration_per_question) || 0);
 
-  const numQuestions = blockRows.reduce((sum, b) => sum + b.question_count, 0);
-  const typeCountsStr = blockRows.map((b) => `${b.question_count} ${b.question_type}`).join(", ");
-  const totalDuration = blockRows.reduce(
-    (sum, b) => sum + b.question_count * (b.duration_per_question || 120),
-    0
-  );
+/**
+ * Server-side view of where the student is allowed to be right now.
+ * Questions are strictly sequential: a question's window starts when the
+ * previous one ends (or when the student advanced early) and lasts its
+ * duration. Windows that have fully elapsed are skipped automatically, so
+ * a student who goes offline cannot come back to an old question.
+ */
+export const computeTiming = (attempt, questions, now = Date.now()) => {
+  const durations = durationsOf(questions);
+  const count = questions.length;
+  const totalSeconds = durations.reduce((a, b) => a + b, 0);
+  const startedAt = new Date(attempt.started_at).getTime();
+  const deadline = startedAt + totalSeconds * 1000;
 
-  // Set is_executed to true if not already
-  if (!assessment.is_executed) {
-    console.log(`🔄 Updating is_executed to true for assessment ${assessmentId}`);
-    await db.query(
-      `UPDATE assessments SET is_executed = true, updated_at = NOW() WHERE id = $1`,
-      [assessmentId]
-    );
-  } else {
-    console.log(`ℹ️ Assessment ${assessmentId} already has is_executed = true`);
+  let index = Math.min(Number(attempt.current_question_index) || 0, count);
+  let questionStart = new Date(attempt.current_question_started_at || attempt.started_at).getTime();
+
+  while (index < count && now > questionStart + durations[index] * 1000 + GRACE_MS) {
+    questionStart += durations[index] * 1000;
+    index += 1;
   }
 
-  // Validate enrollment
-  const { rows: enrollRows } = await db.query(
-    `SELECT 1 FROM enrollments WHERE student_id = $1 AND assessment_id = $2`,
-    [studentId, assessmentId]
-  );
-  
-  if (enrollRows.length === 0) {
-    console.warn(`⚠️ Student ${studentId} not enrolled for assessment ${assessmentId}`);
-    throw new Error("NOT_ENROLLED");
-  }
-
-  // Check for existing in-progress attempt
-  const { rows: existingAttempt } = await db.query(
-    `SELECT id FROM assessment_attempts WHERE student_id = $1 AND assessment_id = $2 AND status = 'in_progress'`,
-    [studentId, assessmentId]
-  );
-  
-  if (existingAttempt.length > 0) {
-    console.warn(`⚠️ In-progress attempt exists for student ${studentId}, assessment ${assessmentId}`);
-    throw new Error("ALREADY_IN_PROGRESS");
-  }
-
-  // Create attempt
-  const { rows: attemptRows } = await db.query(
-    `INSERT INTO assessment_attempts (student_id, assessment_id, attempt_number, started_at, language, status)
-     VALUES ($1, $2, 1, NOW(), $3, 'in_progress') RETURNING id`,
-    [studentId, assessmentId, language]
-  );
-  
-  const attemptId = attemptRows[0].id;
-  // Generate questions using the assessmentModel
-  await generateAssessmentQuestions(assessmentId, attemptId, language, assessment);
-
-  // Fetch generated questions
-  const { rows: questionRows } = await db.query(
-    `SELECT id, question_type, question_text, options, positive_marks, negative_marks, duration_per_question
-     FROM generated_questions WHERE attempt_id = $1 ORDER BY question_order`,
-    [attemptId]
-  );
+  const expired = index >= count || now > deadline + GRACE_MS;
+  const clamp = (value, max) => Math.max(0, Math.min(max, value));
+  const questionRemainingSeconds = expired
+    ? 0
+    : clamp(Math.ceil((questionStart + durations[index] * 1000 - now) / 1000), durations[index]);
+  const laterSeconds = expired ? 0 : durations.slice(index + 1).reduce((a, b) => a + b, 0);
+  const remainingSeconds = expired
+    ? 0
+    : clamp(Math.min(Math.ceil((deadline - now) / 1000), questionRemainingSeconds + laterSeconds), totalSeconds);
 
   return {
-    attemptId,
-    duration: totalDuration,
-    questions: questionRows,
+    index: Math.min(index, count),
+    questionStart,
+    expired,
+    questionRemainingSeconds,
+    remainingSeconds,
+    totalSeconds,
+    late: now > deadline + GRACE_MS,
   };
 };
 
-// 2. SUBMIT ASSESSMENT FOR STUDENT SERVICE
-export const submitAssessmentForStudentService = async (
-  studentId,
-  assessmentId,
-  attemptId,
-  answers
-) => {
+const timingChanged = (attempt, timing) =>
+  Number(attempt.current_question_index) !== timing.index ||
+  new Date(attempt.current_question_started_at || attempt.started_at).getTime() !== timing.questionStart;
 
-  // Validate attempt
-  const { rows: attemptRows } = await db.query(
-    `SELECT id, assessment_id, student_id, status
-     FROM assessment_attempts WHERE id = $1 AND student_id = $2 AND assessment_id = $3 AND status = 'in_progress'`,
-    [attemptId, studentId, assessmentId]
-  );
-  
-  if (attemptRows.length === 0) {
-    throw new Error("INVALID_ATTEMPT");
-  }
+// ------------------------------------------------------------- serializers
 
-  // Fetch all questions for the attempt
-  const { rows: questionRows } = await db.query(
-    `SELECT id, question_type, correct_answer, positive_marks, negative_marks
-     FROM generated_questions WHERE attempt_id = $1 ORDER BY question_order`,
-    [attemptId]
-  );
+/** Questions as sent to a student during an attempt: never includes answers. */
+const toPublicQuestion = (q) => ({
+  id: q.id,
+  question_order: q.question_order,
+  question_type: q.question_type,
+  question_text: q.question_text,
+  options: q.question_type === "multiple_choice" ? normalizeOptions(q.options) : null,
+  positive_marks: Number(q.positive_marks),
+  negative_marks: Number(q.negative_marks),
+  duration_per_question: Number(q.duration_per_question),
+});
 
-  let totalScore = 0;
-  const evaluatedAnswers = [];
-
-  for (const q of questionRows) {
-    const submittedAnswer = answers.find((a) => a.questionId === q.id);
-    const studentAnswer = submittedAnswer ? submittedAnswer.answer : null;
-
-    let isCorrect = false;
-
-    // Smart comparison for all types
-    if (q.question_type === "short_answer") {
-      const rule =
-        typeof q.correct_answer === "string"
-          ? JSON.parse(q.correct_answer)
-          : q.correct_answer;
-
-      isCorrect = evaluateShortAnswer(studentAnswer, rule);
-    } else {
-      // TRUE/FALSE & MCQ: Smart string comparison
-      const clean = (val) => {
-        if (val === null || val === undefined) return "";
-        return String(val).trim().toLowerCase().replace(/\\"/g, '"');
-      };
-      isCorrect = clean(q.correct_answer) === clean(studentAnswer);
+const buildInProgressState = (attempt, questions, savedRows, timing) => {
+  const savedAnswers = {};
+  for (const row of savedRows) {
+    if (row.student_answer !== null && row.student_answer !== undefined) {
+      savedAnswers[row.question_id] = row.student_answer;
     }
-
-    // Fixed scoring logic
-    const score = isCorrect
-      ? parseFloat(q.positive_marks || 1)
-      : studentAnswer !== null && studentAnswer !== undefined
-      ? -Math.abs(parseFloat(q.negative_marks || 0))
-      : 0;
-
-    totalScore += score;
-
-    evaluatedAnswers.push({
-      questionId: q.id,
-      answer: studentAnswer,
-      correctAnswer: q.correct_answer,
-      score: score,
-      correct: isCorrect,
-    });
-
-    // Save to DB
-    await db.query(
-      `INSERT INTO student_answers (attempt_id, question_id, student_answer, score)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (attempt_id, question_id) DO UPDATE
-       SET student_answer = $3, score = $4`,
-      [
-        attemptId,
-        q.id,
-        studentAnswer !== null
-          ? q.question_type === "short_answer"
-            ? JSON.stringify(studentAnswer)
-            : studentAnswer
-          : null,
-        score,
-      ]
-    );
   }
-
-  // Prevent negative total score
-  totalScore = Math.max(0, totalScore);
-
-  // Update attempt
-  await db.query(
-    `UPDATE assessment_attempts 
-     SET status = 'completed', completed_at = NOW(), score = $1
-     WHERE id = $2`,
-    [totalScore, attemptId]
-  );
-
   return {
-    attemptId,
-    score: totalScore,
-    answers: evaluatedAnswers,
+    status: "in_progress",
+    attemptId: attempt.id,
+    assessmentId: attempt.assessment_id,
+    language: attempt.language,
+    startedAt: attempt.started_at,
+    serverTime: new Date().toISOString(),
+    totalDurationSeconds: timing.totalSeconds,
+    remainingSeconds: timing.remainingSeconds,
+    currentQuestionIndex: timing.index,
+    questionRemainingSeconds: timing.questionRemainingSeconds,
+    questions: questions.map(toPublicQuestion),
+    savedAnswers,
   };
 };
 
-// 3. GET SUBMISSION DETAILS FOR STUDENT SERVICE
-export const getSubmissionDetailsForStudentService = async (studentId, submissionId) => {
-  const { rows: attemptRows } = await db.query(
-    `SELECT aa.*, a.title AS assessment_title
-     FROM assessment_attempts aa
-     JOIN assessments a ON aa.assessment_id = a.id
-     WHERE aa.id = $1 AND aa.student_id = $2 AND aa.status = 'completed'`,
-    [submissionId, studentId]
-  );
-  
-  if (attemptRows.length === 0) {
-    console.warn(`⚠️ Submission ${submissionId} not found for student ${studentId}`);
-    throw new Error("SUBMISSION_NOT_FOUND");
-  }
+/** Full result of a completed attempt, including correct answers. */
+export const buildAttemptResult = async (attempt, client) => {
+  const questions = await attemptRepo.findAttemptQuestionsQuery(attempt.id, { includeAnswers: true }, client);
+  const savedRows = await attemptRepo.findSavedAnswersQuery(attempt.id, client);
+  const saved = new Map(savedRows.map((r) => [r.question_id, r.student_answer]));
 
-  const { rows: answerRows } = await db.query(
-    `SELECT sa.*, gq.question_text, gq.question_type, gq.correct_answer, gq.positive_marks, gq.negative_marks
-     FROM student_answers sa
-     JOIN generated_questions gq ON sa.question_id = gq.id
-     WHERE sa.attempt_id = $1`,
-    [submissionId]
-  );
+  let totalMarks = 0;
+  let correctCount = 0;
+  let incorrectCount = 0;
+  let unansweredCount = 0;
 
-  return {
-    attempt: attemptRows[0],
-    answers: answerRows,
-  };
-};
-
-// 4. GET ASSESSMENT FOR INSTRUCTOR PRINT SERVICE
-export const getAssessmentForInstructorPrintService = async (assessmentId, userId) => {
-  let attemptId;
-
-  try {
-
-    // Fetch assessment + question blocks
-    const { rows: assessmentRows } = await db.query(
-      `SELECT a.id, a.title, a.instructor_id, a.prompt, a.external_links
-       FROM assessments a
-       WHERE a.id = $1 AND a.instructor_id = $2`,
-      [assessmentId, userId]
-    );
-
-    if (assessmentRows.length === 0) {
-      throw new Error("ASSESSMENT_NOT_FOUND");
-    }
-
-    const assessment = assessmentRows[0];
-
-    // Fetch question blocks
-    const { rows: blockRows } = await db.query(
-      `SELECT question_type, question_count, duration_per_question, num_options, positive_marks, negative_marks
-       FROM question_blocks WHERE assessment_id = $1`,
-      [assessmentId]
-    );
-
-    if (blockRows.length === 0) {
-      throw new Error("NO_QUESTION_BLOCKS");
-    }
-
-    // Create temp attempt
-    const { rows: attemptRows } = await db.query(
-      `INSERT INTO assessment_attempts 
-       (assessment_id, student_id, attempt_number, started_at, language, status, is_physical_paper)
-       VALUES ($1, $2, 1, NOW(), $3, 'in_progress', $4)
-       RETURNING id`,
-      [assessmentId, userId, "en", true]
-    );
-    
-    attemptId = attemptRows[0].id;
-
-    // Generate questions
-    const { questions, duration } = await generateAssessmentQuestions(
-      assessmentId,
-      attemptId,
-      "en",
-      assessment
-    );
-
-    const totalMarks = questions.reduce((sum, q) => sum + (q.positive_marks || 0), 0);
-
-    // Mark as completed
-    await db.query(
-      `UPDATE assessment_attempts SET status = 'completed', completed_at = NOW() WHERE id = $1`,
-      [attemptId]
-    );
-
+  const answers = questions.map((q) => {
+    const studentAnswer = saved.get(q.id) ?? null;
+    const { answered, correct, score } = gradeAnswer(q, studentAnswer);
+    totalMarks += Number(q.positive_marks) || 0;
+    if (!answered) unansweredCount += 1;
+    else if (correct) correctCount += 1;
+    else incorrectCount += 1;
     return {
-      questions,
-      duration,
-      totalMarks,
-      assessmentTitle: assessment.title,
+      questionId: q.id,
+      questionOrder: q.question_order,
+      questionType: q.question_type,
+      questionText: q.question_text,
+      options: q.question_type === "multiple_choice" ? normalizeOptions(q.options) : null,
+      studentAnswer,
+      correctAnswer: decodeStoredValue(q.correct_answer),
+      isCorrect: correct,
+      answered,
+      score,
+      positiveMarks: Number(q.positive_marks),
+      negativeMarks: Number(q.negative_marks),
     };
-  } catch (error) {
-    // Cleanup on error
-    if (attemptId) {
-      await db.query(`DELETE FROM assessment_attempts WHERE id = $1`, [attemptId]).catch(() =>
-        console.error("Cleanup failed")
+  });
+
+  const score = Number(attempt.score) || 0;
+  const startedAt = new Date(attempt.started_at).getTime();
+  const completedAt = attempt.completed_at ? new Date(attempt.completed_at).getTime() : Date.now();
+
+  return {
+    status: "completed",
+    attemptId: attempt.id,
+    assessmentId: attempt.assessment_id,
+    language: attempt.language,
+    score,
+    totalMarks,
+    percentage: totalMarks > 0 ? Math.round((score / totalMarks) * 10000) / 100 : 0,
+    correctCount,
+    incorrectCount,
+    unansweredCount,
+    timeTakenSeconds: Math.max(0, Math.round((completedAt - startedAt) / 1000)),
+    completedAt: attempt.completed_at,
+    answers,
+  };
+};
+
+// ---------------------------------------------------------------- finalize
+
+/**
+ * Grade every question from the saved answers and mark the attempt complete.
+ * Idempotent: a second call on a completed attempt just returns its result.
+ */
+export const finalizeAttempt = async (attemptId) =>
+  withTransaction(async (client) => {
+    const attempt = await attemptRepo.findAttemptByIdQuery(attemptId, client, { forUpdate: true });
+    if (!attempt) throw new AppError("ATTEMPT_NOT_FOUND", 404, "Attempt not found");
+    if (attempt.status === "completed") return buildAttemptResult(attempt, client);
+
+    const questions = await attemptRepo.findAttemptQuestionsQuery(attemptId, { includeAnswers: true }, client);
+    const savedRows = await attemptRepo.findSavedAnswersQuery(attemptId, client);
+    const saved = new Map(savedRows.map((r) => [r.question_id, r.student_answer]));
+
+    let total = 0;
+    for (const q of questions) {
+      const studentAnswer = saved.get(q.id) ?? null;
+      const { correct, score } = gradeAnswer(q, studentAnswer);
+      total += score;
+      await attemptRepo.saveGradeQuery(
+        { attemptId, questionId: q.id, answer: studentAnswer, score, isCorrect: correct },
+        client
       );
+    }
+
+    // A negative total is floored at zero (existing product rule).
+    const completed = await attemptRepo.completeAttemptQuery(attemptId, Math.max(0, total), client);
+    return buildAttemptResult(completed, client);
+  });
+
+// ------------------------------------------------------------------ helpers
+
+const requireOwnedAttempt = async (studentId, attemptId, client) => {
+  const id = Number.parseInt(attemptId, 10);
+  if (!Number.isInteger(id)) throw new AppError("ATTEMPT_NOT_FOUND", 404, "Attempt not found");
+  const attempt = await attemptRepo.findAttemptByIdQuery(id, client, { forUpdate: Boolean(client) });
+  // Someone else's attempt is reported as "not found" to avoid leaking ids.
+  if (!attempt || attempt.student_id !== studentId || attempt.is_physical_paper) {
+    throw new AppError("ATTEMPT_NOT_FOUND", 404, "Attempt not found");
+  }
+  return attempt;
+};
+
+const loadInProgressState = async (attempt) => {
+  const questions = await attemptRepo.findAttemptQuestionsQuery(attempt.id);
+  const timing = computeTiming(attempt, questions);
+
+  if (timing.expired) {
+    return finalizeAttempt(attempt.id);
+  }
+  if (timingChanged(attempt, timing)) {
+    await attemptRepo.updateAttemptTimingQuery(attempt.id, timing.index, new Date(timing.questionStart));
+  }
+  const savedRows = await attemptRepo.findSavedAnswersQuery(attempt.id);
+  return buildInProgressState(attempt, questions, savedRows, timing);
+};
+
+const parseAssessmentId = (assessmentId) => {
+  const id = Number.parseInt(assessmentId, 10);
+  if (!Number.isInteger(id)) throw new AppError("ASSESSMENT_NOT_FOUND", 404, "Assessment not found");
+  return id;
+};
+
+// ------------------------------------------------------------- public API
+
+/**
+ * Current state of the student's attempt for an assessment:
+ * not_started | in_progress (questions without answers) | completed (result).
+ */
+export const getAttemptStateService = async (studentId, assessmentId) => {
+  const id = parseAssessmentId(assessmentId);
+  const assessment = await attemptRepo.findAssessmentForStartQuery(id);
+  if (!assessment) throw new AppError("ASSESSMENT_NOT_FOUND", 404, "Assessment not found");
+  if (!(await attemptRepo.isStudentEnrolledQuery(studentId, id))) {
+    throw new AppError("NOT_ENROLLED", 403, "You are not enrolled in this assessment");
+  }
+
+  const attempt = await attemptRepo.findOnlineAttemptQuery(studentId, id);
+  if (!attempt) return { status: "not_started", assessmentId: id, title: assessment.title };
+  if (attempt.status === "completed") return buildAttemptResult(attempt);
+  return loadInProgressState(attempt);
+};
+
+/**
+ * Start the student's single online attempt, or resume it if one is in
+ * progress. Questions are generated BEFORE the attempt row is written, so
+ * an LLM failure never leaves a stuck attempt behind.
+ */
+export const startAssessmentForStudentService = async (studentId, assessmentId, language = "en") => {
+  const id = parseAssessmentId(assessmentId);
+  if (!SUPPORTED_LANGUAGES.includes(language)) {
+    throw new AppError("UNSUPPORTED_LANGUAGE", 400, "Unsupported language");
+  }
+
+  const assessment = await attemptRepo.findAssessmentForStartQuery(id);
+  if (!assessment) throw new AppError("ASSESSMENT_NOT_FOUND", 404, "Assessment not found");
+  if (!(await attemptRepo.isStudentEnrolledQuery(studentId, id))) {
+    throw new AppError("NOT_ENROLLED", 403, "You are not enrolled in this assessment");
+  }
+
+  const existing = await attemptRepo.findOnlineAttemptQuery(studentId, id);
+  if (existing) {
+    if (existing.status === "completed") {
+      throw new AppError("ALREADY_ATTEMPTED", 409, "You have already completed this assessment");
+    }
+    const state = await loadInProgressState(existing);
+    if (state.status === "completed") {
+      throw new AppError("ALREADY_ATTEMPTED", 409, "Your time for this assessment has ended");
+    }
+    return { ...state, resumed: true, code: "IN_PROGRESS" };
+  }
+
+  let generated;
+  try {
+    generated = await generateAssessmentQuestions(id, language, assessment);
+  } catch (error) {
+    if (error.message === "NO_QUESTION_BLOCKS") {
+      throw new AppError("NO_QUESTION_BLOCKS", 400, "This assessment has no questions configured yet");
+    }
+    console.error(`[START] question generation failed for assessment ${id}: ${error.message}`);
+    throw new AppError("GENERATION_FAILED", 503, "Could not prepare your questions. Please try again.");
+  }
+
+  let attempt;
+  try {
+    attempt = await withTransaction(async (client) => {
+      const created = await attemptRepo.insertAttemptQuery({ studentId, assessmentId: id, language }, client);
+      let order = 1;
+      for (const q of generated.questions) {
+        await attemptRepo.insertGeneratedQuestionQuery(created.id, order, q, client);
+        order += 1;
+      }
+      // Only now, after enrollment was checked and the attempt exists.
+      await attemptRepo.markAssessmentExecutedQuery(id, client);
+      return created;
+    });
+  } catch (error) {
+    if (error.code === "23505") {
+      // A parallel Start created the attempt first: resume that one.
+      const concurrent = await attemptRepo.findOnlineAttemptQuery(studentId, id);
+      if (concurrent && concurrent.status === "in_progress") {
+        return { ...(await loadInProgressState(concurrent)), resumed: true, code: "IN_PROGRESS" };
+      }
+      throw new AppError("ALREADY_ATTEMPTED", 409, "You have already completed this assessment");
     }
     throw error;
   }
+
+  return { ...(await loadInProgressState(attempt)), resumed: false };
 };
 
-// ==================== HELPER FUNCTIONS ====================
+/** Autosave one answer. Only the owner, only while in progress, only inside its time window. */
+export const saveAnswerService = async (studentId, attemptId, questionId, answer) => {
+  const qid = Number.parseInt(questionId, 10);
 
-/**
- * Normalize text for comparison
- */
-const normalizeText = (text = "") =>
-  text
-    .toLowerCase()
-    .replace(/[^\w\s]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-/**
- * Evaluate short answer based on required keywords and minimum matches
- */
-const evaluateShortAnswer = (studentAnswer, rule) => {
-  if (!studentAnswer || !rule) return false;
-
-  const answer = normalizeText(studentAnswer);
-
-  const required = rule.required_keywords || [];
-  const minMatch = rule.min_required_match || required.length;
-
-  let matched = 0;
-
-  for (const keyword of required) {
-    if (answer.includes(normalizeText(keyword))) {
-      matched++;
+  const outcome = await withTransaction(async (client) => {
+    const attempt = await requireOwnedAttempt(studentId, attemptId, client);
+    if (attempt.status !== "in_progress") {
+      throw new AppError("ATTEMPT_CLOSED", 409, "This attempt has already been submitted");
     }
-  }
 
-  return matched >= minMatch;
+    const questions = await attemptRepo.findAttemptQuestionsQuery(attempt.id, {}, client);
+    const order = questions.findIndex((q) => q.id === qid);
+    if (order === -1) throw new AppError("INVALID_QUESTION", 400, "Question does not belong to this attempt");
+
+    const timing = computeTiming(attempt, questions);
+    if (timing.expired) return { expired: true, attemptId: attempt.id };
+    if (order < timing.index) {
+      throw new AppError("QUESTION_CLOSED", 409, "Time for this question has ended");
+    }
+
+    let index = timing.index;
+    let questionStart = timing.questionStart;
+    if (order > index) {
+      // The client moved ahead (e.g. an advance call was lost); follow it.
+      index = order;
+      questionStart = Date.now();
+    }
+    const storedStart = new Date(attempt.current_question_started_at || attempt.started_at).getTime();
+    if (index !== Number(attempt.current_question_index) || questionStart !== storedStart) {
+      await attemptRepo.updateAttemptTimingQuery(attempt.id, index, new Date(questionStart), client);
+    }
+
+    const stored = canonicalStudentAnswer(questions[order], answer);
+    const row = await attemptRepo.upsertAnswerQuery({ attemptId: attempt.id, questionId: qid, answer: stored }, client);
+    return { questionId: qid, savedAt: row.answered_at, currentQuestionIndex: index };
+  });
+
+  if (outcome.expired) {
+    await finalizeAttempt(outcome.attemptId);
+    throw new AppError("ATTEMPT_CLOSED", 409, "Time is up; your attempt has been submitted");
+  }
+  return outcome;
+};
+
+/** Move from `fromIndex` to the next question. Idempotent for repeated calls. */
+export const advanceQuestionService = async (studentId, attemptId, fromIndex) => {
+  const outcome = await withTransaction(async (client) => {
+    const attempt = await requireOwnedAttempt(studentId, attemptId, client);
+    if (attempt.status !== "in_progress") return { finished: true, attemptId: attempt.id };
+
+    const questions = await attemptRepo.findAttemptQuestionsQuery(attempt.id, {}, client);
+    const timing = computeTiming(attempt, questions);
+    if (timing.expired) return { finished: true, attemptId: attempt.id };
+
+    let index = timing.index;
+    let questionStart = timing.questionStart;
+    if (Number(fromIndex) === index) {
+      index += 1;
+      questionStart = Date.now();
+    }
+    if (index >= questions.length) return { finished: true, attemptId: attempt.id };
+
+    await attemptRepo.updateAttemptTimingQuery(attempt.id, index, new Date(questionStart), client);
+    const after = computeTiming(
+      { ...attempt, current_question_index: index, current_question_started_at: new Date(questionStart) },
+      questions
+    );
+    return {
+      finished: false,
+      currentQuestionIndex: after.index,
+      questionRemainingSeconds: after.questionRemainingSeconds,
+      remainingSeconds: after.remainingSeconds,
+    };
+  });
+
+  if (outcome.finished) {
+    return { finished: true, result: await finalizeAttempt(outcome.attemptId) };
+  }
+  return outcome;
+};
+
+/**
+ * Submit the attempt. Answers in the payload are a final flush of anything
+ * the autosave may not have delivered; they are accepted only for questions
+ * whose time window is still open. Everything is graded from the DB.
+ */
+export const submitAssessmentForStudentService = async (studentId, assessmentId, attemptId, answers = []) => {
+  const id = parseAssessmentId(assessmentId);
+  let rejectedAnswers = 0;
+
+  const attemptRowId = await withTransaction(async (client) => {
+    const attempt = await requireOwnedAttempt(studentId, attemptId, client);
+    if (attempt.assessment_id !== id) throw new AppError("ATTEMPT_NOT_FOUND", 404, "Attempt not found");
+    if (attempt.status !== "in_progress") return attempt.id;
+
+    const questions = await attemptRepo.findAttemptQuestionsQuery(attempt.id, {}, client);
+    const timing = computeTiming(attempt, questions);
+    const savedRows = await attemptRepo.findSavedAnswersQuery(attempt.id, client);
+    const saved = new Map(savedRows.map((r) => [r.question_id, r.student_answer]));
+
+    for (const item of Array.isArray(answers) ? answers : []) {
+      const qid = Number.parseInt(item?.questionId, 10);
+      const order = questions.findIndex((q) => q.id === qid);
+      if (order === -1) continue;
+      const stored = canonicalStudentAnswer(questions[order], item.answer);
+      if (stored === null || stored === (saved.get(qid) ?? null)) continue;
+
+      const windowOpen = !timing.expired && order >= timing.index;
+      if (!windowOpen) {
+        rejectedAnswers += 1;
+        continue;
+      }
+      await attemptRepo.upsertAnswerQuery({ attemptId: attempt.id, questionId: qid, answer: stored }, client);
+    }
+    return attempt.id;
+  });
+
+  const result = await finalizeAttempt(attemptRowId);
+  return { ...result, rejectedAnswers };
+};
+
+/** Review of a completed attempt (owner only). In-progress attempts are never exposed here. */
+export const getSubmissionDetailsForStudentService = async (studentId, submissionId) => {
+  const attempt = await requireOwnedAttempt(studentId, submissionId);
+  if (attempt.status !== "completed") {
+    throw new AppError("SUBMISSION_NOT_FOUND", 404, "Submission not found");
+  }
+  return buildAttemptResult(attempt);
 };

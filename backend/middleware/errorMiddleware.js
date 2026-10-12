@@ -1,5 +1,12 @@
+import { isAppError } from "../utils/AppError.js"
+
 // Error handling middleware
+// eslint-disable-next-line no-unused-vars -- Express identifies error handlers by arity
 export const errorHandler = (err, req, res, next) => {
+  if (isAppError(err)) {
+    return res.status(err.status).json({ success: false, code: err.code, message: err.message })
+  }
+
   let error = { ...err }
   error.message = err.message
 

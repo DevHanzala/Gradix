@@ -3,6 +3,13 @@ import { mapLanguageCode } from "../services/ai/aiService.js";
 import { generateContent } from "../services/ai/generateContent.js";
 import * as assessmentRepo from "../repositories/assessmentRepository.js";
 import { validateAssessmentData, validateQuestionBlockData } from "../validator/assessment.validator.js";
+import {
+  normalizeOptions,
+  normalizeText,
+  canonicalOption,
+  parseBoolean,
+  parseShortAnswerRule,
+} from "../utils/grading.js";
 
 // ==================== ASSESSMENT CRUD ====================
 
@@ -260,150 +267,180 @@ export const clearLinksForAssessment = async (assessmentId) => {
 
 // ==================== AI QUESTION GENERATION ====================
 
-export const generateAssessmentQuestions = async (assessmentId, attemptId, language, assessment) => {
-  const langName = mapLanguageCode(language);
-  
+const TYPE_INSTRUCTIONS = {
+  multiple_choice: (n) =>
+    `"options": an array of exactly ${n} plain option texts WITHOUT letter labels; ` +
+    `"correct_answer": the exact text of the correct option.`,
+  true_false: () => `"options": null; "correct_answer": a JSON boolean (true or false).`,
+  short_answer: () =>
+    `"options": null; "correct_answer": {"answer": "model answer", ` +
+    `"required_keywords": ["2-4 essential keywords"], "min_required_match": 1}.`,
+};
 
-  // STEP 1: Fetch blocks
-  const blockRows = await assessmentRepo.findQuestionBlocksByAssessmentQuery(assessmentId);
+const buildQuestionPrompt = ({ assessment, blockRows, langName, resourcesContent }) => {
+  const total = blockRows.reduce((sum, b) => sum + b.question_count, 0);
+  const blocksText = blockRows
+    .map(
+      (b) =>
+        `- ${b.question_count} x "${b.question_type}": ` +
+        TYPE_INSTRUCTIONS[b.question_type](b.num_options || 4)
+    )
+    .join("\n");
 
-  if (blockRows.length === 0) {
-    throw new Error(`No question blocks for assessment ${assessmentId}`);
-  }
+  return `You are writing exam questions.
+Write every word of every question and option natively in ${langName}. Do not translate from another language.
 
-
-  const questionTypes = [...new Set(blockRows.map((b) => b.question_type))];
-  const typeCountsStr = blockRows
-    .map((b) => {
-      if (b.question_type === "multiple_choice") {
-        return `${b.question_count} multiple_choice (${b.num_options} options)`;
-      }
-      return `${b.question_count} ${b.question_type}`;
-    })
-    .join(", ");
-
-  // STEP 2: Fetch resources
-  const chunkRows = await assessmentRepo.findResourceChunksByAssessmentQuery(assessmentId);
-  const resourcesContent = chunkRows
-    .filter((row) => row.chunk_text)
-    .map((row) => `Resource "${row.name}":\n${row.chunk_text}`)
-    .join("\n\n---\n\n")
-    .substring(0, 5000) || "No resource content available";
-
-  
-
-  const questionPrompt = `
-CRITICAL: Generate ALL questions EXCLUSIVELY in ${langName} language. 
-Every word MUST be in ${langName}.
-
-CONTENT TO BASE QUESTIONS ON:
+CONTENT TO BASE QUESTIONS ON
 Title: "${assessment.title}"
-Instructor Prompt: "${assessment.prompt || "No prompt provided"}"
-External Links: ${(assessment.external_links || []).join(", ") || "None"}
+Instructor prompt: "${assessment.prompt || "No prompt provided"}"
+External links (titles only, not fetched): ${(assessment.external_links || []).join(", ") || "None"}
 
-Resource Content:
+Resource content:
 ${resourcesContent}
 
-STRICT REQUIREMENTS:
-1. Question types: ${questionTypes.join(", ")}
-2. Counts: ${typeCountsStr}
-3. Language: ALL text in ${langName}
-4. Output ONLY JSON array
+REQUIRED QUESTIONS (${total} in total)
+${blocksText}
 
-Example format:
-[
-  {
-    "question_type": "${questionTypes[0]}",
-    "question_text": "[Question in ${langName}]",
-    "options": ${questionTypes[0] === 'multiple_choice' ? '["A. [Option]", "B. [Option]"]' : questionTypes[0] === 'true_false' ? '["true", "false"]' : 'null'},
-    "correct_answer": ${questionTypes[0] === 'true_false' ? 'true' : '"A. [Option]"'},
-    "positive_marks": ${blockRows[0].positive_marks},
-    "negative_marks": ${blockRows[0].negative_marks},
-    "duration_per_question": ${blockRows[0].duration_per_question}
-  }
-]
+OUTPUT
+Return ONLY a JSON array. Each element:
+{"question_type": "<one of the types above>", "question_text": "...", "options": ..., "correct_answer": ...}
+No markdown, no commentary.`;
+};
 
-Generate ${blockRows.reduce((sum, b) => sum + b.question_count, 0)} questions NOW in ${langName}.`;
+const parseQuestionArray = (aiText) => {
+  const cleaned = String(aiText || "")
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "");
+  const start = cleaned.indexOf("[");
+  const end = cleaned.lastIndexOf("]");
+  if (start === -1 || end <= start) throw new Error("No JSON array in AI response");
+  const parsed = JSON.parse(cleaned.substring(start, end + 1));
+  if (!Array.isArray(parsed)) throw new Error("AI response is not an array");
+  return parsed;
+};
 
+/**
+ * Validate one raw AI question against its block and convert it to the
+ * canonical stored shape. Returns null if the question is unusable.
+ */
+export const normalizeGeneratedQuestion = (raw, block) => {
+  if (!raw || typeof raw.question_text !== "string" || !raw.question_text.trim()) return null;
 
-  // STEP 3: Call AI
-  let questions = [];
-  try {
-    const aiText = await generateContent(questionPrompt, {
-      maxOutputTokens: 4000,
-      temperature: 0.7,
-      responseMimeType: "application/json",
-    });
+  const base = {
+    question_type: block.question_type,
+    question_text: raw.question_text.trim(),
+    positive_marks: Number(block.positive_marks ?? 1),
+    negative_marks: Math.abs(Number(block.negative_marks ?? 0)),
+    duration_per_question: Number(block.duration_per_question) || 120,
+  };
 
-
-    const cleaned = aiText.trim().replace(/^```json\s*/i, "").replace(/\s*```$/i, "");
-    const start = cleaned.indexOf("[");
-    const end = cleaned.lastIndexOf("]") + 1;
-
-    if (start === -1 || end === 0) {
-      throw new Error("No JSON array in AI response");
-    }
-
-    questions = JSON.parse(cleaned.substring(start, end));
-
-    
-  } catch (error) {
-    console.error('[QUESTION GEN] ❌ AI call failed:', error.message);
-    throw error;
+  if (block.question_type === "multiple_choice") {
+    const options = normalizeOptions(raw.options).filter((o) => o.length > 0);
+    if (options.length < 2 || new Set(options.map(normalizeText)).size !== options.length) return null;
+    const correct = canonicalOption(raw.correct_answer, options);
+    if (correct === null) return null;
+    return { ...base, options, correct_answer: correct };
   }
 
-  // STEP 4: Save to DB (only if attemptId exists)
-  let totalDuration = 0;
-  let questionIndex = 0;
-
-  if (attemptId) {
-    await assessmentRepo.deleteGeneratedQuestionsByAttemptQuery(attemptId);
+  if (block.question_type === "true_false") {
+    const correct = parseBoolean(raw.correct_answer);
+    if (correct === null) return null;
+    return { ...base, options: null, correct_answer: correct };
   }
 
+  if (block.question_type === "short_answer") {
+    const rule = parseShortAnswerRule(raw.correct_answer);
+    if (!rule.answer && rule.keywords.length === 0) return null;
+    return {
+      ...base,
+      options: null,
+      correct_answer: {
+        answer: rule.answer,
+        required_keywords: rule.keywords,
+        min_required_match: rule.keywords.length ? Math.max(1, rule.minMatch) : 0,
+      },
+    };
+  }
+
+  return null;
+};
+
+/** Fill each block from AI questions of the same type, preserving block order. */
+const assignToBlocks = (rawQuestions, blockRows) => {
+  const buckets = new Map();
+  for (const q of rawQuestions) {
+    const type = typeof q?.question_type === "string" ? q.question_type.trim() : "";
+    if (!buckets.has(type)) buckets.set(type, []);
+    buckets.get(type).push(q);
+  }
+
+  const result = [];
   for (const block of blockRows) {
-    for (let i = 0; i < block.question_count && questionIndex < questions.length; i++) {
-      let q = questions[questionIndex];
-
-      q.question_type = block.question_type;
-      q.positive_marks = block.positive_marks;
-      q.negative_marks = block.negative_marks;
-      q.duration_per_question = block.duration_per_question;
-
-      if (!q.question_text) {
-        questionIndex++;
-        continue;
-      }
-
-      if (q.question_type === "multiple_choice" && q.options && q.correct_answer) {
-        const letter = String(q.correct_answer).trim().toUpperCase();
-        const key = Object.keys(q.options).find((k) =>
-          k.trim().toUpperCase().startsWith(letter)
-        );
-        if (key) {
-          q.correct_answer = `${key}. ${q.options[key]}`;
-        }
-      }
-
-      totalDuration += q.duration_per_question;
-
-      if (attemptId) {
-        await assessmentRepo.createGeneratedQuestionQuery({
-          attemptId,
-          questionOrder: questionIndex + 1,
-          questionType: q.question_type,
-          questionText: q.question_text.trim(),
-          options: q.options,
-          correctAnswer: q.correct_answer,
-          positiveMarks: q.positive_marks,
-          negativeMarks: q.negative_marks,
-          durationPerQuestion: q.duration_per_question,
-        });
-      }
-
-      questionIndex++;
+    const pool = buckets.get(block.question_type) || [];
+    const accepted = [];
+    while (accepted.length < block.question_count && pool.length > 0) {
+      const normalized = normalizeGeneratedQuestion(pool.shift(), block);
+      if (normalized) accepted.push(normalized);
     }
+    result.push(accepted);
+  }
+  return result;
+};
+
+/**
+ * Generate a question set for an assessment in `language`.
+ * Pure with respect to the database: it reads blocks/resources but writes
+ * nothing, so callers decide whether and where to persist the questions.
+ * Returns { questions, duration } where duration is the total in seconds.
+ */
+export const generateAssessmentQuestions = async (assessmentId, language, assessment) => {
+  const langName = mapLanguageCode(language);
+
+  const blockRows = await assessmentRepo.findQuestionBlocksByAssessmentQuery(assessmentId);
+  if (blockRows.length === 0) {
+    throw new Error("NO_QUESTION_BLOCKS");
   }
 
+  const chunkRows = await assessmentRepo.findResourceChunksByAssessmentQuery(assessmentId);
+  const resourcesContent =
+    chunkRows
+      .filter((row) => row.chunk_text)
+      .map((row) => `Resource "${row.name}":\n${row.chunk_text}`)
+      .join("\n\n---\n\n")
+      .substring(0, 5000) || "No resource content available";
 
-  return { questions, duration: totalDuration };
+  const prompt = buildQuestionPrompt({ assessment, blockRows, langName, resourcesContent });
+
+  // One retry when the model returns too few usable questions.
+  let perBlock = blockRows.map(() => []);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let rawQuestions;
+    try {
+      const aiText = await generateContent(prompt, {
+        maxOutputTokens: 8000,
+        temperature: 0.8,
+        responseMimeType: "application/json",
+      });
+      rawQuestions = parseQuestionArray(aiText);
+    } catch (error) {
+      console.error(`[QUESTION GEN] attempt ${attempt + 1} failed: ${error.message}`);
+      continue;
+    }
+
+    const fresh = assignToBlocks(rawQuestions, blockRows);
+    perBlock = perBlock.map((existing, i) =>
+      existing.concat(fresh[i]).slice(0, blockRows[i].question_count)
+    );
+    const complete = perBlock.every((qs, i) => qs.length >= blockRows[i].question_count);
+    if (complete) break;
+  }
+
+  const questions = perBlock.flat();
+  if (questions.length === 0) {
+    throw new Error("GENERATION_FAILED");
+  }
+
+  const duration = questions.reduce((sum, q) => sum + q.duration_per_question, 0);
+  return { questions, duration };
 };

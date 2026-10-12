@@ -277,7 +277,7 @@ export const previewQuestionsService = async (assessmentId, instructorId, userRo
     throw new Error('Assessment not found');
   }
 
-  const { questions } = await generateAssessmentQuestions(assessmentId, null, 'en', assessment);
+  const { questions } = await generateAssessmentQuestions(assessmentId, 'en', assessment);
   return questions;
 };
 
@@ -298,7 +298,7 @@ export const generatePhysicalPaperService = async (assessmentId, instructorId, u
     throw new Error('Assessment not found');
   }
 
-  const { questions } = await generateAssessmentQuestions(assessmentId, null, language, assessment);
+  const { questions } = await generateAssessmentQuestions(assessmentId, language, assessment);
 
   if (!questions || questions.length === 0) {
     throw new Error('No questions generated');

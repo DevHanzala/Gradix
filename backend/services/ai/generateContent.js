@@ -4,7 +4,7 @@ import { getRandomCreationProvider } from "./aiProviders.js";
    GENERATE CONTENT (CONTROLLED)
 ========================= */
 
-export const generateContent = async (prompt, options = {}) => {
+const generateWithProviders = async (prompt, options = {}) => {
   const primary = getRandomCreationProvider();
   const secondary = getRandomCreationProvider();
 
@@ -72,3 +72,11 @@ export const generateContent = async (prompt, options = {}) => {
     throw secondaryError;
   }
 };
+
+/**
+ * Indirection so tests can replace the LLM without network access.
+ * All application code calls `generateContent`.
+ */
+export const aiAdapter = { generate: generateWithProviders };
+
+export const generateContent = (prompt, options = {}) => aiAdapter.generate(prompt, options);

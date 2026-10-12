@@ -7,7 +7,6 @@ import {
   getAssessmentDetailsService,
   getAssessmentQuestionsService,
   getStudentReportService,
-  getStudentAssessmentsListService,
 } from "../services/studentAnalytics.service.js";
 
 // ==================== CONTROLLER FUNCTIONS ====================
@@ -256,27 +255,6 @@ export const getStudentReport = async (req, res) => {
       success: false,
       message: "Failed to generate student report",
       error: error.message,
-    });
-  }
-};
-
-
-//8. GET STUDENT ASSESSMENTS LIST
-export const getStudentAssessmentsList = async (req, res) => {
-  try {
-    const studentId = req.user.id;
-
-    const data = await getStudentAssessmentsListService(studentId);
-
-    res.status(200).json({
-      success: true,
-      data,
-    });
-  } catch (error) {
-    console.error("❌ getStudentAssessmentsList error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to load student assessments",
     });
   }
 };

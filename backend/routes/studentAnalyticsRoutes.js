@@ -8,7 +8,6 @@ import {
   getAssessmentDetails,
   getAssessmentQuestions,
   getStudentReport,
-  getStudentAssessmentsList,
 } from "../controllers/studentAnalyticsController.js";
 const router = express.Router();
 
@@ -20,6 +19,5 @@ router.get("/assessments", getStudentAssessments);
 router.get("/assessment/:id", getAssessmentDetails);
 router.get("/assessment/:id/questions", getAssessmentQuestions);
 router.get("/report", getStudentReport);
-router.get("/assessments", protect, authorizeRoles(["student"]), getStudentAssessmentsList);
 
 export default router;

@@ -296,3 +296,46 @@ export const findAttemptQuestionsQuery = async (attemptId) => {
   const result = await db.query(query, [attemptId]);
   return result.rows;
 };
+// ==================== STUDENT ASSESSMENT LIST ====================
+
+/**
+ * Every assessment the student is enrolled in, with the status of their single
+ * online attempt. Physical-paper and superseded attempts are ignored.
+ */
+export const findEnrolledAssessmentsWithStatusQuery = async (studentId) => {
+  const query = `
+    SELECT
+      a.id,
+      a.title,
+      a.prompt,
+      e.enrolled_at,
+      aa.id            AS attempt_id,
+      aa.status        AS attempt_status,
+      aa.score,
+      aa.started_at,
+      aa.completed_at,
+      blocks.question_count,
+      blocks.duration_seconds,
+      blocks.planned_marks,
+      (SELECT COALESCE(SUM(gq.positive_marks), 0)
+         FROM generated_questions gq WHERE gq.attempt_id = aa.id) AS attempt_marks
+    FROM enrollments e
+    JOIN assessments a ON a.id = e.assessment_id
+    LEFT JOIN assessment_attempts aa
+      ON aa.assessment_id = a.id
+     AND aa.student_id = e.student_id
+     AND aa.is_physical_paper = FALSE
+     AND aa.superseded = FALSE
+    LEFT JOIN LATERAL (
+      SELECT
+        COALESCE(SUM(qb.question_count), 0)                            AS question_count,
+        COALESCE(SUM(qb.question_count * qb.duration_per_question), 0) AS duration_seconds,
+        COALESCE(SUM(qb.question_count * qb.positive_marks), 0)        AS planned_marks
+      FROM question_blocks qb WHERE qb.assessment_id = a.id
+    ) blocks ON TRUE
+    WHERE e.student_id = $1
+    ORDER BY e.enrolled_at DESC, a.id DESC
+  `;
+  const result = await db.query(query, [studentId]);
+  return result.rows;
+};

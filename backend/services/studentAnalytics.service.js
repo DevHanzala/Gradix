@@ -2,12 +2,10 @@ import {
   getStudentAnalytics,
   getPerformanceOverTime,
   getLearningRecommendations,
-  getStudentAssessmentsList,
   getAssessmentAnalytics,
   getAssessmentQuestions as modelGetAssessmentQuestions,
 } from "../models/studentAnalyticsModel.js";
-import { getRedis } from "../DB/redis.js";
-import db from "../DB/db.js";
+import { findEnrolledAssessmentsWithStatusQuery } from "../repositories/studentAnalyticsRepository.js";
 import { getCheckingModel } from "./ai/aiProviders.js";
 
 // ==================== SERVICE FUNCTIONS ====================
@@ -50,26 +48,37 @@ export const getStudentRecommendationsService = async (studentId, userRole) => {
 };
 
 // 4. GET STUDENT ASSESSMENTS SERVICE
+// One row per enrolled assessment with a reliable status, so the dashboard
+// never offers "Start" for an assessment the student already completed.
 export const getStudentAssessmentsService = async (studentId, userRole) => {
   if (userRole !== "student") {
     throw new Error("UNAUTHORIZED_ROLE");
   }
 
-  const cacheKey = `student:assessments:list:${studentId}`;
-
-  // Check Redis cache first
-  const cached = await getRedis().get(cacheKey);
-  if (cached) {
-    console.log(`Student assessments from Redis for student ${studentId}`);
-    return { data: cached, fromCache: true };
-  }
-
-  const assessments = await getStudentAssessmentsList(studentId);
-
-  // Cache for 10 minutes
-  await getRedis().set(cacheKey, assessments, { ex: 600 });
-
-  return { data: assessments, fromCache: false };
+  const rows = await findEnrolledAssessmentsWithStatusQuery(studentId);
+  return {
+    data: rows.map((r) => {
+      const status = !r.attempt_id ? "not_started" : r.attempt_status === "completed" ? "completed" : "in_progress";
+      const totalMarks = Number(status === "not_started" ? r.planned_marks : r.attempt_marks) || 0;
+      const score = r.score === null || r.score === undefined ? null : Number(r.score);
+      return {
+        id: r.id,
+        title: r.title,
+        description: r.prompt ? r.prompt.slice(0, 140) : "",
+        status,
+        attempt_id: r.attempt_id,
+        question_count: Number(r.question_count) || 0,
+        duration_seconds: Number(r.duration_seconds) || 0,
+        total_marks: totalMarks,
+        score: status === "completed" ? score : null,
+        percentage:
+          status === "completed" && totalMarks > 0 ? Math.round(((score || 0) / totalMarks) * 10000) / 100 : null,
+        enrolled_at: r.enrolled_at,
+        started_at: r.started_at,
+        completed_at: r.completed_at,
+      };
+    }),
+  };
 };
 
 // 5. GET ASSESSMENT DETAILS SERVICE
@@ -154,53 +163,6 @@ export const getStudentReportService = async (studentId, userRole, format = "jso
   }
 
   return { format: "json", data: report };
-};
-
-
-// 8. GET STUDENT ASSESSMENTS LIST SERVICE
-export const getStudentAssessmentsListService = async (studentId) => {
-  // First check if tables exist, if not return empty array
-  const tableCheck = await db.query(`
-    SELECT EXISTS (
-      SELECT FROM information_schema.tables 
-      WHERE table_schema = 'public' 
-      AND table_name = 'enrollments'
-    )
-  `);
-
-  if (!tableCheck.rows[0].exists) {
-    return [];
-  }
-
-  const { rows } = await db.query(
-    `SELECT a.id, a.title, a.prompt, a.external_links, a.is_executed,
-            COALESCE(aa.percentage, NULL) as score,
-            aa.submitted_at
-     FROM enrollments e
-     JOIN assessments a ON a.id = e.assessment_id
-     LEFT JOIN LATERAL (
-       SELECT percentage, submitted_at FROM assessment_attempts aa
-       WHERE aa.assessment_id = a.id AND aa.student_id = $1
-       ORDER BY submitted_at DESC NULLS LAST LIMIT 1
-     ) aa ON true
-     WHERE e.student_id = $1
-     ORDER BY a.id DESC`,
-    [studentId]
-  );
-
-  const data = rows.map((r) => ({
-    id: r.id,
-    title: r.title,
-    description: r.prompt?.slice(0, 140) || "",
-    duration: 30, // AI will determine actual duration
-    total_marks: 100, // AI will calculate actual marks
-    end_date: null,
-    submitted: !!r.submitted_at,
-    submitted_at: r.submitted_at,
-    score: r.score,
-  }));
-
-  return data;
 };
 
 

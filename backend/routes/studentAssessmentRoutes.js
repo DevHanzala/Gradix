@@ -1,16 +1,23 @@
 import express from "express";
 import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
 import {
+  getAttemptState,
   startAssessmentForStudent,
+  saveAnswer,
+  advanceQuestion,
   submitAssessmentForStudent,
   getSubmissionDetailsForStudent,
-  getAssessmentForInstructorPrint,
 } from "../controllers/studentAssessmentController.js";
 
 const router = express.Router();
-router.post("/assessments/:assessmentId/start", protect, authorizeRoles(["student"]), startAssessmentForStudent);
-router.post("/assessments/:assessmentId/submit", protect, authorizeRoles(["student"]), submitAssessmentForStudent);
-router.get("/submissions/:submissionId", protect, authorizeRoles(["student", "instructor", "admin", "super_admin"]), getSubmissionDetailsForStudent);
-router.get("/assessments/:assessmentId/print", protect, authorizeRoles(["instructor", "admin", "super_admin"]), getAssessmentForInstructorPrint);
+
+router.use(protect, authorizeRoles("student"));
+
+router.get("/assessments/:assessmentId/attempt", getAttemptState);
+router.post("/assessments/:assessmentId/start", startAssessmentForStudent);
+router.post("/assessments/:assessmentId/submit", submitAssessmentForStudent);
+router.put("/attempts/:attemptId/answers/:questionId", saveAnswer);
+router.post("/attempts/:attemptId/advance", advanceQuestion);
+router.get("/submissions/:submissionId", getSubmissionDetailsForStudent);
 
 export default router;
