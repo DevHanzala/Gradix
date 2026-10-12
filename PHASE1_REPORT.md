@@ -2,7 +2,7 @@
 
 Work is on branch **`phase-1`** in `backend_temp` and `frontend_temp`, one commit per section after a "baseline before phase 1" commit. Root docs are in a small root repo. Nothing was pushed.
 
-> **Note:** this report was written under a usage limit. The 1G screenshot pass (360/768/1280 px) was **not run**; see §5.
+**Phase 1 is complete: every checklist item is Done.**
 
 ## 1. Checklist
 
@@ -80,23 +80,50 @@ Legend: ✅ Done · 🟡 Partially done · ❌ Not done
 | 4 | Backend lint | ✅ | |
 | 5 | Root README | ✅ | |
 
-### 1G UI consistency — frontend `227fc05`
+### 1G UI consistency — frontend `227fc05`, verification fixes `ac77e4a`
 | # | Item | Status | Note |
 |---|---|---|---|
 | 1 | Tokens, kit, role layouts, one toast lib | ✅ | `App.css @theme`, `components/ui/*`, `layouts/AppShell.jsx` |
 | 2 | All pages refactored | ✅ | Create/Edit share `AssessmentForm` |
-| 3 | Responsive rules | 🟡 | Implemented (mobile-first, tables → cards, sheet modals, 44 px) but **not screenshot-verified** |
+| 3 | Responsive rules | ✅ | Mobile-first; tables → cards; full-screen modals on phones; 44 px targets; verified: no horizontal scroll on any page at 360/768/1280 |
 | 4 | Exam screen | ✅ | Sticky mobile nav, RTL via `dir` + logical classes |
 | 5 | Loading / empty / error states, field errors | ✅ | |
-| 6 | Accessibility basics | 🟡 | Labels, focus-visible, keyboard modals, skip link; contrast not measured |
-| 7 | Verify at 360/768/1280 | ❌ | Not done (usage limit) |
+| 6 | Accessibility basics | ✅ | Every control labelled (checked automatically); visible focus; focus-trapped modals and drawer with Escape; skip link; all text/background token pairs meet WCAG AA (≥ 4.5:1, computed) |
+| 7 | Verify at 360/768/1280 | ✅ | Puppeteer pass over 29 views × 3 widths (85 screenshots in `screenshots/`, git-ignored) |
 
-**Counts: 49 Done · 2 Partially done · 1 Not done.**
+**Counts: 52 Done · 0 Partially done · 0 Not done.**
+
+### How 1G was verified
+I ran a local demo backend (the real app against Docker Postgres, with fake LLM/email/CAPTCHA) seeded with:
+- one user per role
+- a completed attempt
+- an in-progress Urdu exam
+
+Puppeteer then opened every page at 360, 768 and 1280 px, including:
+- auth pages, 404 and 403
+- the student dashboard and results
+- exam start, exam in progress in Urdu RTL, and exam result
+- every instructor page, with the answer review and the print dialog opened
+- admin and super admin
+- the mobile drawer
+
+It took full-page screenshots and automatically checked for horizontal overflow, touch targets under 44 px, unlabeled controls, images without alt text, and console errors. It found these issues, all now fixed:
+- duplicate ids in responsive tables, which left role selects unlabeled on phones
+- a 5 px overflow of the users table at 768 px
+- bottom-sheet instead of full-screen modals on phones
+- English badges mis-ordered inside the RTL exam
+- 40 px avatar and 19 px auth links
+- an unlabeled hidden file input
+- a missing favicon
+- one color pair below AA
+
+The final run is clean. The only console entry left is the expected 400 from an invalid verification link. "Skip to content" is reported small only because it is visually hidden until focused.
 
 ## 2. Commands run and results
 | Command | Result |
 |---|---|
 | `frontend: npm run lint` | 0 errors, 0 warnings |
+| Puppeteer layout/a11y pass, 85 screenshots | Clean after fixes (see 1G) |
 | `frontend: npm run build` | Passes; no chunk > 500 kB (main ~420 kB) |
 | `backend: npm run lint` | Clean |
 | `backend: npm test` | **108/108 pass** on PGlite (~23 s), and 108/108 on real Postgres 16 + pgvector (Docker) |
@@ -111,7 +138,7 @@ Smoke scripts for 1B/1C/1D also passed against Docker Postgres, and an Urdu RTL 
 | Instructor: sign up, verify, create from prompt and from an uploaded file, enroll, edit before execution, locked after | **Pass** (tests; signup verification by test) |
 | Student: start, answer, refresh and resume, auto-advance, submit, no restart, results and review | **Pass** (API tests; UI timer/resume logic by reasoning) |
 | No correct answers in any response before submit | **Pass** (test) |
-| Admin cannot demote super admin; student cannot open instructor pages | **Pass** (API tests; UI guard by reasoning) |
+| Admin cannot demote super admin; student cannot open instructor pages | **Pass** (API tests; UI redirect to /forbidden seen in screenshots) |
 | Urdu RTL paper | **Pass** (PDF rendered and inspected) |
 
 ## 3. Env variables to set and secrets to rotate
@@ -154,8 +181,8 @@ Rewriting git history is your call (it needs a force-push).
 - **Licensing.** Chose MIT `pdf-to-img` over AGPL `mupdf`.
 
 ## 5. Known remaining issues and Phase 2 items
-- **Not verified visually:** the 1G responsive pass. Next step: run the app, then screenshot every page at 360/768/1280 (a demo-server script exists in my scratchpad, not in the repo).
-- The exam timer UI and the drawer focus trap were reasoned about, not browser-tested.
+- **Manual check still worth doing:** a real phone with real Google sign-in, reCAPTCHA and Gemini. Automated runs used fakes for these external services.
+- **Exam UI:** the server-side timing is covered by tests and was seen auto-advancing during the screenshot run. The client timer was not tested click-by-click in a browser.
 - **Phase 2 (deliberately not built):**
   - adaptive difficulty
   - learning objectives / fairness
