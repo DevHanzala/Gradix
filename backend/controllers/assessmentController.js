@@ -95,7 +95,7 @@ export const previewQuestions = async (req, res, next) => {
   }
 };
 
-const PAGE_SIZES = ["A4", "Letter", "Legal"];
+const PAGE_SIZES = ["A4", "A5", "Letter", "Legal"];
 const clampFont = (value, fallback, min, max) => {
   const n = Number(value);
   return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
