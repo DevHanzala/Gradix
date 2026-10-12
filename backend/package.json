@@ -10,8 +10,9 @@
     "migrate": "node scripts/migrate.js up",
     "migrate:down": "node scripts/migrate.js down",
     "create-super-admin": "node scripts/createSuperAdmin.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "lint": "eslint ."
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js --runInBand --silent",
+    "lint": "eslint .",
+    "seed": "node scripts/seed.js"
   },
   "keywords": [
     "education",
@@ -46,6 +47,9 @@
     "tesseract.js": "^6.0.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite-pgvector": "^0.0.9",
+    "@electric-sql/pglite-socket": "^0.2.11",
     "@eslint/js": "^10.0.1",
     "eslint": "^10.12.0",
     "globals": "^17.13.0",
