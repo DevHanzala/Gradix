@@ -50,3 +50,16 @@ export const unenrollStudentApi = (assessmentId, studentId) =>
 
 export const fetchPreviewQuestionsApi = (assessmentId) =>
   apiClient.get(`/assessments/${assessmentId}/preview-questions`);
+
+/* =========================
+   Learning objectives
+========================= */
+
+export const fetchObjectivesApi = (assessmentId) =>
+  apiClient.get(`/assessments/${assessmentId}/objectives`);
+
+export const saveObjectivesApi = (assessmentId, objectives) =>
+  apiClient.put(`/assessments/${assessmentId}/objectives`, { objectives });
+
+export const regenerateObjectivesApi = (assessmentId) =>
+  apiClient.post(`/assessments/${assessmentId}/objectives/regenerate`);

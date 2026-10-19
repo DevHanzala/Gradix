@@ -20,7 +20,8 @@
     "migrate": "npm run migrate --workspace backend",
     "seed": "npm run seed --workspace backend",
     "dev:worker": "npm run dev:worker --workspace backend",
-    "worker": "npm run worker --workspace backend"
+    "worker": "npm run worker --workspace backend",
+    "rechunk": "npm run rechunk -w backend"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

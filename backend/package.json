@@ -14,7 +14,8 @@
     "create-super-admin": "node scripts/createSuperAdmin.js",
     "test": "node scripts/runJest.js",
     "lint": "eslint .",
-    "seed": "node scripts/seed.js"
+    "seed": "node scripts/seed.js",
+    "rechunk": "node scripts/rechunkResources.js"
   },
   "keywords": [
     "education",
@@ -26,8 +27,8 @@
   "license": "MIT",
   "dependencies": {
     "@google/genai": "^1.21.0",
+    "@huggingface/transformers": "^4.3.1",
     "@napi-rs/canvas": "^1.0.11",
-    "@xenova/transformers": "^2.17.2",
     "axios": "^1.13.5",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",

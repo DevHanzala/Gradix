@@ -1,6 +1,8 @@
 import { mapLanguageCode } from "../services/ai/aiService.js";
 import { generateContent } from "../services/ai/generateContent.js";
 import * as assessmentRepo from "../repositories/assessmentRepository.js";
+import { findObjectivesQuery, findAssessmentLifecycleQuery } from "../repositories/objectiveRepository.js";
+import { generateObjectiveQuestions } from "../services/questions/generator.js";
 import {
   normalizeOptions,
   normalizeText,
@@ -202,6 +204,72 @@ const assignToBlocks = (rawQuestions, blockRows) => {
  * Returns { questions, duration } where duration is the total in seconds.
  */
 export const generateAssessmentQuestions = async (assessmentId, language, assessment) => {
+  const lifecycle = await findAssessmentLifecycleQuery(assessmentId);
+  if (lifecycle?.blueprint?.slots?.length) {
+    return generateFromBlueprint(assessmentId, language, { ...assessment, ...lifecycle });
+  }
+  return generateLegacy(assessmentId, language, assessment);
+};
+
+/**
+ * Blueprint path: questions for every slot, generated per objective from the
+ * passages retrieved for that objective. Each question carries its
+ * objective, difficulty, language, source chunks and stem hash.
+ */
+export const generateFromBlueprint = async (assessmentId, language, assessment) => {
+  const { slots } = assessment.blueprint;
+  const objectives = new Map((await findObjectivesQuery(assessmentId)).map((o) => [o.id, o]));
+  const byObjective = new Map();
+  for (const slot of slots) {
+    if (!byObjective.has(slot.objective_id)) byObjective.set(slot.objective_id, []);
+    byObjective.get(slot.objective_id).push(slot);
+  }
+
+  const produced = [];
+  for (const [objectiveId, objectiveSlots] of byObjective) {
+    const objective = objectives.get(objectiveId);
+    if (!objective) continue;
+    const requests = new Map();
+    for (const slot of objectiveSlots) {
+      const difficulty = slot.difficulty || 3;
+      const key = `${slot.question_type}|${difficulty}|${slot.num_options || ""}`;
+      if (!requests.has(key)) {
+        requests.set(key, { question_type: slot.question_type, difficulty, num_options: slot.num_options, count: 0 });
+      }
+      requests.get(key).count += 1;
+    }
+    const { questions } = await generateObjectiveQuestions({
+      assessment: { id: assessmentId, title: assessment.title, prompt: assessment.prompt },
+      objective,
+      language,
+      requests: [...requests.values()],
+      excludeHashes: new Set(produced.map((q) => q.stem_hash)),
+    });
+    produced.push(...questions);
+  }
+
+  const questions = [];
+  for (const slot of slots) {
+    const difficulty = slot.difficulty || 3;
+    const matches = (q) => q.objective_id === slot.objective_id && q.question_type === slot.question_type;
+    let index = produced.findIndex((q) => matches(q) && q.difficulty === difficulty);
+    if (index === -1) index = produced.findIndex(matches);
+    if (index === -1) throw new Error("GENERATION_FAILED");
+    const [q] = produced.splice(index, 1);
+    questions.push({
+      ...q,
+      positive_marks: slot.positive_marks,
+      negative_marks: slot.negative_marks,
+      duration_per_question: slot.duration_per_question,
+    });
+  }
+
+  const duration = questions.reduce((sum, q) => sum + q.duration_per_question, 0);
+  return { questions, duration };
+};
+
+/** Phase 1 path for assessments without objectives (kept for compatibility). */
+const generateLegacy = async (assessmentId, language, assessment) => {
   const langName = mapLanguageCode(language);
 
   const blockRows = await assessmentRepo.findQuestionBlocksByAssessmentQuery(assessmentId);

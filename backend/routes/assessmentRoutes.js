@@ -14,6 +14,7 @@ import {
   previewQuestions,
   generatePhysicalPaper,
 } from '../controllers/assessmentController.js';
+import { getObjectives, replaceObjectives, regenerateObjectives } from '../controllers/objectivesController.js';
 
 const router = express.Router();
 
@@ -55,5 +56,10 @@ router.get('/:id/enrolled-students', protect, authorizeRoles('instructor', 'admi
 
 router.get('/:id/preview-questions', protect, authorizeRoles('instructor', 'admin', 'super_admin'), aiLimiter, previewQuestions);
 router.post('/:id/print', protect, authorizeRoles('instructor', 'admin', 'super_admin'), aiLimiter, generatePhysicalPaper);
+
+const staff = [protect, authorizeRoles('instructor', 'admin', 'super_admin')];
+router.get('/:id/objectives', ...staff, getObjectives);
+router.put('/:id/objectives', ...staff, replaceObjectives);
+router.post('/:id/objectives/regenerate', ...staff, aiLimiter, regenerateObjectives);
 
 export default router;

@@ -3,15 +3,42 @@ import pool from "../DB/db.js";
 // ==================== RESOURCE CRUD ====================
 
 export const createResourceQuery = async (resourceData, client = pool) => {
-  const { name, url = null, file_type = null, file_size = null, content_type, visibility, uploaded_by } = resourceData;
+  const {
+    name,
+    url = null,
+    file_type = null,
+    file_size = null,
+    content_type,
+    visibility,
+    uploaded_by,
+    content_text = null,
+    content_hash = null,
+    language = null,
+    chunking_version = 1,
+    embedding_model = null,
+  } = resourceData;
 
   const query = `
-    INSERT INTO resources (name, url, file_type, file_size, content_type, visibility, uploaded_by)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    INSERT INTO resources (name, url, file_type, file_size, content_type, visibility, uploaded_by,
+                           content_text, content_hash, language, chunking_version, embedding_model)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     RETURNING *
   `;
 
-  const { rows } = await client.query(query, [name, url, file_type, file_size, content_type, visibility, uploaded_by]);
+  const { rows } = await client.query(query, [
+    name,
+    url,
+    file_type,
+    file_size,
+    content_type,
+    visibility,
+    uploaded_by,
+    content_text,
+    content_hash,
+    language,
+    chunking_version,
+    embedding_model,
+  ]);
   return rows[0];
 };
 

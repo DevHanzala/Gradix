@@ -4,6 +4,7 @@ import pdfParse from "pdf-parse/lib/pdf-parse.js";
 import { createWorker } from "tesseract.js";
 import { getTextExtractor } from "office-text-extractor";
 import { AppError } from "../utils/AppError.js";
+import { assessTextQuality } from "./textQuality.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -15,12 +16,14 @@ export const MAX_OCR_PAGES = 20;
 /** A PDF whose text layer is shorter than this is treated as scanned. */
 const MIN_PDF_TEXT_CHARS = 200;
 
-export const MIN_DOCUMENT_WORDS = 20;
-export const CHUNK_WORDS = 500;
-/** A trailing chunk smaller than this is merged into the previous chunk. */
-export const MIN_CHUNK_WORDS = 50;
 
 const officeExtractor = getTextExtractor();
+
+const QUALITY_MESSAGES = {
+  empty: "No readable text was found in this file. If it is a scan, try a clearer image.",
+  too_short: "This file has almost no text (fewer than 3 words). Upload the full material, or use a text prompt instead.",
+  garbage: "The text in this file could not be read reliably (it looks like unreadable scan output). Try a clearer scan or a text/PDF version.",
+};
 
 const unreadable = (message) => new AppError("UNREADABLE_DOCUMENT", 422, message);
 
@@ -97,32 +100,10 @@ export const extractTextFromFile = async (buffer, mimeType) => {
     throw new AppError("UNSUPPORTED_FILE_TYPE", 400, `Unsupported file type: ${mimeType}`);
   }
 
-  const words = text.split(/\s+/u).filter(Boolean);
-  if (words.length === 0) {
-    throw unreadable("No readable text was found in this file. If it is a scan, try a clearer image.");
-  }
-  if (words.length < MIN_DOCUMENT_WORDS) {
-    throw unreadable(
-      `This file contains only ${words.length} words. Please upload a document with at least ${MIN_DOCUMENT_WORDS} words, or use a text prompt instead.`
-    );
+  const quality = assessTextQuality(text);
+  if (!quality.ok) {
+    throw unreadable(QUALITY_MESSAGES[quality.reason]);
   }
 
   return text;
-};
-
-/**
- * Split text into ~CHUNK_WORDS-word chunks. A short trailing piece is merged
- * into the previous chunk so no chunk is too small to embed meaningfully.
- */
-export const chunkText = (text, size = CHUNK_WORDS) => {
-  const words = String(text).split(/\s+/u).filter(Boolean);
-  const chunks = [];
-  for (let i = 0; i < words.length; i += size) {
-    chunks.push(words.slice(i, i + size));
-  }
-  if (chunks.length > 1 && chunks[chunks.length - 1].length < MIN_CHUNK_WORDS) {
-    const last = chunks.pop();
-    chunks[chunks.length - 1] = chunks[chunks.length - 1].concat(last);
-  }
-  return chunks.map((c) => c.join(" "));
 };

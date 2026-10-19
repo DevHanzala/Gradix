@@ -1,4 +1,5 @@
 import db from "../DB/db.js";
+import { toPgVector } from "../helper/embeddingGenerator.js";
 
 // ==================== ASSESSMENT CRUD ====================
 
@@ -246,14 +247,14 @@ export const createQuestionBlockQuery = async (blockData, client = db) => {
   return rows[0];
 };
 
-export const findQuestionBlocksByAssessmentQuery = async (assessmentId) => {
+export const findQuestionBlocksByAssessmentQuery = async (assessmentId, client = db) => {
   const query = `
     SELECT question_type, question_count, duration_per_question, num_options, positive_marks, negative_marks
     FROM question_blocks
     WHERE assessment_id = $1
     ORDER BY id
   `;
-  const { rows } = await db.query(query, [assessmentId]);
+  const { rows } = await client.query(query, [assessmentId]);
   return rows;
 };
 
@@ -291,21 +292,15 @@ export const findEnrolledStudentsQuery = async (assessmentId) => {
 // ==================== RESOURCE CHUNKS ====================
 
 export const createResourceChunkQuery = async (chunkData, client = db) => {
-  const { resourceId, chunkText, embedding, chunkIndex } = chunkData;
-  
-  if (!Array.isArray(embedding) || embedding.length !== 384) {
-    throw new Error("Invalid embedding: must be an array of 384 numbers");
-  }
-  
-  const embeddingString = '[' + embedding.map(num => num.toString()).join(',') + ']';
-  
+  const { resourceId, chunkText, embedding, chunkIndex, tokenCount = null, embeddingModel = null } = chunkData;
+
   const query = `
-    INSERT INTO resource_chunks (resource_id, chunk_text, embedding, chunk_index)
-    VALUES ($1, $2, $3::vector, $4)
-    RETURNING *
+    INSERT INTO resource_chunks (resource_id, chunk_text, embedding, chunk_index, token_count, embedding_model)
+    VALUES ($1, $2, $3::vector, $4, $5, $6)
+    RETURNING id, resource_id, chunk_index, token_count
   `;
-  
-  const values = [resourceId, chunkText, embeddingString, chunkIndex];
+
+  const values = [resourceId, chunkText, toPgVector(embedding), chunkIndex, tokenCount, embeddingModel];
   const { rows } = await client.query(query, values);
   return rows[0];
 };
@@ -324,6 +319,14 @@ export const findResourceChunksByAssessmentQuery = async (assessmentId) => {
 };
 
 // ==================== ASSESSMENT RESOURCES ====================
+
+export const findAssessmentResourceIdsQuery = async (assessmentId, client = db) => {
+  const { rows } = await client.query(
+    `SELECT resource_id FROM assessment_resources WHERE assessment_id = $1 ORDER BY resource_id`,
+    [assessmentId]
+  );
+  return rows.map((r) => r.resource_id);
+};
 
 export const linkResourceToAssessmentQuery = async (assessmentId, resourceId, client = db) => {
   const query = `

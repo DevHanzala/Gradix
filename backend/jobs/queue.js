@@ -68,7 +68,7 @@ const runInline = async (def, data) => {
   let lastError;
   for (let attempt = 1; attempt <= attempts; attempt++) {
     try {
-      return await def.handler(data, { jobId: `inline-${Date.now()}`, attempt });
+      return await def.handler(data, { jobId: `inline-${Date.now()}`, attempt, maxAttempts: attempts });
     } catch (error) {
       lastError = error;
     }

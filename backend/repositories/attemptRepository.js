@@ -62,8 +62,9 @@ export const insertGeneratedQuestionQuery = async (attemptId, order, q, client =
   const { rows } = await client.query(
     `INSERT INTO generated_questions
        (attempt_id, question_order, question_type, question_text, options,
-        correct_answer, positive_marks, negative_marks, duration_per_question)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        correct_answer, positive_marks, negative_marks, duration_per_question,
+        objective_id, difficulty, language, source_chunk_ids, stem_hash)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
      RETURNING id`,
     [
       attemptId,
@@ -75,6 +76,11 @@ export const insertGeneratedQuestionQuery = async (attemptId, order, q, client =
       q.positive_marks,
       q.negative_marks,
       q.duration_per_question,
+      q.objective_id ?? null,
+      q.difficulty ?? null,
+      q.language ?? null,
+      q.source_chunk_ids ?? null,
+      q.stem_hash ?? null,
     ]
   );
   return rows[0];

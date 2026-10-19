@@ -5,7 +5,9 @@ import { sendAssessmentEnrollmentEmail } from "../helper/emailService.js";
 import { prepareUploadedFiles, insertPreparedResource } from "../helper/resourceIngest.js";
 import { withTransaction } from "../DB/db.js";
 import * as assessmentRepo from "../repositories/assessmentRepository.js";
+import { findAssessmentLifecycleQuery } from "../repositories/objectiveRepository.js";
 import { requireAssessmentAccess } from "./assessmentAccess.js";
+import { requestObjectiveExtraction, recomputeBlueprint } from "./objectives.service.js";
 import { assertResourcesUsable } from "./resource.service.js";
 import { AppError } from "../utils/AppError.js";
 import {
@@ -39,7 +41,7 @@ export const createAssessmentService = async (body, user, files = []) => {
   await assertResourcesUsable(resourceIds, user);
   const prepared = await prepareUploadedFiles(files);
 
-  return withTransaction(async (client) => {
+  const created = await withTransaction(async (client) => {
     const assessment = await assessmentRepo.createAssessmentQuery(
       { title, prompt, external_links: links, instructor_id: user.id, is_executed: false },
       client
@@ -58,6 +60,11 @@ export const createAssessmentService = async (body, user, files = []) => {
 
     return assessment;
   });
+
+  // After commit: objectives are extracted in the background.
+  await requestObjectiveExtraction(created.id);
+  const lifecycle = await findAssessmentLifecycleQuery(created.id);
+  return { ...created, status: lifecycle.status, objectives_state: lifecycle.objectives_state };
 };
 
 // ==================== READ ====================
@@ -113,7 +120,23 @@ export const updateAssessmentService = async (assessmentId, body, user, files = 
   await assertResourcesUsable(resourceIds, user);
   const prepared = await prepareUploadedFiles(files);
 
-  return withTransaction(async (client) => {
+  const lifecycle = await findAssessmentLifecycleQuery(existing.id);
+  if (!["draft", "objectives_ready"].includes(lifecycle.status)) {
+    throw new AppError(
+      "ASSESSMENT_LOCKED",
+      409,
+      "This assessment is being published or has been published and can no longer be changed"
+    );
+  }
+  const previousResourceIds = await assessmentRepo.findAssessmentResourceIdsQuery(existing.id);
+  const sourcesChanged =
+    title !== existing.title ||
+    (prompt || "") !== (existing.prompt || "") ||
+    JSON.stringify(links) !== JSON.stringify(existing.external_links || []) ||
+    prepared.length > 0 ||
+    [...resourceIds].sort((a, b) => a - b).join(",") !== previousResourceIds.join(",");
+
+  const result = await withTransaction(async (client) => {
     const updated = await assessmentRepo.updateAssessmentQuery(existing.id, { title, prompt, external_links: links }, client);
 
     if (blocks) {
@@ -132,8 +155,14 @@ export const updateAssessmentService = async (assessmentId, body, user, files = 
       await assessmentRepo.linkResourceToAssessmentQuery(existing.id, resource.id, client);
     }
 
+    // Same material, new blocks: keep the objectives, re-plan the blueprint.
+    if (!sourcesChanged && blocks) await recomputeBlueprint(existing.id, client);
     return updated;
   });
+
+  // New material means new objectives (instructor edits to the old ones no longer apply).
+  if (sourcesChanged) await requestObjectiveExtraction(existing.id);
+  return result;
 };
 
 // ==================== DELETE ====================

@@ -1,5 +1,8 @@
-import { extractTextFromFile, chunkText } from "./textProcessor.js";
-import { generateEmbedding } from "./embeddingGenerator.js";
+import { createHash } from "crypto";
+import { extractTextFromFile } from "./textProcessor.js";
+import { embedPassages, EMBEDDING_MODEL } from "./embeddingGenerator.js";
+import { chunkDocument, CHUNKING_VERSION } from "./chunker.js";
+import { detectLanguage } from "./language.js";
 import { createResourceQuery } from "../repositories/resourceRepository.js";
 import { createResourceChunkQuery } from "../repositories/assessmentRepository.js";
 import { AppError } from "../utils/AppError.js";
@@ -34,13 +37,41 @@ export const prepareUploadedFile = async (file) => {
     throw new AppError("UNREADABLE_DOCUMENT", 422, `${name}: the file could not be read.`);
   }
 
-  const chunks = chunkText(text);
-  const embeddings = [];
-  for (const chunk of chunks) {
-    embeddings.push(await generateEmbedding(chunk));
-  }
+  return { name, mimetype: file.mimetype, size: file.size, ...(await prepareText(text)) };
+};
 
-  return { name, mimetype: file.mimetype, size: file.size, chunks, embeddings };
+/** sha256 of the normalised text; identical material hashes the same. */
+export const contentHash = (text) =>
+  createHash("sha256").update(String(text).normalize("NFC").replace(/\s+/gu, " ").trim()).digest("hex");
+
+/** Chunk + embed extracted text. Pure (writes nothing). */
+export const prepareText = async (text) => {
+  const chunks = await chunkDocument(text);
+  const embeddings = await embedPassages(chunks.map((c) => c.text));
+  return {
+    text,
+    hash: contentHash(text),
+    language: detectLanguage(text),
+    chunks,
+    embeddings,
+  };
+};
+
+/** Replace a resource's chunks (used by upload and by the re-chunk job). */
+export const insertChunks = async (client, resourceId, prepared) => {
+  for (const [i, chunk] of prepared.chunks.entries()) {
+    await createResourceChunkQuery(
+      {
+        resourceId,
+        chunkText: chunk.text,
+        embedding: prepared.embeddings[i],
+        chunkIndex: chunk.index,
+        tokenCount: chunk.tokenCount,
+        embeddingModel: EMBEDDING_MODEL,
+      },
+      client
+    );
+  }
 };
 
 /** Prepare every file or fail on the first unusable one (nothing is written). */
@@ -61,16 +92,16 @@ export const insertPreparedResource = async (client, prepared, { userId, visibil
       content_type: "file",
       visibility,
       uploaded_by: userId,
+      content_text: prepared.text,
+      content_hash: prepared.hash,
+      language: prepared.language,
+      chunking_version: CHUNKING_VERSION,
+      embedding_model: EMBEDDING_MODEL,
     },
     client
   );
 
-  for (let i = 0; i < prepared.chunks.length; i++) {
-    await createResourceChunkQuery(
-      { resourceId: resource.id, chunkText: prepared.chunks[i], embedding: prepared.embeddings[i], chunkIndex: i },
-      client
-    );
-  }
+  await insertChunks(client, resource.id, prepared);
 
   return resource;
 };

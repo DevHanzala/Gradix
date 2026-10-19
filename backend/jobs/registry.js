@@ -25,7 +25,7 @@ const definitions = new Map();
 
 /**
  * @param {string} name        queue name, e.g. "objectives.extract"
- * @param {(data: object, ctx: {jobId: string, attempt: number}) => Promise<any>} handler
+ * @param {(data: object, ctx: {jobId: string, attempt: number, maxAttempts: number}) => Promise<any>} handler
  * @param {object} [options]   pg-boss queue options (retryLimit, retryDelay, ...)
  */
 export const defineJob = (name, handler, options = {}) => {

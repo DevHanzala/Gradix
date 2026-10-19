@@ -13,10 +13,16 @@ const start = async () => {
 
     for (const def of listJobDefinitions()) {
       await boss.work(def.name, { batchSize: 1, localConcurrency: concurrency }, async ([job]) =>
-        def.handler(job.data, { jobId: job.id, attempt: (job.retryCount ?? 0) + 1 })
+        def.handler(job.data, {
+          jobId: job.id,
+          attempt: (job.retryCount ?? 0) + 1,
+          maxAttempts: (def.options.retryLimit ?? 0) + 1,
+        })
       );
     }
     await boss.schedule("maintenance.prune-llm-log", "30 3 * * *");
+    // Bring resources from older chunking/embedding versions up to date.
+    await boss.send("resources.rechunk-sweep", {}, { singletonKey: "sweep" });
 
     console.log(`Gradix worker running ${listJobDefinitions().length} job type(s), concurrency ${concurrency}`);
 

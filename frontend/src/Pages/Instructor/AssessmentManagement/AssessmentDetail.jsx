@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { FaBinoculars, FaChartBar, FaEdit, FaLink, FaPrint, FaUserPlus } from "react-icons/fa";
+import { FaBinoculars, FaChartBar, FaEdit, FaLink, FaListOl, FaPrint, FaUserPlus } from "react-icons/fa";
+import AssessmentStatus, { StatusSteps } from "../../../components/assessment/AssessmentStatus.jsx";
 import useAssessmentStore from "../../../store/assessmentStore.js";
 import PhysicalPaperModal from "../../../components/PhysicalPaperModal.jsx";
-import { Alert, Badge, Button, Card, CardBody, CardHeader, PageHeader, PageSpinner, ResponsiveTable } from "../../../components/ui";
+import { Alert, Button, Card, CardBody, CardHeader, PageHeader, PageSpinner, ResponsiveTable } from "../../../components/ui";
 import { errorMessage } from "../../../utils/forms.js";
 
 const TYPE_LABEL = { multiple_choice: "Multiple choice", true_false: "True / False", short_answer: "Short answer" };
@@ -59,6 +60,9 @@ function AssessmentDetail() {
                 Edit
               </Button>
             )}
+            <Button to={`/instructor/assessments/${id}/objectives`} variant="secondary" icon={FaListOl}>
+              Objectives
+            </Button>
             <Button to={`/instructor/assessments/${id}/enroll`} variant="secondary" icon={FaUserPlus}>
               Enroll students
             </Button>
@@ -115,8 +119,9 @@ function AssessmentDetail() {
             <CardBody className="space-y-3 text-sm">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-ink-muted">State</span>
-                {assessment.is_executed ? <Badge tone="warning">Started · locked</Badge> : <Badge tone="primary">Draft</Badge>}
+                <AssessmentStatus assessment={assessment} />
               </div>
+              <StatusSteps assessment={assessment} />
               <div className="flex items-center justify-between gap-2">
                 <span className="text-ink-muted">Created</span>
                 <span>{assessment.created_at ? new Date(assessment.created_at).toLocaleString() : "–"}</span>

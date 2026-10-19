@@ -3,7 +3,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import request from "supertest";
 import app from "../app.js";
-import { extractTextFromFile, chunkText, MIN_CHUNK_WORDS } from "../helper/textProcessor.js";
+import { extractTextFromFile } from "../helper/textProcessor.js";
 import { embeddingAdapter } from "../helper/embeddingGenerator.js";
 import { pool, resetDatabase, createUser, createAssessment, auth, installFakes, flushEmails } from "./helpers.js";
 
@@ -46,14 +46,21 @@ describe("text extraction and chunking", () => {
     expect(text).toMatch(/Photosynthesis/i);
   }, 60000);
 
-  test("a short trailing chunk is merged into the previous one", () => {
-    const sizes = chunkText(words(1010).toString()).map((c) => c.split(" ").length);
-    expect(sizes).toEqual([500, 510]);
-    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(MIN_CHUNK_WORDS);
-  });
-
   test("a tiny document fails with a clear 422, never a 500", async () => {
     await expect(extractTextFromFile(Buffer.from("too short"), "text/plain")).rejects.toMatchObject({ status: 422 });
+  });
+
+  test("a short legitimate text (a short surah) is accepted", async () => {
+    const surah = "قُلْ هُوَ اللَّهُ أَحَدٌ ۝ اللَّهُ الصَّمَدُ ۝ لَمْ يَلِدْ وَلَمْ يُولَدْ ۝ وَلَمْ يَكُن لَّهُ كُفُوًا أَحَدٌ";
+    await expect(extractTextFromFile(Buffer.from(surah), "text/plain")).resolves.toContain("الصَّمَدُ");
+  });
+
+  test("OCR garbage is rejected with an explanation", async () => {
+    const garbage = "|| ~~ %% 1 2 3 ;; ## @@ !! ^^ && ** (( )) == ++ -- __ ,, .. ?? // \\ || ~~ %%";
+    await expect(extractTextFromFile(Buffer.from(garbage), "text/plain")).rejects.toMatchObject({
+      status: 422,
+      message: expect.stringMatching(/could not be read reliably/),
+    });
   });
 });
 
@@ -92,7 +99,12 @@ describe("assessment creation", () => {
        FROM assessment_resources ar JOIN resources r ON r.id = ar.resource_id WHERE ar.assessment_id = $1`,
       [res.body.data.id]
     );
-    expect(rows).toEqual([{ file_type: "text/plain", name: "notes.txt", chunks: 2 }]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ file_type: "text/plain", name: "notes.txt" });
+    expect(rows[0].chunks).toBeGreaterThan(1);
+    const meta = await pool.query("SELECT content_hash, language, chunking_version, embedding_model FROM resources");
+    expect(meta.rows[0]).toMatchObject({ language: "en", chunking_version: 2 });
+    expect(meta.rows[0].content_hash).toMatch(/^[0-9a-f]{64}$/);
   });
 
   test("if embedding fails nothing is written (atomic)", async () => {

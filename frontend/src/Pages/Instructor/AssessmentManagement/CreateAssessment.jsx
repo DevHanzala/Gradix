@@ -12,7 +12,8 @@ function CreateAssessment() {
   const handleSubmit = async (formData) => {
     const created = await createAssessment(formData);
     toast.success("Assessment created.");
-    navigate(created?.id ? `/instructor/assessments/${created.id}` : "/instructor/assessments");
+    // Next step after creating: review the learning objectives.
+    navigate(created?.id ? `/instructor/assessments/${created.id}/objectives` : "/instructor/assessments");
   };
 
   return (

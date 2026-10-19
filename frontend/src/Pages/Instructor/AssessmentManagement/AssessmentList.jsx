@@ -3,7 +3,8 @@ import toast from "react-hot-toast";
 import { FaChartBar, FaClipboardList, FaEdit, FaEye, FaPlus, FaPrint, FaSearch, FaTrash, FaUserPlus } from "react-icons/fa";
 import useAssessmentStore from "../../../store/assessmentStore.js";
 import PhysicalPaperModal from "../../../components/PhysicalPaperModal.jsx";
-import { Alert, Badge, Button, Card, CardHeader, EmptyState, Modal, PageHeader, ResponsiveTable, SkeletonList } from "../../../components/ui";
+import AssessmentStatus from "../../../components/assessment/AssessmentStatus.jsx";
+import { Alert, Button, Card, CardHeader, EmptyState, Modal, PageHeader, ResponsiveTable, SkeletonList } from "../../../components/ui";
 import { errorMessage } from "../../../utils/forms.js";
 
 const questionTotal = (a) => (a.question_blocks || []).reduce((sum, b) => sum + (Number(b.question_count) || 0), 0);
@@ -54,7 +55,7 @@ function AssessmentList() {
       render: (a) => (
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-semibold">{a.title}</span>
-          {a.is_executed ? <Badge tone="warning">Started · locked</Badge> : <Badge tone="primary">Draft</Badge>}
+          <AssessmentStatus assessment={a} />
         </div>
       ),
     },
