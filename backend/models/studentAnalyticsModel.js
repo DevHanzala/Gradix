@@ -174,7 +174,9 @@ export const getLearningRecommendations = async (studentId) => {
       const prompt = `You are an educational AI assistant. Generate learning recommendations for a student with the following weak areas: ${JSON.stringify(weakAreas)}. Respond ONLY with a valid JSON object in this exact format: { "weak_areas": [{ "topic": "string", "performance": number, "suggestion": "string" }], "study_plan": { "daily_practice": [{ "topic": "string", "focus": "string", "time_allocation": "string" }], "weekly_review": [{ "topic": "string", "activity": "string", "goal": "string" }] } }. Ensure the JSON is parseable and matches the structure exactly.`;
       
       let responseText = await generateContent(prompt, {
-        purpose: "checking",
+        purpose: "recommendations",
+        useCheckingKey: true,
+        userId: studentId,
         maxOutputTokens: 1000,
         temperature: 0.7,
         responseMimeType: "application/json",

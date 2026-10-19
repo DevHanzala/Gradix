@@ -8,6 +8,8 @@ import studentAnalyticsRoutes from "./routes/studentAnalyticsRoutes.js";
 import studentAssessmentRoutes from "./routes/studentAssessmentRoutes.js";
 import instructorAssessmentAnalyticsRoutes from "./routes/instructorAssessmentAnalyticsRoutes.js";
 import { errorHandler, notFound } from "./middleware/errorMiddleware.js";
+// Registers background job definitions so routes can enqueue them.
+import "./jobs/index.js";
 
 /**
  * Builds the Express app without connecting to the database or listening,

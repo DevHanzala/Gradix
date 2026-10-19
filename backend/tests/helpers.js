@@ -13,6 +13,7 @@ export const PASSWORD = "Passw0rdGood";
 let passwordHash;
 
 const TABLES = [
+  "llm_usage_log",
   "student_answers",
   "generated_questions",
   "assessment_attempts",

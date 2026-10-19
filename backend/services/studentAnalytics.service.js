@@ -208,7 +208,8 @@ Expected JSON format:
 
   try {
     let responseText = await generateContent(prompt, {
-      purpose: "checking",
+      purpose: "recommendations",
+      useCheckingKey: true,
       maxOutputTokens: 1000,
       temperature: 0.4,
       responseMimeType: "application/json",

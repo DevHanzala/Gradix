@@ -259,7 +259,13 @@ keep the same lines and format; output only the translated text.
 ${headerText}`;
 
     try {
-      const translated = await generateContent(translationPrompt, { maxOutputTokens: 1000, temperature: 0.3 });
+      const translated = await generateContent(translationPrompt, {
+        purpose: "paper_header_translation",
+        assessmentId: assessment.id,
+        userId: user.id,
+        maxOutputTokens: 1000,
+        temperature: 0.3,
+      });
       const lines = translated.split("\n").map((l) => l.trim()).filter(Boolean);
       headers = {
         instituteName: extractValue(lines, labels.institute) || instituteName,

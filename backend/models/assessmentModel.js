@@ -225,6 +225,8 @@ export const generateAssessmentQuestions = async (assessmentId, language, assess
     let rawQuestions;
     try {
       const aiText = await generateContent(prompt, {
+        purpose: "question_generation",
+        assessmentId,
         maxOutputTokens: 8000,
         temperature: 0.8,
         responseMimeType: "application/json",
