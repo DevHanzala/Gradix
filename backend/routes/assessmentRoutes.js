@@ -15,6 +15,17 @@ import {
   generatePhysicalPaper,
 } from '../controllers/assessmentController.js';
 import { getObjectives, replaceObjectives, regenerateObjectives } from '../controllers/objectivesController.js';
+import {
+  listQuestions,
+  getPoolStatus,
+  publish,
+  retryPublish,
+  addQuestion,
+  editQuestion,
+  retireQuestion,
+  approveQuestion,
+  regenerateQuestion,
+} from '../controllers/poolController.js';
 
 const router = express.Router();
 
@@ -61,5 +72,15 @@ const staff = [protect, authorizeRoles('instructor', 'admin', 'super_admin')];
 router.get('/:id/objectives', ...staff, getObjectives);
 router.put('/:id/objectives', ...staff, replaceObjectives);
 router.post('/:id/objectives/regenerate', ...staff, aiLimiter, regenerateObjectives);
+
+router.post('/:id/publish', ...staff, publish);
+router.post('/:id/publish/retry', ...staff, retryPublish);
+router.get('/:id/pool/status', ...staff, getPoolStatus);
+router.get('/:id/questions', ...staff, listQuestions);
+router.post('/:id/questions', ...staff, addQuestion);
+router.put('/:id/questions/:questionId', ...staff, editQuestion);
+router.delete('/:id/questions/:questionId', ...staff, retireQuestion);
+router.post('/:id/questions/:questionId/approve', ...staff, approveQuestion);
+router.post('/:id/questions/:questionId/regenerate', ...staff, aiLimiter, regenerateQuestion);
 
 export default router;

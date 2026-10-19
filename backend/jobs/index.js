@@ -3,6 +3,7 @@
 import "./definitions/maintenance.js";
 import "./definitions/resources.js";
 import "./definitions/objectives.js";
+import "./definitions/pool.js";
 
 export { enqueue, queueAdapter, getBoss, stopBoss } from "./queue.js";
 export { defineJob, listJobDefinitions } from "./registry.js";

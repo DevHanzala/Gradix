@@ -7,6 +7,7 @@ import {
 } from "../models/studentAnalyticsModel.js";
 import { findEnrolledAssessmentsWithStatusQuery } from "../repositories/studentAnalyticsRepository.js";
 import { generateContent } from "./ai/generateContent.js";
+import { availableLanguages } from "./assessmentAvailability.js";
 
 // ==================== SERVICE FUNCTIONS ====================
 
@@ -73,6 +74,8 @@ export const getStudentAssessmentsService = async (studentId, userRole) => {
         score: status === "completed" ? score : null,
         percentage:
           status === "completed" && totalMarks > 0 ? Math.round(((score || 0) / totalMarks) * 10000) / 100 : null,
+        // Languages a student can start in right now (empty: not published yet).
+        available_languages: availableLanguages(r),
         enrolled_at: r.enrolled_at,
         started_at: r.started_at,
         completed_at: r.completed_at,

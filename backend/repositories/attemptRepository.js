@@ -7,7 +7,8 @@ import db from "../DB/db.js";
 
 export const findAssessmentForStartQuery = async (assessmentId, client = db) => {
   const { rows } = await client.query(
-    `SELECT id, title, prompt, external_links, is_executed FROM assessments WHERE id = $1`,
+    `SELECT id, title, prompt, external_links, is_executed, status, blueprint, languages, adaptive, instructor_id
+     FROM assessments WHERE id = $1`,
     [assessmentId]
   );
   return rows[0] || null;
@@ -63,8 +64,8 @@ export const insertGeneratedQuestionQuery = async (attemptId, order, q, client =
     `INSERT INTO generated_questions
        (attempt_id, question_order, question_type, question_text, options,
         correct_answer, positive_marks, negative_marks, duration_per_question,
-        objective_id, difficulty, language, source_chunk_ids, stem_hash)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        objective_id, difficulty, language, source_chunk_ids, stem_hash, pool_question_id)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
      RETURNING id`,
     [
       attemptId,
@@ -81,6 +82,7 @@ export const insertGeneratedQuestionQuery = async (attemptId, order, q, client =
       q.language ?? null,
       q.source_chunk_ids ?? null,
       q.stem_hash ?? null,
+      q.pool_question_id ?? null,
     ]
   );
   return rows[0];

@@ -32,7 +32,9 @@ const TYPE_FORMAT = {
   true_false: () => `"options": null; "correct_answer": true or false (JSON boolean)`,
   short_answer: () =>
     `"options": null; "correct_answer": {"answer": "model answer (one or two sentences)", ` +
-    `"required_keywords": ["2-4 essential keywords as they would appear in a correct answer"], "min_required_match": 1}`,
+    `"rubric": [{"concept": "an essential idea, 1-3 words", "accept": ["other wordings or spellings a correct answer may use"]}], ` +
+    `"min_required_match": number of rubric concepts required (usually all but one)}. ` +
+    `Give 2-4 concepts; write concepts and accepted wordings in the question's language`,
 };
 
 /** Passages for an objective: top-k by similarity, plus its source passages. */

@@ -2,6 +2,9 @@ import { withTransaction } from "../DB/db.js";
 import { generateAssessmentQuestions } from "../models/assessmentModel.js";
 import * as attemptRepo from "../repositories/attemptRepository.js";
 import { AppError } from "../utils/AppError.js";
+import { availableLanguages } from "./assessmentAvailability.js";
+import { findLanguageStatesQuery, incrementServedQuery } from "../repositories/poolRepository.js";
+import { selectPoolQuestion, otherStudentSets, topUpIfLow, languageBuckets, isLanguageReady } from "./pool/pool.service.js";
 import {
   gradeAnswer,
   canonicalStudentAnswer,
@@ -221,6 +224,77 @@ const parseAssessmentId = (assessmentId) => {
   return id;
 };
 
+// ------------------------------------------------------- question sources
+
+const unavailable = (code, message) => new AppError(code, 409, message);
+
+/** Can a student take this assessment in this language right now? */
+const assertAvailable = async (assessment, language) => {
+  if (!["publishing", "published"].includes(assessment.status)) {
+    throw unavailable("NOT_PUBLISHED", "This assessment has not been published yet.");
+  }
+  if (!assessment.blueprint?.slots?.length) return; // Phase 1 assessment (no objectives)
+  if (!(assessment.languages || []).includes(language)) {
+    throw new AppError("UNSUPPORTED_LANGUAGE", 400, "This assessment is not offered in that language.");
+  }
+  const state = (await findLanguageStatesQuery(assessment.id)).find((s) => s.language === language);
+  if (state?.state !== "ready" && !isLanguageReady(await languageBuckets(assessment, language))) {
+    throw unavailable("POOL_NOT_READY", "Questions in your language are still being prepared. Please try again in a few minutes.");
+  }
+};
+
+/** One question per blueprint slot, from the pool (never the same question twice for a student). */
+const selectFromPool = async (assessment, language) => {
+  const slots = assessment.blueprint.slots;
+  const servedIds = [];
+  const otherSets = await otherStudentSets(assessment.id, language, null);
+  const questions = [];
+  for (const [i, slot] of slots.entries()) {
+    const row = await selectPoolQuestion({
+      assessment,
+      language,
+      bucket: { ...slot, difficulty: slot.difficulty || 3 },
+      servedIds,
+      isLast: i === slots.length - 1,
+      otherSets,
+    });
+    if (!row) {
+      await topUpIfLow(assessment, language);
+      throw new AppError("POOL_EXHAUSTED", 503, "Your questions are being prepared. Please try again in a minute.");
+    }
+    servedIds.push(row.id);
+    questions.push({
+      question_type: row.question_type,
+      question_text: row.question_text,
+      options: row.options ? normalizeOptions(row.options) : null,
+      correct_answer: decodeStoredValue(row.correct_answer),
+      positive_marks: slot.positive_marks,
+      negative_marks: slot.negative_marks,
+      duration_per_question: slot.duration_per_question,
+      objective_id: row.objective_id,
+      difficulty: row.difficulty,
+      language,
+      source_chunk_ids: row.source_chunk_ids,
+      stem_hash: row.stem_hash,
+      pool_question_id: row.id,
+    });
+  }
+  return { questions };
+};
+
+/** Phase 1 assessments without objectives: generate the set on the fly (unchanged behaviour). */
+const generateLegacySet = async (assessment, language) => {
+  try {
+    return await generateAssessmentQuestions(assessment.id, language, assessment);
+  } catch (error) {
+    if (error.message === "NO_QUESTION_BLOCKS") {
+      throw new AppError("NO_QUESTION_BLOCKS", 400, "This assessment has no questions configured yet");
+    }
+    console.error(`[START] question generation failed for assessment ${assessment.id}: ${error.message}`);
+    throw new AppError("GENERATION_FAILED", 503, "Could not prepare your questions. Please try again.");
+  }
+};
+
 // ------------------------------------------------------------- public API
 
 /**
@@ -236,7 +310,20 @@ export const getAttemptStateService = async (studentId, assessmentId) => {
   }
 
   const attempt = await attemptRepo.findOnlineAttemptQuery(studentId, id);
-  if (!attempt) return { status: "not_started", assessmentId: id, title: assessment.title };
+  if (!attempt) {
+    const ready = (await findLanguageStatesQuery(id)).filter((st) => st.state === "ready").map((st) => st.language);
+    return {
+      status: "not_started",
+      assessmentId: id,
+      title: assessment.title,
+      availableLanguages: availableLanguages({
+        assessment_status: assessment.status,
+        uses_pool: Boolean(assessment.blueprint),
+        ready_languages: ready,
+        languages: assessment.languages,
+      }),
+    };
+  }
   if (attempt.status === "completed") return buildAttemptResult(attempt);
   return loadInProgressState(attempt);
 };
@@ -270,17 +357,10 @@ export const startAssessmentForStudentService = async (studentId, assessmentId, 
     return { ...state, resumed: true, code: "IN_PROGRESS" };
   }
 
-  let generated;
-  try {
-    generated = await generateAssessmentQuestions(id, language, assessment);
-  } catch (error) {
-    if (error.message === "NO_QUESTION_BLOCKS") {
-      throw new AppError("NO_QUESTION_BLOCKS", 400, "This assessment has no questions configured yet");
-    }
-    console.error(`[START] question generation failed for assessment ${id}: ${error.message}`);
-    throw new AppError("GENERATION_FAILED", 503, "Could not prepare your questions. Please try again.");
-  }
-
+  await assertAvailable(assessment, language);
+  const generated = assessment.blueprint?.slots?.length
+    ? await selectFromPool(assessment, language)
+    : await generateLegacySet(assessment, language);
   let attempt;
   try {
     attempt = await withTransaction(async (client) => {
@@ -289,6 +369,9 @@ export const startAssessmentForStudentService = async (studentId, assessmentId, 
       for (const q of generated.questions) {
         await attemptRepo.insertGeneratedQuestionQuery(created.id, order, q, client);
         order += 1;
+      }
+      for (const q of generated.questions) {
+        if (q.pool_question_id) await incrementServedQuery(q.pool_question_id, client);
       }
       // Only now, after enrollment was checked and the attempt exists.
       await attemptRepo.markAssessmentExecutedQuery(id, client);
@@ -306,6 +389,7 @@ export const startAssessmentForStudentService = async (studentId, assessmentId, 
     throw error;
   }
 
+  if (assessment.blueprint?.slots?.length) await topUpIfLow(assessment, language);
   return { ...(await loadInProgressState(attempt)), resumed: false };
 };
 

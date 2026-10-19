@@ -43,6 +43,8 @@ const initialState = {
   result: null,
   error: null,
   errorCode: null,
+  /** Languages the student can start in now (empty until the assessment is published). */
+  availableLanguages: [],
 };
 
 const useStudentAssessmentStore = create((set, get) => {
@@ -69,7 +71,7 @@ const useStudentAssessmentStore = create((set, get) => {
     } else if (data.status === "in_progress") {
       applyInProgress(data);
     } else {
-      set({ phase: "not_started", error: null });
+      set({ phase: "not_started", error: null, availableLanguages: data.availableLanguages || [] });
     }
   };
 

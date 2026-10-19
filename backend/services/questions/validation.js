@@ -72,7 +72,7 @@ export const validateQuestion = (raw, spec) => {
 
   if (spec.question_type === "short_answer") {
     const rule = parseShortAnswerRule(raw.correct_answer);
-    if (!rule.answer && rule.keywords.length === 0) return fail("no_answer");
+    if (!rule.answer && rule.concepts.length === 0) return fail("no_answer");
     if (rule.answer && leaks(stem, rule.answer)) return fail("answer_in_stem");
     return {
       ok: true,
@@ -81,8 +81,10 @@ export const validateQuestion = (raw, spec) => {
         options: null,
         correct_answer: {
           answer: rule.answer,
+          // AI rubric: concepts a correct answer must contain, each with accepted phrasings.
+          rubric: rule.concepts.map(([concept, ...accept]) => ({ concept, accept })),
           required_keywords: rule.keywords,
-          min_required_match: rule.keywords.length ? Math.max(1, rule.minMatch) : 0,
+          min_required_match: rule.concepts.length ? Math.max(1, rule.minMatch) : 0,
         },
       },
     };

@@ -138,42 +138,54 @@ export const parseBoolean = (value) => {
 
 /**
  * Accepts the rule shapes the generator may produce:
+ *   { answer, rubric: [{ concept, accept: [...] }], min_required_match }   (Phase 2 AI rubric)
  *   { answer, required_keywords, min_required_match } | "model answer" | ["kw1", "kw2"]
+ *
+ * Returns { answer, concepts, keywords, minMatch } where each concept is a list
+ * of acceptable phrasings; a concept counts as present when any phrasing appears
+ * in the student's answer. `keywords` (one phrasing per concept) is kept for
+ * older callers.
  */
 export const parseShortAnswerRule = (rule) => {
   const decoded = decodeStoredValue(rule);
-  if (Array.isArray(decoded)) {
-    const keywords = decoded.map(String).filter((k) => normalizeText(k));
-    return { answer: null, keywords, minMatch: keywords.length };
-  }
-  if (decoded && typeof decoded === "object") {
-    const keywords = (decoded.required_keywords || decoded.keywords || [])
-      .map(String)
-      .filter((k) => normalizeText(k));
-    const requested = Number(decoded.min_required_match);
+  const clean = (list) => (Array.isArray(list) ? list.map(String).filter((k) => normalizeText(k)) : []);
+  const build = (answer, concepts, requested) => {
     const minMatch =
-      keywords.length === 0
+      concepts.length === 0
         ? 0
         : Number.isInteger(requested) && requested > 0
-          ? Math.min(requested, keywords.length)
-          : keywords.length;
+          ? Math.min(requested, concepts.length)
+          : concepts.length;
+    return { answer, concepts, keywords: concepts.map((c) => c[0]), minMatch };
+  };
+
+  if (Array.isArray(decoded)) {
+    return build(null, clean(decoded).map((k) => [k]), null);
+  }
+  if (decoded && typeof decoded === "object") {
+    const rubric = Array.isArray(decoded.rubric)
+      ? decoded.rubric
+          .map((item) => clean([item?.concept, ...(Array.isArray(item?.accept) ? item.accept : [])]))
+          .filter((phrases) => phrases.length > 0)
+      : [];
+    const concepts = rubric.length ? rubric : clean(decoded.required_keywords || decoded.keywords).map((k) => [k]);
     const answer = decoded.answer ?? decoded.model_answer ?? null;
-    return { answer: answer === null ? null : String(answer), keywords, minMatch };
+    return build(answer === null ? null : String(answer), concepts, Number(decoded.min_required_match));
   }
   if (typeof decoded === "string" && normalizeText(decoded)) {
-    return { answer: decoded, keywords: [], minMatch: 0 };
+    return build(decoded, [], null);
   }
-  return { answer: null, keywords: [], minMatch: 0 };
+  return build(null, [], null);
 };
 
 const evaluateShortAnswer = (studentAnswer, rule) => {
   const student = normalizeText(studentAnswer);
   if (!student) return false;
 
-  const { answer, keywords, minMatch } = parseShortAnswerRule(rule);
+  const { answer, concepts, minMatch } = parseShortAnswerRule(rule);
 
-  if (keywords.length > 0) {
-    const matched = keywords.filter((keyword) => student.includes(normalizeText(keyword))).length;
+  if (concepts.length > 0) {
+    const matched = concepts.filter((phrases) => phrases.some((p) => student.includes(normalizeText(p)))).length;
     return matched >= Math.max(1, minMatch);
   }
 

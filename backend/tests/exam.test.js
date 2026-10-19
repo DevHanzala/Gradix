@@ -39,7 +39,7 @@ beforeEach(async () => {
   assessment = await createAssessment(instructor, [
     { type: "multiple_choice", count: 2, duration: 60, positive: 2, negative: 0.5 },
     { type: "true_false", count: 1, duration: 60, positive: 1, negative: 0 },
-  ]);
+  ], { status: "published" });
   await enroll(assessment, student);
 });
 

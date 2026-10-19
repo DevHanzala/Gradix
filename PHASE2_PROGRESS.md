@@ -8,8 +8,8 @@ Resume rule: read this file, check `git log --oneline main..phase-2`, continue w
 | Section | Status | Commit |
 |---|---|---|
 | 0. Prep (audit, pg-boss worker, LLM usage log) | done | 3266e49 |
-| 1. Learning objectives + real RAG | done | (this commit) |
-| 2. Question pool + pre-generation | todo | |
+| 1. Learning objectives + real RAG | done | da46b32 |
+| 2. Question pool + pre-generation | done | (this commit) |
 | 3. Adaptive difficulty engine | todo | |
 | 4. Full multilingual app | todo | |
 | 5. Learning pathways | todo | |
@@ -18,9 +18,9 @@ Resume rule: read this file, check `git log --oneline main..phase-2`, continue w
 | Final verification + PHASE2_REPORT.md | todo | |
 
 ## Next
-Section 2: question pool (pre-generation on publish per objective x difficulty x language, validation +
-regeneration, within/across-student uniqueness, top-up job, on-demand fallback, instructor question bank,
-publishing progress, short-answer AI rubric).
+Section 3: adaptive engine (per-assessment toggle; server serves ONE question at a time and grades each
+answer with answered_at/time_taken; rolling score over last 3 with time, thresholds in one config file;
+blueprint objective order; difficulty-weighted final score 0.6..1.4 with raw/adjusted + path; resume; tests).
 
 ## Section 0 summary
 - npm audit: non-breaking fixes applied (lockfile only). Upgraded nodemailer 6 -> 10 and puppeteer 24 -> 25
@@ -67,6 +67,31 @@ publishing progress, short-answer AI rubric).
   create now lands on the objectives page.
 - New env: EMBEDDING_MODEL, EMBEDDING_CACHE_DIR. Tests: 157 (39 new).
 
+## Section 2 summary
+- Migration 1760000000300: question_pool (bucket = assessment, language, objective, type, difficulty; versioned
+  edits via previous_version_id; status active/retired; approval; times_served; e5 embedding), unique active
+  stem per assessment+language, pool_language_state, assessments.languages (default en/ur/ar) + published_at,
+  generated_questions.pool_question_id. Up/down/up verified on Postgres 16.
+- Sizing (services/pool/targets.js): minimum per bucket = what one student can need; target sized so the pool
+  allows >= 30 different full sets (product of C(target, minimum)); adaptive pools hold all 5 difficulties.
+- Publishing: POST /api/assessments/:id/publish {languages} -> status publishing, job `pool.fill` per language
+  (stately, 5 attempts, backoff). Each run generates only the deficit (<= 10 per LLM call, per objective, from the
+  objective's retrieved passages), validates, drops hash duplicates and embedding near-duplicates (cos >= 0.95),
+  inserts. Language "ready" when every bucket reaches its minimum; assessment "published" when all are ready.
+  Final failure -> language "failed" with a message; POST /publish/retry. GET /pool/status for progress.
+- Serving: least-served unseen question per slot (random among equals) -> on-demand generation (timeout,
+  POOL_ON_DEMAND_TIMEOUT_MS) -> nearest difficulty -> 503 POOL_EXHAUSTED (never 500; no attempt created).
+  Last slot skips a candidate that would duplicate another student's full set. Top-up job queued when a
+  bucket is below target (incl. exposure: target grows with times_served / 5).
+- Students: start only when published/publishing AND their language is ready (409 NOT_PUBLISHED /
+  POOL_NOT_READY with a "being prepared" message); dashboard + attempt state expose available languages.
+- Question bank API + page: filters (language, objective, difficulty, type, status, search), pagination,
+  preview with correct answer, edit (new version; attempts keep their copy), add manual (validated, auto-
+  approved), approve, remove (retire), regenerate one. Publish panel with per-language progress bars.
+- Short answer: AI rubric {answer, rubric:[{concept, accept[]}], min_required_match}; graded by the shared
+  grader (any accepted wording counts per concept); old keyword rules unchanged.
+- New env: POOL_ON_DEMAND_TIMEOUT_MS. Tests: 185 (28 new), incl. 30 students -> 30 distinct sets.
+
 ## Decisions
 - D0.1 npm audit majors NOT applied (risk noted): firebase (frontend; vulnerable firestore/grpc code is never
   imported, only firebase/auth), jest/nodemon (dev-only; npm suggests downgrades), office-text-extractor 4
@@ -88,6 +113,15 @@ publishing progress, short-answer AI rubric).
   no objective is silently untested.
 - D1.5 Leak check only flags answers of >= 12 characters found verbatim in the stem; short answers ("Paris",
   "4") can legitimately appear in other words of a question.
+
+- D2.1 Students may only start published (or publishing with their language ready) assessments. Phase 1
+  assessments without objectives keep on-the-fly generation once published (existing executed ones were
+  marked published by migration 200); drafts must go through objectives + publish.
+- D2.2 Unapproved AI questions are served (they passed automatic validation); approval is a review marker.
+  Requiring approval would block every exam on manual review of hundreds of questions.
+- D2.3 Pool editing stays allowed after publishing (to fix a wrong question), always as a new version.
+- D2.4 Fallback order favours fairness: same difficulty from the LLM first (bounded wait), a nearby difficulty
+  only if that fails.
 
 ## Open issues
 - office-text-extractor major upgrade still pending (D0.1).

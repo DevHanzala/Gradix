@@ -24,6 +24,9 @@ function AssessmentAction({ assessment }) {
     );
   }
   const resuming = assessment.status === "in_progress";
+  if (!resuming && (assessment.available_languages || []).length === 0) {
+    return <Badge tone="neutral">Not available yet</Badge>;
+  }
   return (
     <Button to={`/student/assessments/${assessment.id}/take`} icon={resuming ? FaRedo : FaPlayCircle} className="w-full sm:w-auto">
       {resuming ? "Resume" : "Start"}

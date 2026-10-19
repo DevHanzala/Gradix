@@ -163,3 +163,38 @@ describe("generated question normalization", () => {
     expect(normalizeGeneratedQuestion({ question_text: "Q", options: ["a", "b"], correct_answer: "z" }, block)).toBeNull();
   });
 });
+
+describe("short-answer AI rubric", () => {
+  const question = {
+    question_type: "short_answer",
+    positive_marks: 2,
+    negative_marks: 0,
+    correct_answer: {
+      answer: "Plants use chlorophyll to capture sunlight",
+      rubric: [
+        { concept: "chlorophyll", accept: ["green pigment"] },
+        { concept: "sunlight", accept: ["light energy", "sun"] },
+      ],
+      min_required_match: 2,
+    },
+  };
+
+  test("any accepted wording of each concept counts", () => {
+    expect(gradeAnswer(question, "The green pigment absorbs light energy").correct).toBe(true);
+    expect(gradeAnswer(question, "chlorophyll and the sun").correct).toBe(true);
+  });
+
+  test("missing a required concept is wrong", () => {
+    expect(gradeAnswer(question, "chlorophyll only").correct).toBe(false);
+  });
+
+  test("Urdu rubric phrases match regardless of diacritics normalisation", () => {
+    const urdu = { ...question, correct_answer: { answer: "x", rubric: [{ concept: "سورج", accept: ["دھوپ"] }], min_required_match: 1 } };
+    expect(gradeAnswer(urdu, "پودے دھوپ استعمال کرتے ہیں").correct).toBe(true);
+  });
+
+  test("old keyword rules still grade the same", () => {
+    const old = { ...question, correct_answer: { answer: "x", required_keywords: ["alpha", "beta"], min_required_match: 1 } };
+    expect(gradeAnswer(old, "beta").correct).toBe(true);
+  });
+});

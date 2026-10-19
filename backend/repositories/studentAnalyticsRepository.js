@@ -235,6 +235,11 @@ export const findEnrolledAssessmentsWithStatusQuery = async (studentId) => {
        a.title,
        a.prompt,
        e.enrolled_at,
+       a.status         AS assessment_status,
+       (a.blueprint IS NOT NULL) AS uses_pool,
+       a.languages,
+       (SELECT COALESCE(array_agg(pls.language ORDER BY pls.language), '{}')
+        FROM pool_language_state pls WHERE pls.assessment_id = a.id AND pls.state = 'ready') AS ready_languages,
        aa.id            AS attempt_id,
        aa.status        AS attempt_status,
        aa.score,

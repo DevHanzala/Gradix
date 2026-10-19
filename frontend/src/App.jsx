@@ -69,6 +69,9 @@ const AssessmentPreview = lazy(() =>
 const AssessmentObjectives = lazy(() =>
   import("./Pages/Instructor/AssessmentManagement/AssessmentObjectives")
 );
+const QuestionBank = lazy(() =>
+  import("./Pages/Instructor/AssessmentManagement/QuestionBank")
+);
 
 /* Student */
 const StudentDashboard = lazy(() =>
@@ -97,6 +100,7 @@ const INSTRUCTOR_ROUTES = [
   { path: "/instructor/assessments/:assessmentId/analytics", page: AssessmentAnalytics },
   { path: "/instructor/assessments/:id/preview", page: AssessmentPreview },
   { path: "/instructor/assessments/:id/objectives", page: AssessmentObjectives },
+  { path: "/instructor/assessments/:id/questions", page: QuestionBank },
   { path: "/instructor/students", page: AddStudent },
 ];
 

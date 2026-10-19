@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { FaArrowDown, FaArrowUp, FaListOl, FaPlus, FaRedo, FaSave, FaTrash } from "react-icons/fa";
 import { fetchObjectivesApi, regenerateObjectivesApi, saveObjectivesApi } from "../../../api/assessment.api.js";
 import AssessmentStatus, { StatusSteps } from "../../../components/assessment/AssessmentStatus.jsx";
+import PublishPanel from "../../../components/assessment/PublishPanel.jsx";
 import { Alert, Badge, Button, Card, CardBody, CardHeader, EmptyState, Input, Modal, PageHeader, SkeletonList, Textarea } from "../../../components/ui";
 import { errorMessage } from "../../../utils/forms.js";
 import { textDirection } from "../../../utils/text.js";
@@ -313,6 +314,15 @@ function AssessmentObjectives() {
             </ol>
           </CardBody>
         </Card>
+      )}
+
+      {view.status !== "draft" && (
+        <PublishPanel
+          assessmentId={id}
+          status={view.status}
+          canPublish={view.status === "objectives_ready" && !dirty && drafts.length > 0}
+          onStatusChange={() => load({ force: !dirty })}
+        />
       )}
 
       <Modal

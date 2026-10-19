@@ -14,6 +14,8 @@ let passwordHash;
 
 const TABLES = [
   "llm_usage_log",
+  "pool_language_state",
+  "question_pool",
   "learning_objectives",
   "student_answers",
   "generated_questions",
@@ -46,10 +48,18 @@ export const createUser = async ({ name, role = "student", verified = true, emai
 export const auth = (user) =>
   `Bearer ${jwt.sign({ id: user.id, email: user.email, role: user.role }, process.env.JWT_SECRET)}`;
 
-export const createAssessment = async (instructor, blocks = [{ type: "multiple_choice", count: 2, duration: 60, positive: 1, negative: 0 }]) => {
+/**
+ * A Phase 1-style assessment (no objectives). `status: "published"` makes it
+ * startable by students through the legacy generator.
+ */
+export const createAssessment = async (
+  instructor,
+  blocks = [{ type: "multiple_choice", count: 2, duration: 60, positive: 1, negative: 0 }],
+  { status = "draft" } = {}
+) => {
   const { rows } = await pool.query(
-    `INSERT INTO assessments (title, prompt, instructor_id) VALUES ('Sample', 'General knowledge', $1) RETURNING *`,
-    [instructor.id]
+    `INSERT INTO assessments (title, prompt, instructor_id, status) VALUES ('Sample', 'General knowledge', $1, $2) RETURNING *`,
+    [instructor.id, status]
   );
   for (const b of blocks) {
     await pool.query(
@@ -160,7 +170,9 @@ export const installFakes = () => {
   };
   aiAdapter.generate = async (prompt, options = {}) => {
     fakes.prompts.push({ purpose: options.purpose, prompt });
-    const responder = fakes.ai[options.purpose];
+    // Pool generation purposes share the question generator's fake (looked up at call time).
+    const purpose = String(options.purpose || "").startsWith("pool_") ? "question_generation" : options.purpose;
+    const responder = fakes.ai[purpose];
     if (responder) return responder(prompt, options);
     return JSON.stringify(fakes.aiQuestions);
   };

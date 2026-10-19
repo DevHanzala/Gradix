@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { FaBinoculars, FaChartBar, FaEdit, FaLink, FaListOl, FaPrint, FaUserPlus } from "react-icons/fa";
+import { FaBinoculars, FaChartBar, FaDatabase, FaEdit, FaLink, FaListOl, FaPrint, FaUserPlus } from "react-icons/fa";
 import AssessmentStatus, { StatusSteps } from "../../../components/assessment/AssessmentStatus.jsx";
 import useAssessmentStore from "../../../store/assessmentStore.js";
 import PhysicalPaperModal from "../../../components/PhysicalPaperModal.jsx";
@@ -55,14 +55,19 @@ function AssessmentDetail() {
         backLabel="All assessments"
         actions={
           <>
-            {!assessment.is_executed && (
+            {!assessment.is_executed && ["draft", "objectives_ready"].includes(assessment.status || "draft") && (
               <Button to={`/instructor/assessments/${id}/edit`} icon={FaEdit}>
                 Edit
               </Button>
             )}
             <Button to={`/instructor/assessments/${id}/objectives`} variant="secondary" icon={FaListOl}>
-              Objectives
+              Objectives & publishing
             </Button>
+            {["publishing", "published"].includes(assessment.status) && (
+              <Button to={`/instructor/assessments/${id}/questions`} variant="secondary" icon={FaDatabase}>
+                Question bank
+              </Button>
+            )}
             <Button to={`/instructor/assessments/${id}/enroll`} variant="secondary" icon={FaUserPlus}>
               Enroll students
             </Button>

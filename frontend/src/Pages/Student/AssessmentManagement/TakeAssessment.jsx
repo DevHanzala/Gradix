@@ -61,6 +61,7 @@ function TakeAssessment() {
     result,
     error,
     errorCode,
+    availableLanguages,
     loadAttempt,
     startAssessment,
     setAnswer,
@@ -147,8 +148,28 @@ function TakeAssessment() {
     return <ResultSummary result={result} />;
   }
 
+  if ((phase === "not_started" || phase === "starting") && availableLanguages.length === 0) {
+    return (
+      <CenteredPanel>
+        <FaClock className="mx-auto text-4xl text-primary-600" aria-hidden="true" />
+        <h1 className="mt-4 text-xl font-bold text-ink">Not available yet</h1>
+        <p className="mt-2 text-ink-muted">
+          Your instructor has not published this assessment yet, or its questions are still being prepared. Please check again later.
+        </p>
+        <div className="mt-6 flex flex-wrap justify-center gap-3">
+          <Button variant="secondary" onClick={() => loadAttempt(assessmentId)}>
+            Check again
+          </Button>
+          <Button to="/student/dashboard">Back to dashboard</Button>
+        </div>
+      </CenteredPanel>
+    );
+  }
+
   if (phase === "not_started" || phase === "starting") {
     const starting = phase === "starting";
+    const offered = LANGUAGES.filter((l) => availableLanguages.includes(l.value));
+    const chosenLanguage = availableLanguages.includes(selectedLanguage) ? selectedLanguage : offered[0].value;
     return (
       <CenteredPanel dir={dir}>
         <h1 className="text-2xl font-bold text-ink sm:text-3xl">Ready to begin?</h1>
@@ -160,12 +181,12 @@ function TakeAssessment() {
           </label>
           <select
             id="exam-language"
-            value={selectedLanguage}
+            value={chosenLanguage}
             onChange={(e) => setSelectedLanguage(e.target.value)}
             disabled={starting}
             className="w-full min-h-11 rounded-control border border-line-strong bg-surface px-3 py-2 text-base focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-200"
           >
-            {LANGUAGES.map((l) => (
+            {offered.map((l) => (
               <option key={l.value} value={l.value}>
                 {l.label}
               </option>
@@ -188,7 +209,7 @@ function TakeAssessment() {
 
         <button
           type="button"
-          onClick={() => startAssessment(assessmentId, selectedLanguage)}
+          onClick={() => startAssessment(assessmentId, chosenLanguage)}
           disabled={starting}
           className="btn-primary mt-6 w-full"
         >

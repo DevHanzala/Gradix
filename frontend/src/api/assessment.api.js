@@ -63,3 +63,34 @@ export const saveObjectivesApi = (assessmentId, objectives) =>
 
 export const regenerateObjectivesApi = (assessmentId) =>
   apiClient.post(`/assessments/${assessmentId}/objectives/regenerate`);
+
+/* =========================
+   Publishing + question bank
+========================= */
+
+export const publishAssessmentApi = (assessmentId, languages) =>
+  apiClient.post(`/assessments/${assessmentId}/publish`, { languages });
+
+export const retryPublishApi = (assessmentId) =>
+  apiClient.post(`/assessments/${assessmentId}/publish/retry`);
+
+export const fetchPoolStatusApi = (assessmentId) =>
+  apiClient.get(`/assessments/${assessmentId}/pool/status`);
+
+export const fetchBankQuestionsApi = (assessmentId, params) =>
+  apiClient.get(`/assessments/${assessmentId}/questions`, { params });
+
+export const addBankQuestionApi = (assessmentId, question) =>
+  apiClient.post(`/assessments/${assessmentId}/questions`, question);
+
+export const editBankQuestionApi = (assessmentId, questionId, question) =>
+  apiClient.put(`/assessments/${assessmentId}/questions/${questionId}`, question);
+
+export const retireBankQuestionApi = (assessmentId, questionId) =>
+  apiClient.delete(`/assessments/${assessmentId}/questions/${questionId}`);
+
+export const approveBankQuestionApi = (assessmentId, questionId) =>
+  apiClient.post(`/assessments/${assessmentId}/questions/${questionId}/approve`);
+
+export const regenerateBankQuestionApi = (assessmentId, questionId) =>
+  apiClient.post(`/assessments/${assessmentId}/questions/${questionId}/regenerate`);

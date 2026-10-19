@@ -346,6 +346,8 @@ describe("retrieval and generation", () => {
     const id = (await create()).body.data.id;
     const student = await createUser({ role: "student" });
     await enroll({ id }, student);
+    const published = await request(app).post(`/api/assessments/${id}/publish`).set("Authorization", auth(instructor)).send({ languages: ["en", "ur"] });
+    expect(published.status).toBe(202);
     const start = await request(app).post(`/api/taking/assessments/${id}/start`).set("Authorization", auth(student)).send({ language: "ur" });
     expect(start.status).toBe(200);
     expect(start.body.data.questions).toHaveLength(6);
@@ -365,7 +367,7 @@ describe("retrieval and generation", () => {
     expect(new Set(rows.map((q) => q.stem_hash)).size).toBe(rows.length);
 
     // Generation prompts contained only retrieved passages for the objective.
-    const genPrompt = fakes.prompts.find((p) => p.purpose === "question_generation").prompt;
+    const genPrompt = fakes.prompts.find((p) => p.purpose === "pool_generation").prompt;
     expect([...genPrompt.matchAll(/\[chunk (\d+)\]/g)].length).toBeLessThanOrEqual(6);
   });
 
@@ -383,9 +385,12 @@ describe("retrieval and generation", () => {
       }
       return original(prompt);
     };
+    await request(app).post(`/api/assessments/${id}/publish`).set("Authorization", auth(instructor)).send({ languages: ["en"] });
     const start = await request(app).post(`/api/taking/assessments/${id}/start`).set("Authorization", auth(student)).send({ language: "en" });
     expect(start.status).toBe(200);
     expect(start.body.data.questions.map((q) => q.question_text)).not.toContain("Bad?");
+    const { rows } = await pool.query("SELECT count(*)::int AS n FROM question_pool WHERE question_text = 'Bad?'");
+    expect(rows[0].n).toBe(0);
   });
 });
 
