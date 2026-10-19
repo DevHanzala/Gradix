@@ -51,7 +51,11 @@ function TakeAssessment() {
   const { assessmentId } = useParams();
   const {
     phase,
-    questions,
+    question: currentQuestion,
+    totalQuestions,
+    preparing,
+    liveScore,
+    lastAnswer,
     answers,
     currentIndex,
     questionDeadline,
@@ -92,12 +96,12 @@ function TakeAssessment() {
   const now = useNow(inProgress);
   const questionRemaining = inProgress ? Math.ceil((questionDeadline - now) / 1000) : 0;
   const overallRemaining = inProgress ? Math.ceil((overallDeadline - now) / 1000) : 0;
-  const isLast = currentIndex >= questions.length - 1;
+  const isLast = currentIndex >= totalQuestions - 1;
 
   // Per-question timeout auto-advances (last question auto-submits);
   // overall timeout auto-submits. Fire once per question index.
   useEffect(() => {
-    if (!inProgress || questions.length === 0) return;
+    if (!inProgress || !currentQuestion || preparing) return;
     if (overallRemaining <= 0) {
       if (firedForIndex.current !== "overall") {
         firedForIndex.current = "overall";
@@ -109,7 +113,7 @@ function TakeAssessment() {
       firedForIndex.current = currentIndex;
       advance();
     }
-  }, [inProgress, questionRemaining, overallRemaining, currentIndex, questions.length, advance, submit]);
+  }, [inProgress, questionRemaining, overallRemaining, currentIndex, currentQuestion, preparing, advance, submit]);
 
   const dir = RTL_LANGUAGES.includes(inProgress ? language : selectedLanguage) ? "rtl" : "ltr";
 
@@ -228,11 +232,14 @@ function TakeAssessment() {
 
   // ------------------------------------------------------------ exam view
 
-  const question = questions[currentIndex];
-  if (!question) {
+  const question = currentQuestion;
+  if (!question || preparing) {
     return (
-      <CenteredPanel>
+      <CenteredPanel dir={dir}>
         <LoadingSpinner size="lg" />
+        <p className="mt-4 text-ink-muted" role="status">
+          Preparing your next question…
+        </p>
       </CenteredPanel>
     );
   }
@@ -245,7 +252,7 @@ function TakeAssessment() {
       <header className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2 px-4 py-3">
           <span className="text-sm font-semibold text-ink-muted">
-            Question {currentIndex + 1} / {questions.length}
+            Question {currentIndex + 1} / {totalQuestions}
           </span>
           <div className="flex flex-wrap items-center gap-2">
             <SaveIndicator status={saveStatus} />
@@ -266,13 +273,25 @@ function TakeAssessment() {
         <div className="h-1 bg-gray-100" aria-hidden="true">
           <div
             className="h-1 bg-primary-600 transition-all"
-            style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
+            style={{ width: `${((currentIndex + 1) / Math.max(1, totalQuestions)) * 100}%` }}
           />
         </div>
       </header>
 
       {/* Question */}
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 pb-32 pt-6 sm:pb-12">
+        {liveScore && (
+          <div className="mb-4 flex flex-wrap items-center gap-2 text-sm" role="status" aria-live="polite">
+            {lastAnswer && (
+              <span className={`rounded-full px-3 py-1 font-semibold ${lastAnswer.correct ? "bg-success-50 text-success-700" : "bg-danger-50 text-danger-700"}`}>
+                {lastAnswer.correct ? "Previous answer: correct" : "Previous answer: incorrect"}
+              </span>
+            )}
+            <span className="rounded-full bg-gray-100 px-3 py-1 font-semibold text-ink-muted">
+              Score so far: <span dir="ltr">{liveScore.score}</span>
+            </span>
+          </div>
+        )}
         <div className="mb-4 flex flex-wrap gap-2 text-xs font-semibold">
           <span dir="ltr" className="rounded-full bg-success-50 px-3 py-1 text-success-700">+{question.positive_marks} correct</span>
           {question.negative_marks > 0 && (
@@ -422,6 +441,9 @@ function ResultSummary({ result }) {
   const stats = [
     { label: "Score", value: `${result.score} / ${result.totalMarks}` },
     { label: "Percentage", value: `${result.percentage}%` },
+    ...(result.adjustedPercentage !== null && result.adjustedPercentage !== undefined
+      ? [{ label: "Difficulty-adjusted", value: `${result.adjustedPercentage}%` }]
+      : []),
     { label: "Correct", value: result.correctCount },
     { label: "Incorrect", value: result.incorrectCount },
     { label: "Unanswered", value: result.unansweredCount },

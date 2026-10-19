@@ -8,7 +8,7 @@ import { validateQuestion, stemHash } from "../services/questions/validation.js"
 import { searchAssessmentChunks } from "../services/rag/retrieval.js";
 import { rechunkResourceJob } from "../jobs/definitions/resources.js";
 import { queueAdapter } from "../jobs/queue.js";
-import { pool, resetDatabase, createUser, auth, installFakes, enroll, fakeEmbedding, fakeTokenCount } from "./helpers.js";
+import { pool, resetDatabase, createUser, auth, installFakes, enroll, fakeEmbedding, fakeTokenCount, playThrough } from "./helpers.js";
 
 let fakes;
 let instructor;
@@ -348,9 +348,8 @@ describe("retrieval and generation", () => {
     await enroll({ id }, student);
     const published = await request(app).post(`/api/assessments/${id}/publish`).set("Authorization", auth(instructor)).send({ languages: ["en", "ur"] });
     expect(published.status).toBe(202);
-    const start = await request(app).post(`/api/taking/assessments/${id}/start`).set("Authorization", auth(student)).send({ language: "ur" });
-    expect(start.status).toBe(200);
-    expect(start.body.data.questions).toHaveLength(6);
+    const { result } = await playThrough(app, request, id, student, "ur");
+    expect(result.answers).toHaveLength(6);
 
     const { rows } = await pool.query(
       "SELECT objective_id, difficulty, language, source_chunk_ids, stem_hash FROM generated_questions ORDER BY question_order"
@@ -386,9 +385,8 @@ describe("retrieval and generation", () => {
       return original(prompt);
     };
     await request(app).post(`/api/assessments/${id}/publish`).set("Authorization", auth(instructor)).send({ languages: ["en"] });
-    const start = await request(app).post(`/api/taking/assessments/${id}/start`).set("Authorization", auth(student)).send({ language: "en" });
-    expect(start.status).toBe(200);
-    expect(start.body.data.questions.map((q) => q.question_text)).not.toContain("Bad?");
+    const { result } = await playThrough(app, request, id, student);
+    expect(result.answers.map((q) => q.questionText)).not.toContain("Bad?");
     const { rows } = await pool.query("SELECT count(*)::int AS n FROM question_pool WHERE question_text = 'Bad?'");
     expect(rows[0].n).toBe(0);
   });

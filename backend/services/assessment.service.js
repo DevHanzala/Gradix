@@ -18,6 +18,13 @@ import {
   normalizeAssessmentInput,
 } from "../validator/assessmentInput.js";
 
+/** multipart sends booleans as strings; undefined means "not sent". */
+const parseFlag = (value) => {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value === "boolean") return value;
+  return ["true", "1", "on", "yes"].includes(String(value).toLowerCase());
+};
+
 // ==================== CREATE ====================
 
 /**
@@ -43,7 +50,15 @@ export const createAssessmentService = async (body, user, files = []) => {
 
   const created = await withTransaction(async (client) => {
     const assessment = await assessmentRepo.createAssessmentQuery(
-      { title, prompt, external_links: links, instructor_id: user.id, is_executed: false },
+      {
+        title,
+        prompt,
+        external_links: links,
+        instructor_id: user.id,
+        is_executed: false,
+        adaptive: parseFlag(body.adaptive) ?? false,
+        show_live_score: parseFlag(body.show_live_score) ?? false,
+      },
       client
     );
 
@@ -128,6 +143,7 @@ export const updateAssessmentService = async (assessmentId, body, user, files = 
       "This assessment is being published or has been published and can no longer be changed"
     );
   }
+  const adaptiveFlag = parseFlag(body.adaptive);
   const previousResourceIds = await assessmentRepo.findAssessmentResourceIdsQuery(existing.id);
   const sourcesChanged =
     title !== existing.title ||
@@ -137,7 +153,11 @@ export const updateAssessmentService = async (assessmentId, body, user, files = 
     [...resourceIds].sort((a, b) => a - b).join(",") !== previousResourceIds.join(",");
 
   const result = await withTransaction(async (client) => {
-    const updated = await assessmentRepo.updateAssessmentQuery(existing.id, { title, prompt, external_links: links }, client);
+    const updated = await assessmentRepo.updateAssessmentQuery(
+      existing.id,
+      { title, prompt, external_links: links, adaptive: adaptiveFlag, show_live_score: parseFlag(body.show_live_score) },
+      client
+    );
 
     if (blocks) {
       await assessmentRepo.deleteQuestionBlocksByAssessmentQuery(existing.id, client);
@@ -155,8 +175,8 @@ export const updateAssessmentService = async (assessmentId, body, user, files = 
       await assessmentRepo.linkResourceToAssessmentQuery(existing.id, resource.id, client);
     }
 
-    // Same material, new blocks: keep the objectives, re-plan the blueprint.
-    if (!sourcesChanged && blocks) await recomputeBlueprint(existing.id, client);
+    // Same material, new blocks or adaptivity: keep the objectives, re-plan the blueprint.
+    if (!sourcesChanged && (blocks || adaptiveFlag !== undefined)) await recomputeBlueprint(existing.id, client);
     return updated;
   });
 

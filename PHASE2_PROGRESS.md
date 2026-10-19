@@ -9,8 +9,8 @@ Resume rule: read this file, check `git log --oneline main..phase-2`, continue w
 |---|---|---|
 | 0. Prep (audit, pg-boss worker, LLM usage log) | done | 3266e49 |
 | 1. Learning objectives + real RAG | done | da46b32 |
-| 2. Question pool + pre-generation | done | (this commit) |
-| 3. Adaptive difficulty engine | todo | |
+| 2. Question pool + pre-generation | done | 3e2fadb |
+| 3. Adaptive difficulty engine | done | (this commit) |
 | 4. Full multilingual app | todo | |
 | 5. Learning pathways | todo | |
 | 6. Institutions, roles, notifications | todo | |
@@ -18,9 +18,10 @@ Resume rule: read this file, check `git log --oneline main..phase-2`, continue w
 | Final verification + PHASE2_REPORT.md | todo | |
 
 ## Next
-Section 3: adaptive engine (per-assessment toggle; server serves ONE question at a time and grades each
-answer with answered_at/time_taken; rolling score over last 3 with time, thresholds in one config file;
-blueprint objective order; difficulty-weighted final score 0.6..1.4 with raw/adjusted + path; resume; tests).
+Section 4: i18n (react-i18next en/ur/ar + fa for exam/reports; every string incl. zod + emails; i18n:check in lint;
+dir/lang + RTL logical classes + mirrored icons; Noto Nastaliq Urdu / Noto Naskh Arabic in app + PDFs;
+users.language_preference + selectors; Intl formatting; emails in recipient language; TRANSLATION_REVIEW.md;
+fas.traineddata + optional Gemini OCR fallback behind an env flag with logging).
 
 ## Section 0 summary
 - npm audit: non-breaking fixes applied (lockfile only). Upgraded nodemailer 6 -> 10 and puppeteer 24 -> 25
@@ -92,6 +93,32 @@ blueprint objective order; difficulty-weighted final score 0.6..1.4 with raw/adj
   grader (any accepted wording counts per concept); old keyword rules unchanged.
 - New env: POOL_ON_DEMAND_TIMEOUT_MS. Tests: 185 (28 new), incl. 30 students -> 30 distinct sets.
 
+## Section 3 summary
+- Migration 1760000000400: assessments.show_live_score; attempts.plan (blueprint snapshot), adaptive,
+  current_difficulty, serve_delay_ms, raw/adjusted score + percentage, difficulty_path; generated_questions.served_at
+  + unique (attempt_id, question_order); student_answers.time_taken_seconds, timed_out, graded_at.
+- One engine for all assessments (services/studentAssessment.service.js). The API exposes only the CURRENT
+  question (`question`, `totalQuestions`, `savedAnswer`); pool attempts choose each question only when its slot
+  opens (the next question does not exist anywhere before it is served). Phase 1 assessments keep their
+  pre-generated set but reveal it one question at a time.
+- A question closes on Next, on timeout (counts as wrong if unanswered) or at submit and is graded then:
+  score, correctness, answered_at, time_taken. Slots whose windows passed while away are "not reached"; their
+  marks still count in the total (submitting early never inflates a percentage). Waiting for a question to be
+  prepared is added back to the deadline (serve_delay_ms).
+- Adaptive rules in services/engine/adaptiveConfig.js (documented there): start 3; performance per answer
+  (wrong/timeout 0; correct 1 minus up to 0.3 for slowness beyond half the time); recency-weighted rolling mean of
+  the last 3 since the last change; >= 0.75 up, <= 0.4 down, needs 2 answers; bounded 1..5. Difficulty is replayed
+  from graded rows, so it is deterministic and resume-safe. Objective/type order always follows the blueprint.
+- Scoring: raw (unchanged rules) + adjusted (correct x weight 0.6/0.8/1.0/1.2/1.4; 100% = full marks at medium;
+  a fixed 10/20/40/20/10 mix all-correct = 100%; capped at 100, uncapped score stored) + difficulty path.
+- Live score (also a section 7 item, done here): off by default; when on, advance returns lastAnswer and the state
+  a running score. With it off no correctness field is ever sent during an attempt (tested).
+- UI: adaptive + live-score toggles on the assessment form; exam page shows one question, "Preparing your next
+  question…" while serving, live score when enabled; result shows the difficulty-adjusted %.
+- Phase 1 exam tests migrated to the new contract (all 21 rules kept) + "later questions never reach the
+  browser". Tests: 209 (23 new in engine.test.js incl. strong vs weak path, same objective order, timeouts,
+  resume, parallel advance, early submit, offline catch-up).
+
 ## Decisions
 - D0.1 npm audit majors NOT applied (risk noted): firebase (frontend; vulnerable firestore/grpc code is never
   imported, only firebase/auth), jest/nodemon (dev-only; npm suggests downgrades), office-text-extractor 4
@@ -122,6 +149,13 @@ blueprint objective order; difficulty-weighted final score 0.6..1.4 with raw/adj
 - D2.3 Pool editing stays allowed after publishing (to fix a wrong question), always as a new version.
 - D2.4 Fallback order favours fairness: same difficulty from the LLM first (bounded wait), a nearby difficulty
   only if that fails.
+
+- D3.1 One engine and one API for every assessment (adaptive or not, pool or Phase 1). Fewer code paths means
+  fewer integrity gaps; Phase 1 attempts in progress at deploy time continue (plan derived from their rows).
+- D3.2 Missed windows (student offline) are "not reached", not auto-served: no question is revealed that the
+  student never had a chance to answer, and marks still count in the total.
+- D3.3 Adjusted % is normalised to medium difficulty (weight 1.0) and capped at 100 so it reads like a normal
+  percentage; the raw % is always shown alongside (no student is told "100% correct = 85%").
 
 ## Open issues
 - office-text-extractor major upgrade still pending (D0.1).

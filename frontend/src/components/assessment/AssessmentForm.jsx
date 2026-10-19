@@ -29,6 +29,8 @@ const toFormData = (values, files) => {
       }))
     )
   );
+  data.append("adaptive", String(Boolean(values.adaptive)));
+  data.append("show_live_score", String(Boolean(values.showLiveScore)));
   files.forEach((file) => data.append("files", file));
   return data;
 };
@@ -282,6 +284,26 @@ function AssessmentForm({ initialValues, submitLabel, onSubmit, onCancel, disabl
           >
             Add question block
           </Button>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader title="Exam behaviour" />
+        <CardBody className="space-y-1">
+          <Checkbox
+            label="Adaptive difficulty"
+            description="Each student starts at medium difficulty; it goes up after strong answers and down after weak ones. Every student still covers the same objectives."
+            checked={Boolean(values.adaptive)}
+            onChange={(e) => set("adaptive", e.target.checked)}
+            disabled={disabled}
+          />
+          <Checkbox
+            label="Show live score"
+            description="Students see whether each answer was correct and their running score during the exam. Off by default."
+            checked={Boolean(values.showLiveScore)}
+            onChange={(e) => set("showLiveScore", e.target.checked)}
+            disabled={disabled}
+          />
         </CardBody>
       </Card>
 

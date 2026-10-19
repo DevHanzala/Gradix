@@ -11,6 +11,8 @@ import {
  * Exam session state. The server is the source of truth for the attempt,
  * the current question and the remaining time; this store mirrors it,
  * autosaves answers and retries saves that failed while offline.
+ * The server sends ONE question at a time: the next one is only known after
+ * the student moves on (it may depend on their answers when adaptive).
  *
  * phase: idle | loading | not_started | starting | in_progress | submitting | completed | error
  * saveStatus: idle | saving | saved | offline | error
@@ -18,6 +20,7 @@ import {
 
 const SAVE_DEBOUNCE_MS = { short_answer: 800, default: 250 };
 const RETRY_DELAY_MS = 3000;
+const PREPARING_RETRY_MS = 3000;
 
 const saveTimers = new Map(); // questionId -> timeout id
 let retryTimer = null;
@@ -33,9 +36,16 @@ const initialState = {
   assessmentId: null,
   attemptId: null,
   language: "en",
-  questions: [],
+  question: null,
+  totalQuestions: 0,
   answers: {},
   currentIndex: 0,
+  /** True while the next question is being prepared by the server. */
+  preparing: false,
+  adaptive: false,
+  /** Only present when the instructor enabled "show live score". */
+  liveScore: null,
+  lastAnswer: null,
   questionDeadline: 0,
   overallDeadline: 0,
   pending: {}, // questionId -> answer awaiting a successful save
@@ -55,9 +65,17 @@ const useStudentAssessmentStore = create((set, get) => {
       attemptId: data.attemptId,
       assessmentId: data.assessmentId,
       language: data.language,
-      questions: data.questions || [],
-      answers: { ...(data.savedAnswers || {}), ...get().pending },
+      question: data.question || null,
+      totalQuestions: data.totalQuestions || 0,
+      answers: {
+        ...(data.question && data.savedAnswer !== null && data.savedAnswer !== undefined ? { [data.question.id]: data.savedAnswer } : {}),
+        ...get().pending,
+      },
       currentIndex: data.currentQuestionIndex || 0,
+      preparing: false,
+      adaptive: Boolean(data.adaptive),
+      liveScore: data.liveScore || null,
+      lastAnswer: data.lastAnswer || null,
       questionDeadline: toDeadline(data.questionRemainingSeconds),
       overallDeadline: toDeadline(data.remainingSeconds),
       error: null,
@@ -193,54 +211,65 @@ const useStudentAssessmentStore = create((set, get) => {
       return ok;
     },
 
-    /** Leave the current question (manually or when its timer ends). */
+    /** Leave the current question (manually or when its timer ends); the server sends the next one. */
     advance: async () => {
-      const { attemptId, currentIndex, questions, phase } = get();
-      if (phase !== "in_progress") return;
-      if (currentIndex >= questions.length - 1) {
+      const { attemptId, currentIndex, totalQuestions, phase, preparing } = get();
+      if (phase !== "in_progress" || preparing) return;
+      if (currentIndex >= totalQuestions - 1) {
         await get().submit();
         return;
       }
 
       await get().flushPending();
-      // Move on immediately in the UI; the server confirms the window.
-      set({
-        currentIndex: currentIndex + 1,
-        questionDeadline: toDeadline(questions[currentIndex + 1]?.duration_per_question),
-      });
-
+      set({ preparing: true });
       try {
         const response = await advanceQuestionApi(attemptId, currentIndex);
         const data = response.data.data;
         if (data.finished) {
-          set({ phase: "completed", result: data.result, pending: {} });
+          set({ phase: "completed", result: data.result, pending: {}, preparing: false });
           return;
         }
-        set({
-          currentIndex: data.currentQuestionIndex,
-          questionDeadline: toDeadline(data.questionRemainingSeconds),
-          overallDeadline: toDeadline(data.remainingSeconds),
-        });
+        applyInProgress(data);
       } catch (error) {
         if (isNetworkError(error)) {
-          set({ saveStatus: "offline" });
-          return; // The server auto-advances by time; we resync on the next call.
+          set({ saveStatus: "offline", preparing: false });
+          return; // The server closes windows by time; we resync on the next call.
+        }
+        if (errorCode(error) === "POOL_EXHAUSTED") {
+          // The next question is still being prepared: keep waiting and ask again.
+          setTimeout(() => get().resync(), PREPARING_RETRY_MS);
+          return;
         }
         await get().loadAttempt(get().assessmentId);
       }
     },
 
+    /** Re-read the attempt without leaving the exam screen (e.g. while the next question is prepared). */
+    resync: async () => {
+      const { assessmentId, phase } = get();
+      if (phase !== "in_progress") return;
+      try {
+        const response = await getAttemptStateApi(assessmentId);
+        applyServerState(response.data.data);
+      } catch (error) {
+        if (errorCode(error) === "POOL_EXHAUSTED" || isNetworkError(error)) {
+          setTimeout(() => get().resync(), PREPARING_RETRY_MS);
+          return;
+        }
+        set({ phase: "error", error: errorMessage(error, "Could not load this assessment."), preparing: false });
+      }
+    },
+
     /** Submit the attempt (manual, last-question timeout, or overall timeout). */
     submit: async () => {
-      const { attemptId, assessmentId, phase, answers } = get();
+      const { attemptId, assessmentId, phase, answers, question } = get();
       if (phase !== "in_progress") return;
       set({ phase: "submitting" });
 
       await get().flushPending();
-      const payload = Object.entries(answers).map(([questionId, answer]) => ({
-        questionId: Number(questionId),
-        answer,
-      }));
+      // Only the current question can still change; earlier ones are closed on the server.
+      const payload =
+        question && answers[question.id] !== undefined ? [{ questionId: question.id, answer: answers[question.id] }] : [];
 
       try {
         const response = await submitAssessmentApi(assessmentId, { attemptId, answers: payload });

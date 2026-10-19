@@ -4,7 +4,7 @@ import { computeTargets, distinctSets, MIN_DISTINCT_SETS } from "../services/poo
 import { buildBlueprint } from "../services/blueprint.js";
 import { matchesLanguage } from "../services/questions/validation.js";
 import { queueAdapter } from "../jobs/queue.js";
-import { pool, resetDatabase, createUser, auth, installFakes, enroll } from "./helpers.js";
+import { pool, resetDatabase, createUser, auth, installFakes, enroll, playThrough } from "./helpers.js";
 
 let fakes;
 let instructor;
@@ -192,14 +192,14 @@ describe("serving from the pool", () => {
   test("a student never gets the same question twice", async () => {
     const id = await makePublished([MCQ, TF, SA], ["en"]);
     const student = await newStudent(id);
-    const res = await start(id, student);
-    expect(res.status).toBe(200);
-    const ids = await attemptPoolIds(res.body.data.attemptId);
+    const { attemptId } = await playThrough(app, request, id, student);
+    const ids = await attemptPoolIds(attemptId);
+    expect(ids).toHaveLength(6);
     expect(new Set(ids).size).toBe(ids.length);
-    const hashes = (await pool.query("SELECT stem_hash FROM generated_questions WHERE attempt_id = $1", [res.body.data.attemptId])).rows.map((r) => r.stem_hash);
-    expect(new Set(hashes).size).toBe(hashes.length);
+    const rows = (await pool.query("SELECT stem_hash, question_type FROM generated_questions WHERE attempt_id = $1", [attemptId])).rows;
+    expect(new Set(rows.map((r) => r.stem_hash)).size).toBe(rows.length);
     // Served questions follow the blueprint's types.
-    expect(res.body.data.questions.map((q) => q.question_type).sort()).toEqual(
+    expect(rows.map((q) => q.question_type).sort()).toEqual(
       ["multiple_choice", "multiple_choice", "multiple_choice", "true_false", "true_false", "short_answer"].sort()
     );
   });
@@ -208,10 +208,10 @@ describe("serving from the pool", () => {
     const id = await makePublished([{ ...TF, question_count: 2 }], ["en"]);
     const sets = new Set();
     for (let i = 0; i < 30; i++) {
-      const student = await newStudent(id);
-      const res = await start(id, student);
-      expect(res.status).toBe(200);
-      sets.add((await attemptPoolIds(res.body.data.attemptId)).sort((a, b) => a - b).join(","));
+      const { attemptId } = await playThrough(app, request, id, await newStudent(id));
+      const ids = await attemptPoolIds(attemptId);
+      expect(ids).toHaveLength(2);
+      sets.add(ids.sort((a, b) => a - b).join(","));
     }
     expect(sets.size).toBe(30);
   }, 120000);
@@ -250,7 +250,7 @@ describe("serving from the pool", () => {
     };
     const res = await start(id, await newStudent(id));
     expect(res.status).toBe(200);
-    expect(res.body.data.questions[0].question_text).toBe("Fallback question about plants");
+    expect(res.body.data.question.question_text).toBe("Fallback question about plants");
   });
 
   test("with nothing to serve the student gets a clear 503, never a 500, and no attempt is created", async () => {
@@ -275,7 +275,7 @@ describe("serving from the pool", () => {
 
   test("questions are counted as served", async () => {
     const id = await makePublished([{ ...TF, question_count: 2 }], ["en"]);
-    await start(id, await newStudent(id));
+    await playThrough(app, request, id, await newStudent(id));
     const { rows } = await pool.query("SELECT sum(times_served)::int AS n FROM question_pool");
     expect(rows[0].n).toBe(2);
   });
@@ -303,7 +303,7 @@ describe("question bank", () => {
     const id = await makePublished([{ ...TF, question_count: 1 }], ["en"]);
     const res = await start(id, await newStudent(id));
     const servedPoolId = (await attemptPoolIds(res.body.data.attemptId))[0];
-    const servedText = res.body.data.questions[0].question_text;
+    const servedText = res.body.data.question.question_text;
 
     const edit = await bank(id, `/${servedPoolId}`, "put", { question_text: "Edited: plants need light", correct_answer: true });
     expect(edit.status).toBe(200);

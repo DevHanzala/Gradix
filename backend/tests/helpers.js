@@ -190,5 +190,28 @@ export const installFakes = () => {
   return fakes;
 };
 
+/**
+ * Start an exam and move through every question without answering (the
+ * engine serves one question at a time, so a full set exists only after
+ * the student has gone through it). Returns { attemptId, result }.
+ */
+export const playThrough = async (app, request, assessmentId, student, language = "en") => {
+  const started = await request(app)
+    .post(`/api/taking/assessments/${assessmentId}/start`)
+    .set("Authorization", auth(student))
+    .send({ language });
+  if (started.status !== 200) throw new Error(`start failed: ${started.status} ${JSON.stringify(started.body)}`);
+  let current = started.body.data;
+  for (let i = 0; i < current.totalQuestions; i++) {
+    const next = await request(app)
+      .post(`/api/taking/attempts/${started.body.data.attemptId}/advance`)
+      .set("Authorization", auth(student))
+      .send({ fromIndex: i });
+    if (next.body.data.finished) return { attemptId: started.body.data.attemptId, result: next.body.data.result };
+    current = next.body.data;
+  }
+  throw new Error("exam did not finish");
+};
+
 /** Emails are sent fire-and-forget; give them a tick to be captured. */
 export const flushEmails = () => new Promise((resolve) => setTimeout(resolve, 20));

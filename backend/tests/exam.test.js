@@ -30,6 +30,9 @@ const submit = (attemptId, answers = [], user = student) =>
     .send({ attemptId, answers });
 const getState = (user = student) =>
   request(app).get(`/api/taking/assessments/${assessment.id}/attempt`).set("Authorization", auth(user));
+/** Ids of all questions of an attempt (for tests that need a not-yet-served id). */
+const questionIds = async (attemptId) =>
+  (await pool.query("SELECT id FROM generated_questions WHERE attempt_id = $1 ORDER BY question_order", [attemptId])).rows.map((r) => r.id);
 
 beforeEach(async () => {
   await resetDatabase();
@@ -55,8 +58,8 @@ describe("answer-leak check", () => {
     expect(body).not.toMatch(/correct_answer|correctAnswer/);
     expect(body).not.toContain('"is_correct"');
 
-    const { attemptId, questions } = started.body.data;
-    const saved = await saveAnswer(attemptId, questions[0].id, "Paris");
+    const { attemptId, question } = started.body.data;
+    const saved = await saveAnswer(attemptId, question.id, "Paris");
     expect(JSON.stringify(saved.body)).not.toMatch(/correct/i);
 
     const resumed = await getState();
@@ -69,9 +72,21 @@ describe("answer-leak check", () => {
     expect(res.status).toBe(404);
   });
 
+  test("only the current question is sent; later questions never reach the browser", async () => {
+    const started = (await startExam()).body.data;
+    expect(started.questions).toBeUndefined();
+    expect(started.totalQuestions).toBe(3);
+    const ids = await questionIds(started.attemptId);
+    expect(JSON.stringify(started)).not.toContain(`"id":${ids[1]}`);
+    // A later question cannot be answered before it is served.
+    const early = await saveAnswer(started.attemptId, ids[1], "4");
+    expect(early.status).toBe(409);
+    expect(early.body.code).toBe("QUESTION_NOT_OPEN");
+  });
+
   test("options are sent without letter labels", async () => {
-    const { questions } = (await startExam()).body.data;
-    expect(questions[0].options).toEqual(["Paris", "Rome", "Madrid", "Berlin"]);
+    const { question } = (await startExam()).body.data;
+    expect(question.options).toEqual(["Paris", "Rome", "Madrid", "Berlin"]);
   });
 });
 
@@ -111,15 +126,15 @@ describe("one attempt per student", () => {
 describe("resume", () => {
   test("Start while in progress resumes the same attempt with saved answers", async () => {
     const first = (await startExam()).body.data;
-    await saveAnswer(first.attemptId, first.questions[0].id, "b. rome");
+    await saveAnswer(first.attemptId, first.question.id, "b. rome");
 
     const second = await startExam();
     expect(second.status).toBe(200);
     expect(second.body.code).toBe("IN_PROGRESS");
     expect(second.body.data.attemptId).toBe(first.attemptId);
-    expect(second.body.data.questions.map((q) => q.id)).toEqual(first.questions.map((q) => q.id));
+    expect(second.body.data.question.id).toBe(first.question.id);
     // Stored in canonical form.
-    expect(second.body.data.savedAnswers[first.questions[0].id]).toBe("Rome");
+    expect(second.body.data.savedAnswer).toBe("Rome");
   });
 
   test("GET attempt state reports index and remaining time", async () => {
@@ -147,33 +162,35 @@ describe("resume", () => {
 
 describe("timer validation", () => {
   test("answers for a passed question are rejected (QUESTION_CLOSED)", async () => {
-    const { attemptId, questions } = (await startExam()).body.data;
+    const { attemptId, question } = (await startExam()).body.data;
     await advance(attemptId, 0);
-    const late = await saveAnswer(attemptId, questions[0].id, "Paris");
+    const late = await saveAnswer(attemptId, question.id, "Paris");
     expect(late.status).toBe(409);
     expect(late.body.code).toBe("QUESTION_CLOSED");
   });
 
   test("the server moves on when a question's time (plus grace) has elapsed", async () => {
-    const { attemptId, questions } = (await startExam()).body.data;
+    const { attemptId, question } = (await startExam()).body.data;
     await shiftAttemptTime(attemptId, 60 + GRACE_MS / 1000 + 1);
-    const res = await saveAnswer(attemptId, questions[0].id, "Paris");
+    const res = await saveAnswer(attemptId, question.id, "Paris");
     expect(res.body.code).toBe("QUESTION_CLOSED");
-    expect((await saveAnswer(attemptId, questions[1].id, "4")).status).toBe(200);
+    const state = (await getState()).body.data;
+    expect(state.currentQuestionIndex).toBe(1);
+    expect((await saveAnswer(attemptId, state.question.id, "4")).status).toBe(200);
   });
 
   test("an answer inside the grace period is still accepted", async () => {
-    const { attemptId, questions } = (await startExam()).body.data;
+    const { attemptId, question } = (await startExam()).body.data;
     await shiftAttemptTime(attemptId, 60);
-    expect((await saveAnswer(attemptId, questions[0].id, "Paris")).status).toBe(200);
+    expect((await saveAnswer(attemptId, question.id, "Paris")).status).toBe(200);
   });
 
   test("once total time is over the attempt is closed and graded automatically", async () => {
-    const { attemptId, questions } = (await startExam()).body.data;
-    await saveAnswer(attemptId, questions[0].id, "Paris");
+    const { attemptId, question } = (await startExam()).body.data;
+    await saveAnswer(attemptId, question.id, "Paris");
     await shiftAttemptTime(attemptId, 180 + 10);
 
-    const late = await saveAnswer(attemptId, questions[1].id, "4");
+    const late = await saveAnswer(attemptId, (await questionIds(attemptId))[1], "4");
     expect(late.status).toBe(409);
     expect(late.body.code).toBe("ATTEMPT_CLOSED");
 
@@ -183,9 +200,9 @@ describe("timer validation", () => {
   });
 
   test("submit ignores answers whose window has closed", async () => {
-    const { attemptId, questions } = (await startExam()).body.data;
+    const { attemptId, question } = (await startExam()).body.data;
     await advance(attemptId, 0);
-    const res = await submit(attemptId, [{ questionId: questions[0].id, answer: "Paris" }]);
+    const res = await submit(attemptId, [{ questionId: question.id, answer: "Paris" }]);
     expect(res.status).toBe(200);
     expect(res.body.data.rejectedAnswers).toBe(1);
     expect(res.body.data.unansweredCount).toBe(3);
@@ -194,10 +211,10 @@ describe("timer validation", () => {
 
 describe("scoring end to end", () => {
   test("positive, negative and unanswered are all applied", async () => {
-    const { attemptId, questions } = (await startExam()).body.data;
-    await saveAnswer(attemptId, questions[0].id, "A"); // correct: +2
-    await advance(attemptId, 0);
-    await saveAnswer(attemptId, questions[1].id, "3"); // wrong: -0.5
+    const { attemptId, question } = (await startExam()).body.data;
+    await saveAnswer(attemptId, question.id, "A"); // correct: +2
+    const second = (await advance(attemptId, 0)).body.data;
+    await saveAnswer(attemptId, second.question.id, "3"); // wrong: -0.5
     // question 3 unanswered: 0
     const res = await submit(attemptId);
     expect(res.body.data).toMatchObject({
@@ -211,8 +228,8 @@ describe("scoring end to end", () => {
   });
 
   test("a negative total is floored at zero", async () => {
-    const { attemptId, questions } = (await startExam()).body.data;
-    await saveAnswer(attemptId, questions[0].id, "Rome");
+    const { attemptId, question } = (await startExam()).body.data;
+    await saveAnswer(attemptId, question.id, "Rome");
     const res = await submit(attemptId);
     expect(res.body.data.score).toBe(0);
   });
@@ -223,12 +240,12 @@ describe("scoring end to end", () => {
       { question_type: "multiple_choice", question_text: "سورج کہاں سے نکلتا ہے؟", options: ["مشرق", "مغرب", "شمال", "جنوب"], correct_answer: "مشرق" },
       { question_type: "true_false", question_text: "پانی گیلا ہے", options: null, correct_answer: "درست" },
     ];
-    const { attemptId, questions } = (await startExam(student, assessment.id, "ur")).body.data;
-    await saveAnswer(attemptId, questions[0].id, "اسلام آباد");
-    await advance(attemptId, 0);
-    await saveAnswer(attemptId, questions[1].id, "مغرب");
-    await advance(attemptId, 1);
-    await saveAnswer(attemptId, questions[2].id, true);
+    const { attemptId, question } = (await startExam(student, assessment.id, "ur")).body.data;
+    await saveAnswer(attemptId, question.id, "اسلام آباد");
+    const second = (await advance(attemptId, 0)).body.data.question;
+    await saveAnswer(attemptId, second.id, "مغرب");
+    const third = (await advance(attemptId, 1)).body.data.question;
+    await saveAnswer(attemptId, third.id, true);
     const result = (await submit(attemptId)).body.data;
     expect(result.correctCount).toBe(2);
     expect(result.incorrectCount).toBe(1);
@@ -249,8 +266,8 @@ describe("scoring end to end", () => {
 describe("access rules for attempts", () => {
   test("another student cannot read or write someone else's attempt", async () => {
     const other = await createUser({ role: "student" });
-    const { attemptId, questions } = (await startExam()).body.data;
-    expect((await saveAnswer(attemptId, questions[0].id, "Paris", other)).status).toBe(404);
+    const { attemptId, question } = (await startExam()).body.data;
+    expect((await saveAnswer(attemptId, question.id, "Paris", other)).status).toBe(404);
     await submit(attemptId);
     const res = await request(app).get(`/api/taking/submissions/${attemptId}`).set("Authorization", auth(other));
     expect(res.status).toBe(404);

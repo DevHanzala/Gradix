@@ -4,11 +4,11 @@ import { toPgVector } from "../helper/embeddingGenerator.js";
 // ==================== ASSESSMENT CRUD ====================
 
 export const createAssessmentQuery = async (assessmentData, client = db) => {
-  const { title, prompt, external_links, instructor_id, is_executed = false } = assessmentData;
+  const { title, prompt, external_links, instructor_id, is_executed = false, adaptive = false, show_live_score = false } = assessmentData;
   
   const query = `
-    INSERT INTO assessments (title, prompt, external_links, instructor_id, is_executed)
-    VALUES ($1, $2, $3, $4, $5)
+    INSERT INTO assessments (title, prompt, external_links, instructor_id, is_executed, adaptive, show_live_score)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
     RETURNING *
   `;
   
@@ -21,7 +21,9 @@ export const createAssessmentQuery = async (assessmentData, client = db) => {
     prompt, 
     JSON.stringify(validExternalLinks), 
     instructor_id, 
-    is_executed
+    is_executed,
+    adaptive,
+    show_live_score,
   ]);
   
   return rows[0];
@@ -169,7 +171,7 @@ export const findAssessmentByIdForStudentQuery = async (assessmentId, studentId)
 };
 
 export const updateAssessmentQuery = async (assessmentId, updateData, client = db) => {
-  const { title, prompt, external_links } = updateData;
+  const { title, prompt, external_links, adaptive, show_live_score } = updateData;
   
   const validExternalLinks = Array.isArray(external_links) 
     ? external_links.filter(link => link && typeof link === "string" && link.trim() !== "") 
@@ -177,7 +179,8 @@ export const updateAssessmentQuery = async (assessmentId, updateData, client = d
   
   const query = `
     UPDATE assessments
-    SET title = $1, prompt = $2, external_links = $3, updated_at = NOW()
+    SET title = $1, prompt = $2, external_links = $3,
+        adaptive = COALESCE($5, adaptive), show_live_score = COALESCE($6, show_live_score), updated_at = NOW()
     WHERE id = $4
     RETURNING *
   `;
@@ -186,7 +189,9 @@ export const updateAssessmentQuery = async (assessmentId, updateData, client = d
     title || null,
     prompt,
     JSON.stringify(validExternalLinks),
-    assessmentId
+    assessmentId,
+    adaptive ?? null,
+    show_live_score ?? null,
   ]);
   
   return rows[0] || null;
