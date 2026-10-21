@@ -250,15 +250,10 @@ describe("scoring end to end", () => {
     expect(result.correctCount).toBe(2);
     expect(result.incorrectCount).toBe(1);
 
-    const details = await request(app)
-      .get(`/api/student-analytics/assessment/${assessment.id}`)
-      .set("Authorization", auth(student));
-    expect(details.body.data.correct_answers).toBe(2);
-    expect(details.body.data.incorrect_answers).toBe(1);
-
-    const review = await request(app)
-      .get(`/api/student-analytics/assessment/${assessment.id}/questions`)
-      .set("Authorization", auth(student));
+    const results = await request(app).get(`/api/student-analytics/results/${assessment.id}`).set("Authorization", auth(student));
+    expect(results.body.data.accuracy.correct).toBe(2);
+    expect(results.body.data.accuracy.incorrect).toBe(1);
+    const review = { body: { data: results.body.data.review } };
     expect(review.body.data.map((q) => q.is_correct)).toEqual([true, false, true]);
   });
 });

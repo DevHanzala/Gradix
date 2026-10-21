@@ -1,268 +1,54 @@
-import { isAppError } from "../utils/AppError.js";
-// STUDENT ANALYTICS CONTROLLER - Request/Response Handler Layer
-import {
-  getStudentOverviewService,
-  getStudentPerformanceService,
-  getStudentRecommendationsService,
-  getStudentAssessmentsService,
-  getAssessmentDetailsService,
-  getAssessmentQuestionsService,
-  getStudentReportService,
-} from "../services/studentAnalytics.service.js";
+import { getStudentAssessmentsService } from "../services/studentAnalytics.service.js";
+import { getResultsService } from "../services/learning/results.service.js";
+import { getStudyPlanService } from "../services/learning/studyPlan.service.js";
+import { getReportPdfService } from "../services/learning/report.service.js";
+import { createPracticeService, checkPracticeAnswerService } from "../services/learning/practice.service.js";
+import { getUserById } from "../models/userModel.js";
 
-// ==================== CONTROLLER FUNCTIONS ====================
+// Errors (AppError with code/status, or unexpected ones) go to the error middleware.
 
-// 1. GET STUDENT OVERVIEW ANALYTICS
-export const getStudentOverview = async (req, res, next) => {
+/** The signed-in student with their language preference (the JWT does not carry it). */
+const currentStudent = async (req) => {
+  const user = await getUserById(req.user.id);
+  return { id: req.user.id, language_preference: user?.language_preference || "en" };
+};
+
+const handle = (fn) => async (req, res, next) => {
   try {
-    const studentId = req.user.id;
-
-    const analytics = await getStudentOverviewService(studentId, req.user.role);
-
-    res.status(200).json({
-      success: true,
-      message: "Student analytics retrieved successfully",
-      data: analytics,
-    });
+    res.status(200).json({ success: true, data: await fn(req) });
   } catch (error) {
-    if (isAppError(error)) return next(error);
-    console.error("❌ Get student overview error:", error.stack || error.message);
-
-    if (error.message === "UNAUTHORIZED_ROLE") {
-      return res.status(403).json({
-        success: false,
-        message: "Only students can access their analytics",
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to retrieve student analytics",
-      error: error.message,
-    });
+    next(error);
   }
 };
 
-// 2. GET STUDENT PERFORMANCE OVER TIME
-export const getStudentPerformance = async (req, res, next) => {
+export const getStudentAssessments = handle(async (req) => (await getStudentAssessmentsService(req.user.id, req.user.role)).data);
+
+export const getResults = handle((req) => getResultsService(req.user.id, req.params.assessmentId));
+
+export const getStudyPlan = handle(async (req) =>
+  getStudyPlanService(await currentStudent(req), req.params.assessmentId, {
+    language: req.body?.language || req.query.language,
+    refresh: Boolean(req.body?.refresh),
+  })
+);
+
+export const createPractice = handle(async (req) =>
+  createPracticeService(await currentStudent(req), req.params.assessmentId, { language: req.body?.language, count: req.body?.count })
+);
+
+export const checkPracticeAnswer = handle((req) =>
+  checkPracticeAnswerService({ id: req.user.id }, req.params.sessionId, req.body?.index, req.body?.answer)
+);
+
+export const downloadReport = async (req, res, next) => {
   try {
-    const studentId = req.user.id;
-    const { timeRange = "month" } = req.query;
-
-    const performance = await getStudentPerformanceService(
-      studentId,
-      req.user.role,
-      timeRange
-    );
-
-    res.status(200).json({
-      success: true,
-      message: "Performance data retrieved successfully",
-      data: performance,
+    const { pdf, language } = await getReportPdfService(await currentStudent(req), req.params.assessmentId, {
+      language: req.query.language,
     });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="gradix-report-${req.params.assessmentId}-${language}.pdf"`);
+    res.send(pdf);
   } catch (error) {
-    if (isAppError(error)) return next(error);
-    console.error("❌ Get student performance error:", error.stack || error.message);
-
-    if (error.message === "UNAUTHORIZED_ROLE") {
-      return res.status(403).json({
-        success: false,
-        message: "Only students can access their performance data",
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to retrieve performance data",
-      error: error.message,
-    });
-  }
-};
-
-// 3. GET STUDENT LEARNING RECOMMENDATIONS
-export const getStudentRecommendations = async (req, res, next) => {
-  try {
-    const studentId = req.user.id;
-
-    const recommendations = await getStudentRecommendationsService(
-      studentId,
-      req.user.role
-    );
-
-    res.status(200).json({
-      success: true,
-      message: "Recommendations available only in report",
-      data: recommendations,
-    });
-  } catch (error) {
-    if (isAppError(error)) return next(error);
-    console.error("Get student recommendations error:", error);
-
-    if (error.message === "UNAUTHORIZED_ROLE") {
-      return res.status(403).json({
-        success: false,
-        message: "Only students can access their recommendations",
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to retrieve recommendations",
-    });
-  }
-};
-
-// 4. GET STUDENT ASSESSMENTS
-export const getStudentAssessments = async (req, res, next) => {
-  try {
-    const studentId = req.user.id;
-
-    const { data } = await getStudentAssessmentsService(studentId, req.user.role);
-
-    res.status(200).json({
-      success: true,
-      message: "Student assessments retrieved successfully",
-      data,
-    });
-  } catch (error) {
-    if (isAppError(error)) return next(error);
-    console.error("Get student assessments error:", error);
-
-    if (error.message === "UNAUTHORIZED_ROLE") {
-      return res.status(403).json({
-        success: false,
-        message: "Only students can access their assessments",
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to retrieve assessments",
-    });
-  }
-};
-
-// 5. GET DETAILED ASSESSMENT ANALYTICS
-export const getAssessmentDetails = async (req, res, next) => {
-  try {
-    const studentId = req.user.id;
-    const assessmentId = parseInt(req.params.id);
-
-    const details = await getAssessmentDetailsService(
-      studentId,
-      assessmentId,
-      req.user.role
-    );
-
-    res.status(200).json({
-      success: true,
-      message: "Assessment details retrieved successfully",
-      data: details,
-    });
-  } catch (error) {
-    if (isAppError(error)) return next(error);
-    console.error("❌ Get assessment details error:", error.stack || error.message);
-
-    if (error.message === "UNAUTHORIZED_ROLE") {
-      return res.status(403).json({
-        success: false,
-        message: "Only students can access their assessment details",
-      });
-    }
-
-    if (error.message === "No completed attempt found for this assessment") {
-      return res.status(404).json({
-        success: false,
-        message: "No completed attempt found for this assessment",
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to retrieve assessment details",
-      error: error.message,
-    });
-  }
-};
-
-// 6. GET ASSESSMENT QUESTIONS AND ANSWERS
-export const getAssessmentQuestions = async (req, res, next) => {
-  try {
-    const studentId = req.user.id;
-    const assessmentId = parseInt(req.params.id);
-
-    const questions = await getAssessmentQuestionsService(
-      studentId,
-      assessmentId,
-      req.user.role
-    );
-
-    res.status(200).json({
-      success: true,
-      message: "Assessment questions and answers retrieved successfully",
-      data: questions,
-    });
-  } catch (error) {
-    if (isAppError(error)) return next(error);
-    console.error("❌ Get assessment questions error:", error.stack || error.message);
-
-    if (error.message === "UNAUTHORIZED_ROLE") {
-      return res.status(403).json({
-        success: false,
-        message: "Only students can access their assessment details",
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to retrieve assessment questions",
-      error: error.message,
-    });
-  }
-};
-
-// 7. GENERATE DETAILED STUDENT REPORT WITH AI RECOMMENDATIONS
-export const getStudentReport = async (req, res, next) => {
-  try {
-    const studentId = req.user.id;
-    const { format = "json", assessmentId } = req.query;
-
-    const result = await getStudentReportService(
-      studentId,
-      req.user.role,
-      format,
-      assessmentId
-    );
-
-    if (result.format === "csv") {
-      res.setHeader("Content-Type", "text/csv");
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename="student-report${result.assessmentId ? `-${result.assessmentId}` : ""}.csv"`
-      );
-      return res.send(result.data);
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Student report generated successfully",
-      data: result.data,
-    });
-  } catch (error) {
-    if (isAppError(error)) return next(error);
-    console.error("❌ Get student report error:", error.stack || error.message);
-
-    if (error.message === "UNAUTHORIZED_ROLE") {
-      return res.status(403).json({
-        success: false,
-        message: "Only students can access their reports",
-      });
-    }
-
-    res.status(500).json({
-      success: false,
-      message: "Failed to generate student report",
-      error: error.message,
-    });
+    next(error);
   }
 };

@@ -4,8 +4,6 @@ import {
   Routes,
   Route,
   useLocation,
-  useParams,
-  Navigate,
 } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import "./App.css";
@@ -82,6 +80,7 @@ const StudentDashboard = lazy(() =>
 const TakeAssessment = lazy(() =>
   import("./Pages/Student/AssessmentManagement/TakeAssessment")
 );
+const Results = lazy(() => import("./Pages/Student/Results"));
 const StudentAnalytics = lazy(() =>
   import("./Pages/Student/StudentAnalytics")
 );
@@ -132,12 +131,6 @@ function ScrollToTop() {
   }, [pathname]);
 
   return null;
-}
-
-/** Per-assessment results link -> results page with that assessment selected. */
-function ResultsRedirect() {
-  const { assessmentId } = useParams();
-  return <Navigate to={`/student/analytics?assessment=${assessmentId}`} replace />;
 }
 
 /* =======================
@@ -245,7 +238,16 @@ function App() {
             }
           />
 
-          <Route path="/student/results/:assessmentId" element={<ResultsRedirect />} />
+          <Route
+            path="/student/results/:assessmentId"
+            element={
+              <ProtectedRoute allowedRoles={["student"]}>
+                <MainLayout>
+                  <Results />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
 
           <Route
             path="/student/analytics"

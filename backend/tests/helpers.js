@@ -14,6 +14,8 @@ let passwordHash;
 
 const TABLES = [
   "llm_usage_log",
+  "practice_sessions",
+  "learning_reports",
   "pool_language_state",
   "question_pool",
   "learning_objectives",
@@ -157,6 +159,21 @@ export const installFakes = () => {
     { text: "Identify where photosynthesis happens", description: "Chloroplasts and leaves", source_chunk_ids: chunkIds.slice(-1), weight: 1 },
   ];
   fakes.prompts = [];
+  fakes.ai.study_plan = (prompt) => {
+    const objectiveIds = [...prompt.matchAll(/\[objective (\d+)\]/g)].map((m) => Number(m[1]));
+    const chunks = [...prompt.matchAll(/\[chunk (\d+)\] \(objective (\d+)/g)].map((m) => ({ id: Number(m[1]), objective: Number(m[2]) }));
+    return JSON.stringify({
+      summary: "Focus on the weak objectives.",
+      steps: objectiveIds.map((id) => ({
+        objective_id: id,
+        focus: `Review objective ${id}`,
+        why: "Low accuracy",
+        activities: ["Re-read the passages", "Practise questions"],
+        source_chunk_ids: chunks.filter((c) => c.objective === id).map((c) => c.id).concat([999999]),
+      })),
+      encouragement: "You can do it.",
+    });
+  };
   fakes.ai.question_generation = (prompt) => {
     const request = prompt.match(/REQUEST_JSON: (.*)/);
     if (!request) return JSON.stringify(fakes.aiQuestions);
@@ -171,7 +188,8 @@ export const installFakes = () => {
   aiAdapter.generate = async (prompt, options = {}) => {
     fakes.prompts.push({ purpose: options.purpose, prompt });
     // Pool generation purposes share the question generator's fake (looked up at call time).
-    const purpose = String(options.purpose || "").startsWith("pool_") ? "question_generation" : options.purpose;
+    const generatorPrompt = !fakes.ai[options.purpose] && String(prompt).includes("REQUEST_JSON:");
+    const purpose = String(options.purpose || "").startsWith("pool_") || generatorPrompt ? "question_generation" : options.purpose;
     const responder = fakes.ai[purpose];
     if (responder) return responder(prompt, options);
     return JSON.stringify(fakes.aiQuestions);

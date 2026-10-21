@@ -11,17 +11,17 @@ Resume rule: read this file, check `git log --oneline main..phase-2`, continue w
 | 1. Learning objectives + real RAG | done | da46b32 |
 | 2. Question pool + pre-generation | done | 3e2fadb |
 | 3. Adaptive difficulty engine | done | e462b21 |
-| 4. Full multilingual app | done | (this commit) |
-| 5. Learning pathways | todo | |
+| 4. Full multilingual app | done | f331066 |
+| 5. Learning pathways | done | (this commit) |
 | 6. Institutions, roles, notifications | todo | |
 | 7. Remaining SRS features | todo | |
 | Final verification + PHASE2_REPORT.md | todo | |
 
 ## Next
-Section 5: learning pathways (results page: raw/adjusted, accuracy, time, per-objective bars, difficulty chart;
-review with objective per question after submit; weak areas by objective; AI study plan in the student's
-language with source passages; server Puppeteer PDF report persisted in learning_reports; ungraded practice quiz;
-remove or wire the dead analytics endpoints). Note: /student/results/:id currently redirects to /student/analytics.
+Section 6: institutions (groups + group_memberships; admins scoped to their groups, promote/demote only
+student<->instructor; enroll a whole group; super admin manages groups and any role; notifications table + bell;
+notify on role change, deletion (email only), password change, enrollment, published, results ready; account
+deletion anonymizes results; scope tests).
 
 ## Section 0 summary
 - npm audit: non-breaking fixes applied (lockfile only). Upgraded nodemailer 6 -> 10 and puppeteer 24 -> 25
@@ -146,6 +146,25 @@ remove or wire the dead analytics endpoints). Note: /student/results/:id current
 - TRANSLATION_REVIEW.md lists terminology choices and uncertain strings.
 - New env: OCR_GEMINI_FALLBACK. Tests: 220 (11 new backend i18n/OCR tests).
 
+## Section 5 summary
+- Migration 1760000000600: learning_reports (per attempt + language: study_plan JSONB + source ai/fallback, pdf
+  BYTEA; student_id SET NULL so anonymised results keep their report) and practice_sessions.
+- API (students, completed attempts only; 404 before submitting, so neither answers nor objectives can be seen
+  early): GET /api/student-analytics/results/:id (raw/adjusted scores, accuracy incl. not-reached questions,
+  time, per-objective breakdown, weak areas < 60%, difficulty path, review with objective per question);
+  POST .../study-plan (AI plan in the student's language, grounded in the weak objectives' retrieved passages,
+  hallucinated chunk ids dropped, cached per language, deterministic fallback from the backend catalog if the
+  model fails); GET .../report.pdf (server Puppeteer, embedded Nastaliq/Naskh fonts, report + study plan, stored
+  and reused, invalidated when the plan changes); POST .../practice and /practice/:id/check (ungraded).
+- Removed dead endpoints /student-analytics/overview, /performance, /recommendations, /report and
+  /assessment/:id(+/questions) with their model/validator/repository code; removed jsPDF (client report).
+  The dashboard percentage now uses the stored raw percentage (counts not-reached questions).
+- UI: /student/results/:assessmentId with stat tiles, objective accuracy bars (one hue, value printed, weak
+  objectives flagged with icon + label), difficulty path step chart (correct = filled circle, not correct =
+  hollow square; hover/focus tooltip, hidden data table, mirrored in RTL), weak areas, study plan with
+  passages, practice quiz with instant feedback, report language picker + PDF download, full review.
+- Tests: 234 (14 new) incl. a real Chromium render of an Urdu report.
+
 ## Decisions
 - D0.1 npm audit majors NOT applied (risk noted): firebase (frontend; vulnerable firestore/grpc code is never
   imported, only firebase/auth), jest/nodemon (dev-only; npm suggests downgrades), office-text-extractor 4
@@ -189,6 +208,11 @@ remove or wire the dead analytics endpoints). Note: /student/results/:id current
 - D4.2 Non-English UIs show translated error codes instead of English server messages (losing some detail,
   e.g. which question block is invalid) rather than mixing languages.
 - D4.3 The Gemini OCR fallback is opt-in because it sends the instructor's documents to a third party.
+
+- D5.1 Practice questions are generated fresh per session and never stored in or drawn from the exam pool, so
+  practice can never expose exam questions (to this or any other student).
+- D5.2 Weak area = objective accuracy below 60% (WEAK_THRESHOLD); questions never reached count as not correct.
+- D5.3 Study plan and report default to the student's account language, selectable per request.
 
 ## Open issues
 - office-text-extractor major upgrade still pending (D0.1).
