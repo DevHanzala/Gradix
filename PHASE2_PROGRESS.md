@@ -15,11 +15,25 @@ Resume rule: read this file, check `git log --oneline main..phase-2`, continue w
 | 5. Learning pathways | done | 3298e7b |
 | 6. Institutions, roles, notifications | done | 0256e4c |
 | 7. Remaining SRS features | done | (this commit) |
-| Final verification + PHASE2_REPORT.md | todo | |
+| Final verification + PHASE2_REPORT.md | in progress | |
 
 ## Next
-Final verification: lint + i18n:check + build + tests; Puppeteer screenshots of the new pages at 360/768/1280 in
-English and Urdu with automatic checks; live Gemini smoke test if keys exist; Gate 2 evidence; PHASE2_REPORT.md.
+Final verification, in progress. Done so far: lint, i18n check, build and 257 tests pass. A Puppeteer pass
+covered 15 pages x 360/768/1280 x en/ur (90 shots) on a demo stack: a throwaway Docker DB "gradix_demo" plus the
+test fakes for LLM and email. The scripts are in the session scratchpad (shots/demoServer.mjs, shots/shoot.mjs).
+After the header fix all automatic checks passed. Visual review then found and fixed:
+- PageHeader actions overflowing at 768.
+- The print dialog starting in English for non-English users.
+- The English exam inside the Urdu UI using the Urdu font and Urdu number formats.
+- "null" shown as a model name in platform stats.
+
+Remaining:
+- Re-run the screenshot pass to confirm these fixes.
+- Review the rest of the screenshots by eye.
+- Live Gemini smoke test, only if keys exist.
+- Gate 2 evidence.
+- PHASE2_REPORT.md (env vars: WORKER_CONCURRENCY, JOB_POOL_MAX, LLM_LOG_RETENTION_DAYS, EMBEDDING_MODEL,
+  EMBEDDING_CACHE_DIR, POOL_ON_DEMAND_TIMEOUT_MS, OCR_GEMINI_FALLBACK, LLM_PRICES_JSON).
 
 ## Section 0 summary
 - npm audit: non-breaking fixes applied (lockfile only). Upgraded nodemailer 6 -> 10 and puppeteer 24 -> 25

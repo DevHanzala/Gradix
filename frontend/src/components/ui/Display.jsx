@@ -35,11 +35,11 @@ export function PageHeader({ title, description, actions, backTo, backLabel }) {
         </Link>
       )}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-3xl">{title}</h1>
           {description && <p className="mt-1 max-w-3xl text-ink-muted">{description}</p>}
         </div>
-        {actions && <div className="flex flex-wrap gap-2 sm:shrink-0">{actions}</div>}
+        {actions && <div className="flex flex-wrap gap-2 sm:max-w-[60%] sm:justify-end">{actions}</div>}
       </div>
     </header>
   );

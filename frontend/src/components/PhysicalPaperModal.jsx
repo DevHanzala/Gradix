@@ -35,11 +35,13 @@ const fontOptions = (min, max) => Array.from({ length: max - min + 1 }, (_, i) =
 const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) => {
   const { generatePhysicalPaper } = useAssessmentStore();
   const [step, setStep] = useState("language");
-  const [language, setLanguage] = useState("en");
+  const { i18n } = useTranslation();
+  // Start in the reader's own language so the first step is readable to them.
+  const uiLanguage = LANGUAGES.some((l) => l.code === i18n.language) ? i18n.language : "en";
+  const [language, setLanguage] = useState(uiLanguage);
   const [form, setForm] = useState(INITIAL_FORM);
   const [loading, setLoading] = useState(false);
 
-  const { i18n } = useTranslation();
   // The dialog speaks the paper's language (header labels are printed in it).
   const tPaper = i18n.getFixedT(language);
   const tp = (key) => tPaper(`paper.${key}`);
@@ -47,7 +49,7 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
 
   const reset = () => {
     setStep("language");
-    setLanguage("en");
+    setLanguage(uiLanguage);
     setForm(INITIAL_FORM);
   };
 

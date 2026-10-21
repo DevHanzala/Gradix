@@ -239,7 +239,7 @@ function TakeAssessment() {
       <header className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2 px-4 py-3">
           <span className="text-sm font-semibold text-ink-muted">
-            {t("exam.progress", { current: formatNumber(currentIndex + 1), total: formatNumber(totalQuestions) })}
+            {t("exam.progress", { current: formatNumber(currentIndex + 1, undefined, examLanguage), total: formatNumber(totalQuestions, undefined, examLanguage) })}
           </span>
           <div className="flex flex-wrap items-center gap-2">
             <SaveIndicator status={saveStatus} t={t} />
@@ -425,14 +425,14 @@ function CenteredPanel({ children, dir = "ltr", lang }) {
 /** Short summary right after submitting; the full results page has the details. */
 function ResultSummary({ result, t, dir, lang }) {
   const stats = [
-    { label: t("results.raw"), value: formatPercent(result.rawPercentage ?? result.percentage) },
+    { label: t("results.raw"), value: formatPercent(result.rawPercentage ?? result.percentage, 1, lang) },
     ...(result.adjustedPercentage !== null && result.adjustedPercentage !== undefined
-      ? [{ label: t("results.adjusted"), value: formatPercent(result.adjustedPercentage) }]
+      ? [{ label: t("results.adjusted"), value: formatPercent(result.adjustedPercentage, 1, lang) }]
       : []),
-    { label: t("analytics.correct"), value: formatNumber(result.correctCount) },
-    { label: t("results.incorrect"), value: formatNumber(result.incorrectCount) },
-    { label: t("results.unanswered"), value: formatNumber(result.unansweredCount) },
-    { label: t("review.timeTaken"), value: formatDuration(result.timeTakenSeconds) },
+    { label: t("analytics.correct"), value: formatNumber(result.correctCount, undefined, lang) },
+    { label: t("results.incorrect"), value: formatNumber(result.incorrectCount, undefined, lang) },
+    { label: t("results.unanswered"), value: formatNumber(result.unansweredCount, undefined, lang) },
+    { label: t("review.timeTaken"), value: formatDuration(result.timeTakenSeconds, lang) },
   ];
 
   return (

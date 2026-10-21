@@ -77,7 +77,7 @@ function PlatformStats() {
                 rowKey={(r) => `${r.provider}-${r.model}`}
                 rows={data.llm.byModel}
                 columns={[
-                  { key: "model", header: t("platform.model"), primary: true, render: (r) => <span dir="ltr">{`${r.provider} · ${r.model}`}</span> },
+                  { key: "model", header: t("platform.model"), primary: true, render: (r) => <span dir="ltr">{r.model ? `${r.provider} · ${r.model}` : r.provider}</span> },
                   { key: "calls", header: t("platform.calls"), render: (r) => formatNumber(r.calls) },
                   { key: "latency", header: t("platform.latency"), render: (r) => formatNumber(r.avgLatencyMs, { style: "unit", unit: "millisecond", unitDisplay: "short" }) },
                   { key: "cost", header: t("platform.cost"), render: (r) => (r.estimatedCostUsd === null ? "–" : usd(r.estimatedCostUsd)) },

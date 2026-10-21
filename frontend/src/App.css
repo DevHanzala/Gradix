@@ -73,6 +73,11 @@
   font-family: "Noto Naskh Arabic", Tahoma, serif;
   line-height: 1.8;
 }
+/* An English block inside an RTL page (e.g. an English exam in the Urdu UI) gets the Latin font back. */
+[lang="en"] {
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
 
 /* reCAPTCHA v3 badge is hidden; the required notice is shown on the auth forms. */
 .grecaptcha-badge { visibility: hidden !important; }
