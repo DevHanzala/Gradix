@@ -14,26 +14,12 @@ Resume rule: read this file, check `git log --oneline main..phase-2`, continue w
 | 4. Full multilingual app | done | f331066 |
 | 5. Learning pathways | done | 3298e7b |
 | 6. Institutions, roles, notifications | done | 0256e4c |
-| 7. Remaining SRS features | done | (this commit) |
-| Final verification + PHASE2_REPORT.md | in progress | |
+| 7. Remaining SRS features | done | dda3445 |
+| Final verification + PHASE2_REPORT.md | done | 5478973 + final commit |
 
 ## Next
-Final verification, in progress. Done so far: lint, i18n check, build and 257 tests pass. A Puppeteer pass
-covered 15 pages x 360/768/1280 x en/ur (90 shots) on a demo stack: a throwaway Docker DB "gradix_demo" plus the
-test fakes for LLM and email. The scripts are in the session scratchpad (shots/demoServer.mjs, shots/shoot.mjs).
-After the header fix all automatic checks passed. Visual review then found and fixed:
-- PageHeader actions overflowing at 768.
-- The print dialog starting in English for non-English users.
-- The English exam inside the Urdu UI using the Urdu font and Urdu number formats.
-- "null" shown as a model name in platform stats.
-
-Remaining:
-- Re-run the screenshot pass to confirm these fixes.
-- Review the rest of the screenshots by eye.
-- Live Gemini smoke test, only if keys exist.
-- Gate 2 evidence.
-- PHASE2_REPORT.md (env vars: WORKER_CONCURRENCY, JOB_POOL_MAX, LLM_LOG_RETENTION_DAYS, EMBEDDING_MODEL,
-  EMBEDDING_CACHE_DIR, POOL_ON_DEMAND_TIMEOUT_MS, OCR_GEMINI_FALLBACK, LLM_PRICES_JSON).
+Phase 2 is complete. See PHASE2_REPORT.md for the full report and docs/phase2-evidence/ for the evidence.
+Nothing from Phase 2 is left in progress; known issues are listed below and in the report.
 
 ## Section 0 summary
 - npm audit: non-breaking fixes applied (lockfile only). Upgraded nodemailer 6 -> 10 and puppeteer 24 -> 25
@@ -223,6 +209,22 @@ Remaining:
 - "Show live score" was already done in section 3.
 - Tests: 257 (14 new in srs.test.js).
 
+## Final verification summary
+- lint (incl. i18n check), i18n:check, build, tests: all pass (259 tests). Log: docs/phase2-evidence/checks.log.
+- Screenshots: 15 new/changed pages x 360/768/1280 x en/ur/ar = 135, on a demo stack (throwaway Docker DB, test
+  fakes for LLM/email/embeddings, production build). Automatic checks: page overflow, elements outside the
+  viewport, document dir, raw i18n keys, unlabeled controls, touch targets (< 44 px; 24 px for inline links and
+  boxes), console errors, failed API calls. Final run: 135/135 clean. Fixed on the way: PageHeader actions
+  overflowing at 768; print dialog opening in English for non-English users; English exam inside an RTL UI
+  using the Urdu font and number format; a timed-out exam's result shown in English instead of the exam
+  language; link touch targets under 44 px; "null" model name in platform stats.
+- Live smoke test with the real keys (values never read or printed): 9 objectives, 10 valid questions each in
+  English and natural Urdu, 8 LLM calls, about 7,700 input + 6,000 output tokens, 25 s.
+- Gate 2: 6/6 pass (docs/phase2-evidence/gate2/gate2.log).
+- Gap found and closed: the PDF report now contains practice questions with answers (SRS item 5.5).
+- Dependencies: vulnerable pins inside office-text-extractor (mammoth directory traversal, js-yaml, fflate)
+  patched with scoped npm overrides in the same majors; DOCX extraction regression test added.
+
 ## Decisions
 - D0.1 npm audit majors NOT applied (risk noted): firebase (frontend; vulnerable firestore/grpc code is never
   imported, only firebase/auth), jest/nodemon (dev-only; npm suggests downgrades), office-text-extractor 4
@@ -287,7 +289,34 @@ Remaining:
   convenience for intranet pages).
 - D7.6 Cost figures are labelled estimates; unpriced models are excluded and named, not filled with a guess.
 
+- D8.1 After an attempt ends, the exam page keeps speaking the attempt's language (also after a reload), as
+  during the attempt; the store no longer defaults it to English.
+- D8.2 The PDF report's practice questions are the student's latest practice set in the report language, or
+  a new set from the same generator. They are never exam-pool questions (D5.1), and the report is still
+  produced if practice is unavailable.
+- D8.3 The print dialog starts in the instructor's UI language; the paper language can still be changed.
+- D8.4 Vulnerable pinned dependencies of office-text-extractor are patched with scoped npm overrides (same
+  majors, DOCX regression test) instead of the breaking v4 upgrade.
+
 ## Open issues
-- office-text-extractor major upgrade still pending (D0.1).
+- office-text-extractor 4 (major) still pending; file-type (moderate, ASF media parser) remains through it.
+- firebase -> firestore/grpc advisories (high): firestore is never imported (only firebase/auth); npm's fix is
+  a firebase downgrade, not applied. exceljs -> uuid (moderate): npm's fix is an exceljs downgrade, not applied.
+- An assessment can have more objectives than questions (live smoke: 9 objectives, 3 questions). The UI does
+  not warn; the instructor has to merge or delete objectives.
+- YouTube ingestion reads the caption tracks embedded in the watch page (there is no official transcript API).
+  It is tested with a fake fetcher, not live.
+- Urdu/Arabic/Persian strings need a native speaker's review (TRANSLATION_REVIEW.md).
+- The frontend has no unit-test runner; UI behaviour is covered by the Puppeteer pass, lint and the i18n check.
+- The Vite build warns about chunks over 500 kB (no code splitting yet).
+- Secrets that were in the old repos' git history must be rotated (from the monorepo merge).
 
 ## Phase 3 temptations (noted, not built)
+- Logging tab switches / focus loss during an exam (proctoring); the one-question engine would make it easy.
+- Image-based questions from diagrams the OCR pipeline already sees.
+- Matching questions in the question bank editor.
+- Offline/PWA caching of the exam page (only the retry of unsaved answers exists).
+- A live class view where the instructor watches progress as students answer.
+- Polls / exit tickets built on the practice-quiz component.
+- Per-institution usage limits or plans based on the LLM cost log (payments).
+- Docker compose / deployment scripts for app + worker.

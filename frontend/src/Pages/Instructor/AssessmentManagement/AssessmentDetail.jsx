@@ -169,9 +169,9 @@ function AssessmentDetail() {
                   {links.length > 0 && (
                     <ul className="space-y-1">
                       {links.map((l) => (
-                        <li key={l} className="flex items-start gap-2 break-all">
-                          <FaLink className="mt-1 shrink-0 text-ink-subtle" aria-hidden="true" />
-                          <a href={l} target="_blank" rel="noreferrer" dir="ltr" className="text-primary-700 hover:underline">
+                        <li key={l} className="flex items-center gap-2 break-all">
+                          <FaLink className="shrink-0 text-ink-subtle" aria-hidden="true" />
+                          <a href={l} target="_blank" rel="noreferrer" dir="ltr" className="inline-flex min-h-11 items-center text-primary-700 hover:underline">
                             {l}
                           </a>
                         </li>

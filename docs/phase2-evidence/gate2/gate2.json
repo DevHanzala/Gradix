@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Two students get different question sets covering the same objectives the same number of times",
+    "pass": true,
+    "evidence": "student A pool ids: 14,21,23,25,33,40,55,56\nstudent B pool ids: 11,18,19,24,34,41,53,54\nshared questions: 0/8\nobjective counts A: {\"1\":4,\"2\":2,\"3\":2}\nobjective counts B: {\"1\":4,\"2\":2,\"3\":2}"
+  },
+  {
+    "name": "Difficulty visibly adapts and the adjusted score is correct",
+    "pass": true,
+    "evidence": "A (all correct) path: 3 → 3 → 4 → 4 → 5 → 5 → 5 → 5; raw 100%, adjusted 100% (recomputed 100%)\nB (4 right, 4 wrong) path: 3 → 3 → 4 → 4 → 5 → 5 → 4 → 4; raw 50%, adjusted 55% (recomputed 55%)\nweights: {\"1\":0.6,\"2\":0.8,\"3\":1,\"4\":1.2,\"5\":1.4}"
+  },
+  {
+    "name": "Urdu and Arabic: exam, results and PDF report in the student's language (UI RTL: see screenshots)",
+    "pass": true,
+    "evidence": "ur: questions served in [ur] e.g. \"سبق کے بارے میں سوال نمبر 70 کیا ہے؟\"; report.pdf 200, 294014 bytes, embeds NotoNastaliqUrdu: true → report-ur.pdf\nar: questions served in [ar] e.g. \"ما هو السؤال رقم 137 عن الدرس؟\"; report.pdf 200, 196378 bytes, embeds NotoNaskhArabic: true → report-ar.pdf"
+  },
+  {
+    "name": "Student sees results immediately and downloads a full report",
+    "pass": true,
+    "evidence": "ur: result returned with the last answer (raw 50%, adjusted 45%); GET results 200 with 8 reviewed questions, 3 objectives; report downloaded (294014 bytes)\nar: result returned with the last answer (raw 50%, adjusted 45%); GET results 200 with 8 reviewed questions, 3 objectives; report downloaded (196378 bytes)"
+  },
+  {
+    "name": "An admin only sees their own group",
+    "pass": true,
+    "evidence": "admin sees users: Gate Student 1@test.io, Gate Student 0@test.io, Gate Instructor@test.io, Gate Admin@test.io\nadmin sees groups: Gate group\nchange role of outsider: 403 OUT_OF_SCOPE; of own group member: 200"
+  },
+  {
+    "name": "A paper prints as PDF and DOCX, both same-paper and unique-paper modes",
+    "pass": true,
+    "evidence": "PDF same: 200 application/pdf, 165911 bytes → paper-same.pdf\nPDF unique x3: 200 application/pdf, 238574 bytes → paper-unique.pdf\nDOCX same: 200 application/vnd.openxmlformats-officedocument.wordprocessingml.document, 10293 bytes, header printed as typed: true, RTL runs: true → paper-same.docx\nDOCX unique x3: 200 application/vnd.openxmlformats-officedocument.wordprocessingml.document, 10727 bytes, header printed as typed: true, RTL runs: true → paper-unique.docx"
+  }
+]

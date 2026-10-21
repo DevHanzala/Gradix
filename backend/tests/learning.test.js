@@ -183,6 +183,37 @@ describe("PDF report", () => {
     expect(rendered).toBeNull(); // cached
   });
 
+  test("includes practice questions with answers at the end: the latest set, or a new one", async () => {
+    const id = await published();
+    let rendered = null;
+    pdfRenderer.render = async (html) => {
+      rendered = html;
+      return Buffer.from("%PDF-fake");
+    };
+    const sessions = () => pool.query("SELECT questions FROM practice_sessions ORDER BY id").then((r) => r.rows);
+
+    // No practice yet: the report creates a set (same generator, never the exam pool).
+    const s1 = await newStudent(id);
+    await take(id, s1, () => false);
+    expect((await api(s1).pdf(id, "en")).status).toBe(200);
+    const created = await sessions();
+    expect(created).toHaveLength(1);
+    expect(rendered).toContain("Practice questions");
+    expect(rendered).toContain("<h3>Answers</h3>");
+    for (const q of created[0].questions) expect(rendered).toContain(q.question_text);
+    const poolStems = (await pool.query("SELECT question_text FROM question_pool")).rows.map((r) => r.question_text);
+    for (const q of created[0].questions) expect(poolStems).not.toContain(q.question_text);
+
+    // The student already practised: that set is used, nothing new is generated.
+    const s2 = await newStudent(id);
+    await take(id, s2, () => false);
+    await api(s2).practice(id, { count: 2 });
+    const own = (await sessions())[1].questions;
+    await api(s2).pdf(id, "en");
+    expect(await sessions()).toHaveLength(2);
+    for (const q of own) expect(rendered).toContain(q.question_text);
+  });
+
   test("the report template escapes user content", () => {
     const html = reportHtml({
       language: "en",

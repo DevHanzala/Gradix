@@ -36,7 +36,8 @@ const initialState = {
   phase: "idle",
   assessmentId: null,
   attemptId: null,
-  language: "en",
+  /** The attempt's language once known (null: the page falls back to the UI language). */
+  language: null,
   question: null,
   totalQuestions: 0,
   answers: {},
@@ -86,7 +87,7 @@ const useStudentAssessmentStore = create((set, get) => {
 
   const applyServerState = (data) => {
     if (data.status === "completed") {
-      set({ phase: "completed", result: data, attemptId: data.attemptId, pending: {}, error: null });
+      set({ phase: "completed", result: data, attemptId: data.attemptId, language: data.language || null, pending: {}, error: null });
     } else if (data.status === "in_progress") {
       applyInProgress(data);
     } else {

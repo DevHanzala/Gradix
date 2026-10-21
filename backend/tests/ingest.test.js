@@ -2,6 +2,7 @@ import { readFileSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import request from "supertest";
+import { Document, Packer, Paragraph, TextRun } from "docx";
 import app from "../app.js";
 import { extractTextFromFile } from "../helper/textProcessor.js";
 import { embeddingAdapter } from "../helper/embeddingGenerator.js";
@@ -40,6 +41,23 @@ describe("text extraction and chunking", () => {
     expect(text).toMatch(/Photosynthesis/i);
     expect(text).toMatch(/chlorophyll/i);
   }, 60000);
+
+  test("a Word document (DOCX) is read, including Urdu text", async () => {
+    const doc = new Document({
+      sections: [
+        {
+          children: [
+            new Paragraph({ children: [new TextRun("Photosynthesis happens in the chloroplasts of leaf cells.")] }),
+            new Paragraph({ bidirectional: true, children: [new TextRun({ text: "ضیائی تالیف پتوں میں ہوتی ہے۔", rightToLeft: true })] }),
+          ],
+        },
+      ],
+    });
+    const mime = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    const text = await extractTextFromFile(await Packer.toBuffer(doc), mime);
+    expect(text).toContain("Photosynthesis happens in the chloroplasts");
+    expect(text).toContain("ضیائی تالیف پتوں میں ہوتی ہے");
+  });
 
   test("a scanned PDF (no text layer) falls back to OCR", async () => {
     const text = await extractTextFromFile(readFileSync(path.join(fixtures, "scanned-sample.pdf")), "application/pdf");

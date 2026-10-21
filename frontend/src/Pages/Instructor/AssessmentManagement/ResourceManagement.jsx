@@ -277,7 +277,7 @@ function ResourceManagement() {
                 render: (r) => (
                   <span className="break-all" dir="auto">
                     {r.content_type === "link" && r.url ? (
-                      <a href={r.url} target="_blank" rel="noreferrer" className="text-primary-700 hover:underline">
+                      <a href={r.url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center text-primary-700 hover:underline">
                         {r.name}
                       </a>
                     ) : (

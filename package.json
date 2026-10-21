@@ -26,5 +26,12 @@
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
+  },
+  "overrides": {
+    "office-text-extractor": {
+      "mammoth": "^1.13.0",
+      "js-yaml": "^4.3.2",
+      "fflate": "^0.8.3"
+    }
   }
 }
