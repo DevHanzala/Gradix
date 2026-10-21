@@ -1,0 +1,19 @@
+{
+  "titleFor": "نتائج: {{title}}",
+  "description": "اس امتحان کو مکمل کرنے والے طلبہ کے اسکور۔ ہر طالب علم کے اپنے سوالات تھے۔",
+  "averageScore": "اوسط اسکور",
+  "averageTime": "اوسط وقت",
+  "students": "طلبہ",
+  "none": "ابھی کوئی مکمل کوشش نہیں",
+  "noneDescription": "طلبہ کے جمع کرواتے ہی نتائج یہاں نظر آئیں گے۔",
+  "studentResults": "طلبہ کے نتائج",
+  "student": "طالب علم",
+  "correct": "درست",
+  "correctOf": "{{correct}} / {{total}}",
+  "score": "اسکور",
+  "time": "وقت",
+  "reviewAnswers": "جوابات دیکھیں",
+  "loadingAnswers": "جوابات لوڈ ہو رہے ہیں…",
+  "answersOf": "جوابات: {{name}}",
+  "answersSummary": "{{correct}} درست · {{score}}"
+}

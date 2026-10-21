@@ -1,0 +1,16 @@
+{
+  "blocks": "Question blocks",
+  "blocksSummary": "Questions: {{questions}} · {{duration}} · Marks: {{marks}}",
+  "correctMarks": "Correct",
+  "wrongMarks": "Wrong",
+  "secondsEach": "Seconds each",
+  "editableDescription": "Not published yet: you can still edit it.",
+  "lockedDescription": "Published or started by students, so its settings are locked.",
+  "fixedDifficulty": "Fixed difficulty mix",
+  "mode": "Mode",
+  "noPrompt": "No prompt. Questions are generated from the selected material.",
+  "noSources": "No resources or links.",
+  "objectivesAndPublishing": "Objectives & publishing",
+  "printPaper": "Print paper",
+  "state": "State"
+}

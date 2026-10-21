@@ -1,0 +1,37 @@
+{
+  "eyebrow": "AI assessments",
+  "title": "Fair, multilingual assessments, generated for every student.",
+  "lead": "Gradix turns a short prompt or your teaching material into exams with a unique question set per student, in the language each student prefers.",
+  "createAccount": "Create a free account",
+  "featuresTitle": "What you can do",
+  "features": {
+    "unique": {
+      "title": "A different question set for every student",
+      "text": "Questions come from a checked pool built from your material, so no two students get the same paper and answers can't simply be shared."
+    },
+    "adaptive": {
+      "title": "Adaptive difficulty",
+      "text": "Questions get harder after strong answers and easier after weak ones, while every student covers the same learning objectives."
+    },
+    "languages": {
+      "title": "English, Urdu, Arabic and Persian",
+      "text": "Each student chooses their language. Questions are written natively in it, with right-to-left layout where needed."
+    },
+    "sources": {
+      "title": "Start from a prompt or your files",
+      "text": "Upload PDF, Word, PowerPoint, text or images (scans are read with OCR), or just describe the topic."
+    },
+    "marking": {
+      "title": "Negative marking",
+      "text": "Set marks for correct answers and deductions for wrong ones per question block. Unanswered questions score zero."
+    },
+    "papers": {
+      "title": "Printable papers",
+      "text": "Download a PDF paper in any supported language with your institute header and an answer key."
+    },
+    "fair": {
+      "title": "Fair, timed, one attempt",
+      "text": "Per-question timers enforced by the server, one attempt per student, and answers saved as you go."
+    }
+  }
+}

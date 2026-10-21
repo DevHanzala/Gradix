@@ -1,0 +1,21 @@
+{
+  "enrolled": "{{email}} was enrolled and notified by email.",
+  "enrollFailed": "Could not enroll this student.",
+  "studentEmail": "Student email",
+  "emailHint": "The student must already have a Gradix account.",
+  "enrollButton": "Enroll student",
+  "loadFailed": "Could not load enrolled students.",
+  "removed": "{{name}} was removed.",
+  "removeFailed": "Could not remove the student.",
+  "title": "Enroll students",
+  "description": "Enrolled students see this assessment on their dashboard.",
+  "addStudent": "Add a student",
+  "noAccount": "Student has no account?",
+  "enrolledTitle": "Enrolled students",
+  "count": "Students: {{count}}",
+  "none": "No students enrolled yet",
+  "noneDescription": "Add students by email or enroll a whole group.",
+  "removeTitle": "Remove {{name}}?",
+  "removeConfirm": "Remove student",
+  "removeBody": "The student will no longer see this assessment. Results of an attempt they already made are kept."
+}

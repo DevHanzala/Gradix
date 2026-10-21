@@ -1,0 +1,17 @@
+{
+  "description": "Your account details, language and security settings.",
+  "goToDashboard": "Go to dashboard",
+  "account": "Account",
+  "name": "Name",
+  "role": "Role",
+  "signInMethod": "Sign-in method",
+  "methodGoogle": "Google",
+  "methodPassword": "Email and password",
+  "languageTitle": "Language",
+  "languageDescription": "Used for the app, your emails and your reports.",
+  "changePassword": "Change password",
+  "currentPassword": "Current password",
+  "passwordChanged": "Password changed. We sent you a confirmation email.",
+  "passwordChangeFailed": "Could not change your password.",
+  "googleNoPassword": "You sign in with Google, so there is no Gradix password to change."
+}

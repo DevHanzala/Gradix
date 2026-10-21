@@ -16,12 +16,13 @@ export const createResourceQuery = async (resourceData, client = pool) => {
     language = null,
     chunking_version = 1,
     embedding_model = null,
+    extraction_method = null,
   } = resourceData;
 
   const query = `
     INSERT INTO resources (name, url, file_type, file_size, content_type, visibility, uploaded_by,
-                           content_text, content_hash, language, chunking_version, embedding_model)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                           content_text, content_hash, language, chunking_version, embedding_model, extraction_method)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
     RETURNING *
   `;
 
@@ -38,6 +39,7 @@ export const createResourceQuery = async (resourceData, client = pool) => {
     language,
     chunking_version,
     embedding_model,
+    extraction_method,
   ]);
   return rows[0];
 };

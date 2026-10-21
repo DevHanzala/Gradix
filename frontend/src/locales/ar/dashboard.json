@@ -1,0 +1,12 @@
+{
+  "loadFailed": "تعذّر تحميل لوحة التحكم.",
+  "welcome": "مرحبًا",
+  "welcomeName": "مرحبًا، {{name}}",
+  "instructorDescription": "أنشئ التقييمات وسجّل الطلاب وراجع النتائج.",
+  "summary": "ملخص",
+  "startedByStudents": "بدأها الطلاب",
+  "recentAssessments": "أحدث التقييمات",
+  "quickActions": "إجراءات سريعة",
+  "uploadResources": "رفع الموارد",
+  "resultsByAssessment": "النتائج حسب التقييم"
+}

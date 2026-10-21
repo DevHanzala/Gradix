@@ -1,0 +1,6 @@
+{
+  "student": "Student",
+  "instructor": "Instructor",
+  "admin": "Admin",
+  "super_admin": "Super Admin"
+}

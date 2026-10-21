@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import useAuthStore from "../store/authStore.js";
 import { getCaptchaToken } from "../config/captcha.js";
 import useRecaptchaInit from "../hooks/useRecaptchaInit.js";
@@ -13,6 +14,7 @@ import { Alert, Button, Input } from "../components/ui";
 const EMPTY = { name: "", email: "", password: "" };
 
 function Signup() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { signup, googleAuth } = useAuthStore();
   const siteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
@@ -21,7 +23,7 @@ function Signup() {
   const [form, setForm] = useState(EMPTY);
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState(null);
-  const [success, setSuccess] = useState(null);
+  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -41,11 +43,11 @@ function Signup() {
     setLoading(true);
     try {
       const captchaToken = await getCaptchaToken(siteKey, "signup");
-      const response = await signup({ ...form, captchaToken });
-      setSuccess(response.message || "Account created. Check your email to verify your account.");
+      await signup({ ...form, captchaToken });
+      setSuccess(true);
       setForm(EMPTY);
     } catch (error) {
-      setFormError(errorMessage(error, "Registration failed. Please try again."));
+      setFormError(errorMessage(error, t("auth.signupFailed")));
     } finally {
       setLoading(false);
     }
@@ -58,7 +60,7 @@ function Signup() {
       const user = await googleAuth();
       redirectByRole(user.role, navigate);
     } catch (error) {
-      setFormError(errorMessage(error, "Google sign-up failed. Please try again."));
+      setFormError(errorMessage(error, t("auth.googleFailed")));
     } finally {
       setGoogleLoading(false);
     }
@@ -66,31 +68,31 @@ function Signup() {
 
   return (
     <AuthLayout
-      title="Create your account"
-      subtitle="New accounts start as students. An admin can change your role."
+      title={t("auth.signupTitle")}
+      subtitle={t("auth.signupSubtitle")}
       showRecaptchaNotice
       footer={
         <>
-          Already have an account?{" "}
+          {t("auth.haveAccount")}{" "}
           <Link to="/login" className="inline-flex min-h-11 items-center font-semibold text-primary-700 hover:underline">
-            Log in
+            {t("auth.login")}
           </Link>
         </>
       }
     >
       {success ? (
         <div className="space-y-4">
-          <Alert tone="success" title="Check your inbox">
-            {success}
+          <Alert tone="success" title={t("auth.checkInbox")}>
+            {t("auth.signupSuccess")}
           </Alert>
           <Button to="/login" fullWidth>
-            Go to login
+            {t("auth.goToLogin")}
           </Button>
         </div>
       ) : (
         <>
           <GoogleButton loading={googleLoading} onClick={onGoogle}>
-            Sign up with Google
+            {t("auth.signupWithGoogle")}
           </GoogleButton>
           <OrDivider />
 
@@ -101,21 +103,31 @@ function Signup() {
           )}
 
           <form onSubmit={onSubmit} noValidate className="space-y-4">
-            <Input label="Full name" name="name" autoComplete="name" value={form.name} onChange={onChange} error={errors.name} required />
-            <Input label="Email" name="email" type="email" autoComplete="email" value={form.email} onChange={onChange} error={errors.email} required />
+            <Input label={t("auth.fullName")} name="name" autoComplete="name" value={form.name} onChange={onChange} error={errors.name} required />
             <Input
-              label="Password"
+              label={t("auth.email")}
+              name="email"
+              type="email"
+              dir="ltr"
+              autoComplete="email"
+              value={form.email}
+              onChange={onChange}
+              error={errors.email}
+              required
+            />
+            <Input
+              label={t("auth.password")}
               name="password"
               type="password"
               autoComplete="new-password"
               value={form.password}
               onChange={onChange}
               error={errors.password}
-              hint="At least 8 characters with an uppercase letter, a lowercase letter and a number."
+              hint={t("auth.passwordHint")}
               required
             />
             <Button type="submit" fullWidth loading={loading}>
-              Create account
+              {t("auth.createAccount")}
             </Button>
           </form>
         </>

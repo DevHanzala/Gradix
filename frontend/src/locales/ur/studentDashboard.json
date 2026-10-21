@@ -1,0 +1,22 @@
+{
+  "welcome": "دوبارہ خوش آمدید",
+  "welcomeName": "دوبارہ خوش آمدید، {{name}}",
+  "description": "آپ کے امتحانات اور پیش رفت۔",
+  "enrolled": "شامل",
+  "completed": "مکمل",
+  "pending": "باقی",
+  "myAssessments": "میرے امتحانات",
+  "loadFailed": "آپ کے امتحانات لوڈ نہیں ہو سکے",
+  "noneDescription": "جب کوئی استاد آپ کو شامل کرے گا تو امتحان یہاں نظر آئے گا۔",
+  "viewResults": "نتائج دیکھیں",
+  "notAvailable": "ابھی دستیاب نہیں",
+  "resume": "جاری رکھیں",
+  "start": "شروع کریں",
+  "questionCount": "سوالات: {{count}}",
+  "score": "اسکور {{value}}",
+  "status": {
+    "not_started": "شروع نہیں ہوا",
+    "in_progress": "جاری",
+    "completed": "مکمل"
+  }
+}

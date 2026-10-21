@@ -1,0 +1,16 @@
+{
+  "blocks": "سوالاتی بلاک",
+  "blocksSummary": "سوالات: {{questions}} · {{duration}} · نمبر: {{marks}}",
+  "correctMarks": "درست",
+  "wrongMarks": "غلط",
+  "secondsEach": "فی سوال سیکنڈ",
+  "editableDescription": "ابھی شائع نہیں ہوا: آپ اب بھی ترمیم کر سکتے ہیں۔",
+  "lockedDescription": "شائع ہو چکا ہے یا طلبہ شروع کر چکے ہیں، اس لیے ترتیبات مقفل ہیں۔",
+  "fixedDifficulty": "مقررہ مشکل امتزاج",
+  "mode": "طریقہ",
+  "noPrompt": "کوئی ہدایت نہیں۔ سوالات منتخب مواد سے بنتے ہیں۔",
+  "noSources": "کوئی وسائل یا لنکس نہیں۔",
+  "objectivesAndPublishing": "مقاصد اور اشاعت",
+  "printPaper": "پرچہ پرنٹ کریں",
+  "state": "حالت"
+}

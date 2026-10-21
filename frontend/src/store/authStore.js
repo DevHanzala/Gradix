@@ -14,13 +14,35 @@ import {
   fetchUsersApi,
   changeUserRoleApi,
   deleteUserApi,
+  setLanguageApi,
 } from "../api/auth.api";
+import i18n from "../i18n/index.js";
+
+/** After sign-in the account's saved language wins over the device's. */
+const applyUserLanguage = (user) => {
+  if (user?.language && user.language !== i18n.language) i18n.changeLanguage(user.language);
+};
 
 const useAuthStore = create(
   persist(
     (set) => ({
       token: null,
       user: null,
+
+      /* =========================
+         Language (UI now; saved to the account when signed in)
+      ========================= */
+      setLanguage: async (language) => {
+        await i18n.changeLanguage(language);
+        const { token, user } = useAuthStore.getState();
+        if (!token || !user) return;
+        set({ user: { ...user, language } });
+        try {
+          await setLanguageApi(language);
+        } catch {
+          // The UI already switched; the account keeps its old value until the next change.
+        }
+      },
 
       /* =========================
          Login
@@ -31,6 +53,7 @@ const useAuthStore = create(
           const response = await loginApi(credentials);
           const { token, user } = response.data;
           set({ token, user });
+          applyUserLanguage(user);
           localStorage.setItem("token", token);
           return user;
         } catch (error) {
@@ -71,7 +94,7 @@ const useAuthStore = create(
 
       signup: async (data) => {
         try {
-          const response = await signupApi(data);
+          const response = await signupApi({ ...data, language: i18n.language });
           return response.data;
         } catch (error) {
           throw error.response?.data || error;
@@ -85,8 +108,8 @@ const useAuthStore = create(
       registerStudent: async (studentData) => {
         try {
           // New accounts are always students; never forward a role field.
-          const { name, email, password } = studentData;
-          const response = await registerStudentApi({ name, email, password });
+          const { name, email, password, language } = studentData;
+          const response = await registerStudentApi({ name, email, password, language });
           return response.data;
         } catch (error) {
           throw error.response?.data || error;
@@ -115,7 +138,7 @@ const useAuthStore = create(
             status: error.response?.status || 500,
             message:
               error.response?.data?.message ||
-              "Failed to send reset link",
+              i18n.t("auth.resetSendFailed"),
           };
         }
       },

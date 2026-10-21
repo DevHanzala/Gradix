@@ -1,0 +1,12 @@
+{
+  "loadFailed": "بارگذاری داشبورد ممکن نشد.",
+  "welcome": "خوش آمدید",
+  "welcomeName": "خوش آمدید، {{name}}",
+  "instructorDescription": "آزمون بسازید، دانش‌آموز ثبت‌نام کنید و نتایج را ببینید.",
+  "summary": "خلاصه",
+  "startedByStudents": "شروع‌شده توسط دانش‌آموزان",
+  "recentAssessments": "آزمون‌های اخیر",
+  "quickActions": "اقدامات سریع",
+  "uploadResources": "بارگذاری منابع",
+  "resultsByAssessment": "نتایج به تفکیک آزمون"
+}

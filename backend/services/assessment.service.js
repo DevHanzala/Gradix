@@ -215,7 +215,7 @@ export const enrollStudentService = async (assessmentId, email, user) => {
 
   // After the insert has committed; failures are logged, never thrown.
   const instructor = await getUserById(user.id);
-  sendAssessmentEnrollmentEmail(student.email, student.name, assessment.title, instructor?.name);
+  sendAssessmentEnrollmentEmail(student, assessment.title, instructor?.name);
 
   return { enrollment, student: { id: student.id, name: student.name, email: student.email } };
 };

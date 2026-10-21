@@ -1,0 +1,17 @@
+{
+  "description": "جزئیات حساب، زبان و تنظیمات امنیتی شما.",
+  "goToDashboard": "رفتن به داشبورد",
+  "account": "حساب",
+  "name": "نام",
+  "role": "نقش",
+  "signInMethod": "روش ورود",
+  "methodGoogle": "Google",
+  "methodPassword": "ایمیل و رمز عبور",
+  "languageTitle": "زبان",
+  "languageDescription": "برای برنامه، ایمیل‌ها و گزارش‌های شما به کار می‌رود.",
+  "changePassword": "تغییر رمز عبور",
+  "currentPassword": "رمز عبور فعلی",
+  "passwordChanged": "رمز عبور تغییر کرد. یک ایمیل تأیید برایتان فرستادیم.",
+  "passwordChangeFailed": "تغییر رمز عبور ممکن نشد.",
+  "googleNoPassword": "شما با Google وارد می‌شوید، پس رمز عبور Gradix برای تغییر وجود ندارد."
+}

@@ -1,17 +1,19 @@
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import useAssessmentStore from "../../../store/assessmentStore.js";
 import AssessmentForm from "../../../components/assessment/AssessmentForm.jsx";
 import { formValuesFromAssessment } from "../../../components/assessment/assessmentFormValues.js";
 import { PageHeader } from "../../../components/ui";
 
 function CreateAssessment() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { createAssessment } = useAssessmentStore();
 
   const handleSubmit = async (formData) => {
     const created = await createAssessment(formData);
-    toast.success("Assessment created.");
+    toast.success(t("assessments.createdToast"));
     // Next step after creating: review the learning objectives.
     navigate(created?.id ? `/instructor/assessments/${created.id}/objectives` : "/instructor/assessments");
   };
@@ -19,14 +21,14 @@ function CreateAssessment() {
   return (
     <>
       <PageHeader
-        title="New assessment"
-        description="Give it a title and something to generate questions from. Each student will get their own questions."
+        title={t("nav.newAssessment")}
+        description={t("assessments.createDescription")}
         backTo="/instructor/assessments"
-        backLabel="All assessments"
+        backLabel={t("assessments.all")}
       />
       <AssessmentForm
         initialValues={formValuesFromAssessment(null)}
-        submitLabel="Create assessment"
+        submitLabel={t("assessments.createButton")}
         onSubmit={handleSubmit}
         onCancel={() => navigate("/instructor/assessments")}
       />

@@ -1,4 +1,5 @@
 import toast from "react-hot-toast";
+import { errorMessage } from "./forms.js";
 
 /**
  * Standard handling for a failed request or action:
@@ -8,8 +9,8 @@ import toast from "react-hot-toast";
  * Accepts axios errors, API bodies rethrown by stores ({ code, message })
  * and plain Errors.
  */
-export const reportError = (error, fallback = "Something went wrong.", { silent = false } = {}) => {
-  const message = error?.response?.data?.message || error?.message || fallback;
+export const reportError = (error, fallback, { silent = false } = {}) => {
+  const message = errorMessage(error, fallback);
   if (import.meta.env.DEV) {
     console.error(fallback, error);
   }

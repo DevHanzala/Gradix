@@ -1,0 +1,17 @@
+{
+  "listDescription": "See how you did and review every question with the correct answers.",
+  "loadFailed": "Could not load your results",
+  "none": "No results yet",
+  "noneDescription": "Results appear here after you submit an assessment.",
+  "loading": "Loading results…",
+  "scoreOf": "Score {{score}} / {{total}}",
+  "downloadReport": "Download report",
+  "incorrect": "Incorrect",
+  "unansweredDeducted": "Unanswered: {{unanswered}} · Marks deducted for wrong answers: {{deducted}}",
+  "review": "Review",
+  "reviewDescription": "Green is the correct answer; red marks your answer when it was wrong.",
+  "loadingQuestions": "Loading questions…",
+  "raw": "Score",
+  "adjusted": "Difficulty-adjusted",
+  "unanswered": "Unanswered"
+}

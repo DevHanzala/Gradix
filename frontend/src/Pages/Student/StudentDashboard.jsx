@@ -1,40 +1,35 @@
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { FaChartBar, FaCheckCircle, FaClipboardList, FaClock, FaPlayCircle, FaRedo } from "react-icons/fa";
 import useAuthStore from "../../store/authStore";
 import useStudentAnalyticsStore from "../../store/useStudentAnalyticsStore";
+import { formatDuration, formatNumber, formatPercent } from "../../utils/format.js";
 import { Alert, Badge, Button, Card, CardHeader, EmptyState, PageHeader, SkeletonList, StatCard } from "../../components/ui";
 
-const STATUS = {
-  not_started: { label: "Not started", tone: "primary" },
-  in_progress: { label: "In progress", tone: "warning" },
-  completed: { label: "Completed", tone: "success" },
-};
-
-const formatDuration = (seconds) => {
-  const minutes = Math.round((Number(seconds) || 0) / 60);
-  return minutes < 1 ? "under 1 min" : `${minutes} min`;
-};
+const STATUS_TONE = { not_started: "primary", in_progress: "warning", completed: "success" };
 
 function AssessmentAction({ assessment }) {
+  const { t } = useTranslation();
   if (assessment.status === "completed") {
     return (
-      <Button to={`/student/analytics?assessment=${assessment.id}`} variant="secondary" icon={FaChartBar} className="w-full sm:w-auto">
-        View results
+      <Button to={`/student/results/${assessment.id}`} variant="secondary" icon={FaChartBar} className="w-full sm:w-auto">
+        {t("studentDashboard.viewResults")}
       </Button>
     );
   }
   const resuming = assessment.status === "in_progress";
   if (!resuming && (assessment.available_languages || []).length === 0) {
-    return <Badge tone="neutral">Not available yet</Badge>;
+    return <Badge tone="neutral">{t("studentDashboard.notAvailable")}</Badge>;
   }
   return (
     <Button to={`/student/assessments/${assessment.id}/take`} icon={resuming ? FaRedo : FaPlayCircle} className="w-full sm:w-auto">
-      {resuming ? "Resume" : "Start"}
+      {resuming ? t("studentDashboard.resume") : t("studentDashboard.start")}
     </Button>
   );
 }
 
 function StudentDashboard() {
+  const { t } = useTranslation();
   const { user } = useAuthStore();
   const { assessments, loading, error, fetchAssessments } = useStudentAnalyticsStore();
 
@@ -44,23 +39,27 @@ function StudentDashboard() {
 
   const list = Array.isArray(assessments) ? assessments : [];
   const completed = list.filter((a) => a.status === "completed").length;
+  const stat = (value) => (loading ? "–" : formatNumber(value));
 
   return (
     <>
-      <PageHeader title={`Welcome back${user?.name ? `, ${user.name}` : ""}`} description="Your assessments and progress." />
+      <PageHeader
+        title={user?.name ? t("studentDashboard.welcomeName", { name: user.name }) : t("studentDashboard.welcome")}
+        description={t("studentDashboard.description")}
+      />
 
-      <section aria-label="Summary" className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatCard label="Enrolled" value={loading ? "–" : list.length} icon={FaClipboardList} />
-        <StatCard label="Completed" value={loading ? "–" : completed} icon={FaCheckCircle} />
-        <StatCard label="Pending" value={loading ? "–" : list.length - completed} icon={FaClock} />
+      <section aria-label={t("dashboard.summary")} className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <StatCard label={t("studentDashboard.enrolled")} value={stat(list.length)} icon={FaClipboardList} />
+        <StatCard label={t("studentDashboard.completed")} value={stat(completed)} icon={FaCheckCircle} />
+        <StatCard label={t("studentDashboard.pending")} value={stat(list.length - completed)} icon={FaClock} />
       </section>
 
       <Card>
         <CardHeader
-          title="My assessments"
+          title={t("studentDashboard.myAssessments")}
           actions={
             <Button variant="secondary" onClick={() => fetchAssessments()} disabled={loading}>
-              Refresh
+              {t("common.refresh")}
             </Button>
           }
         />
@@ -68,32 +67,39 @@ function StudentDashboard() {
           <SkeletonList rows={3} />
         ) : error ? (
           <div className="p-4 sm:p-6">
-            <Alert tone="danger" title="Could not load your assessments" action={<Button variant="secondary" onClick={() => fetchAssessments()}>Try again</Button>}>
+            <Alert
+              tone="danger"
+              title={t("studentDashboard.loadFailed")}
+              action={
+                <Button variant="secondary" onClick={() => fetchAssessments()}>
+                  {t("common.tryAgain")}
+                </Button>
+              }
+            >
               {error}
             </Alert>
           </div>
         ) : list.length === 0 ? (
-          <EmptyState icon={FaClipboardList} title="No assessments yet" description="When an instructor enrolls you, it will appear here." />
+          <EmptyState icon={FaClipboardList} title={t("assessments.none")} description={t("studentDashboard.noneDescription")} />
         ) : (
           <ul className="divide-y divide-line">
-            {list.map((a) => {
-              const status = STATUS[a.status] || STATUS.not_started;
-              return (
-                <li key={a.id} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-semibold text-ink">{a.title}</h3>
-                      <Badge tone={status.tone}>{status.label}</Badge>
-                    </div>
-                    <p className="mt-1 text-sm text-ink-muted">
-                      {a.question_count} questions · {formatDuration(a.duration_seconds)}
-                      {a.status === "completed" && a.percentage !== null ? ` · Score ${a.percentage}%` : ""}
-                    </p>
+            {list.map((a) => (
+              <li key={a.id} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-semibold text-ink">{a.title}</h3>
+                    <Badge tone={STATUS_TONE[a.status] || "primary"}>{t(`studentDashboard.status.${a.status || "not_started"}`)}</Badge>
                   </div>
-                  <AssessmentAction assessment={a} />
-                </li>
-              );
-            })}
+                  <p className="mt-1 text-sm text-ink-muted">
+                    {t("studentDashboard.questionCount", { count: a.question_count })} · {formatDuration(a.duration_seconds)}
+                    {a.status === "completed" && a.percentage !== null
+                      ? ` · ${t("studentDashboard.score", { value: formatPercent(a.percentage) })}`
+                      : ""}
+                  </p>
+                </div>
+                <AssessmentAction assessment={a} />
+              </li>
+            ))}
           </ul>
         )}
       </Card>

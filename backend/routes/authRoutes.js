@@ -12,6 +12,7 @@ import {
   changeUserRole,
   removeUser,
   registerStudent,
+  setLanguage,
 } from "../controllers/authController.js";
 import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
 import verifyCaptcha from "../validator/verifyCaptcha.js";
@@ -33,6 +34,7 @@ router.post("/reset-password", authLimiter, resetPassword);
 router.use(protect);
 
 router.post("/change-password", changePassword);
+router.put("/me/language", setLanguage);
 router.post("/register-student", authorizeRoles("admin", "instructor", "super_admin"), registerStudent);
 router.get("/users", authorizeRoles("admin", "super_admin"), getUsers);
 router.put("/change-role", authorizeRoles("admin", "super_admin"), changeUserRole);

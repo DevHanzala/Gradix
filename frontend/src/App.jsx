@@ -4,6 +4,8 @@ import {
   Routes,
   Route,
   useLocation,
+  useParams,
+  Navigate,
 } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import "./App.css";
@@ -132,6 +134,12 @@ function ScrollToTop() {
   return null;
 }
 
+/** Per-assessment results link -> results page with that assessment selected. */
+function ResultsRedirect() {
+  const { assessmentId } = useParams();
+  return <Navigate to={`/student/analytics?assessment=${assessmentId}`} replace />;
+}
+
 /* =======================
    APP
    ======================= */
@@ -236,6 +244,8 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route path="/student/results/:assessmentId" element={<ResultsRedirect />} />
 
           <Route
             path="/student/analytics"

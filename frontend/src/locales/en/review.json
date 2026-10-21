@@ -1,0 +1,12 @@
+{
+  "timedOut": "Time ran out",
+  "state": {
+    "correct": "Correct",
+    "wrong": "Incorrect",
+    "unanswered": "Not answered"
+  },
+  "objective": "Objective {{number}}: {{text}}",
+  "chosenMarker": "(your answer)",
+  "answerGiven": "Answer given",
+  "timeTaken": "Time taken"
+}

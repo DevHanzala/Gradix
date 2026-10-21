@@ -1,0 +1,12 @@
+{
+  "loadFailed": "آپ کا ڈیش بورڈ لوڈ نہیں ہو سکا۔",
+  "welcome": "خوش آمدید",
+  "welcomeName": "خوش آمدید، {{name}}",
+  "instructorDescription": "امتحانات بنائیں، طلبہ شامل کریں اور نتائج دیکھیں۔",
+  "summary": "خلاصہ",
+  "startedByStudents": "طلبہ نے شروع کیے",
+  "recentAssessments": "حالیہ امتحانات",
+  "quickActions": "فوری اقدامات",
+  "uploadResources": "وسائل اپ لوڈ کریں",
+  "resultsByAssessment": "امتحان وار نتائج"
+}

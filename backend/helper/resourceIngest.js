@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { extractTextFromFile } from "./textProcessor.js";
+import { extractTextWithMethod } from "./textProcessor.js";
 import { embedPassages, EMBEDDING_MODEL } from "./embeddingGenerator.js";
 import { chunkDocument, CHUNKING_VERSION } from "./chunker.js";
 import { detectLanguage } from "./language.js";
@@ -28,8 +28,9 @@ export const decodeFilename = (name) => {
 export const prepareUploadedFile = async (file) => {
   const name = decodeFilename(file.originalname);
   let text;
+  let method;
   try {
-    text = await extractTextFromFile(file.buffer, file.mimetype);
+    ({ text, method } = await extractTextWithMethod(file.buffer, file.mimetype));
   } catch (error) {
     if (error instanceof AppError) {
       throw new AppError(error.code, error.status, `${name}: ${error.message}`);
@@ -37,7 +38,9 @@ export const prepareUploadedFile = async (file) => {
     throw new AppError("UNREADABLE_DOCUMENT", 422, `${name}: the file could not be read.`);
   }
 
-  return { name, mimetype: file.mimetype, size: file.size, ...(await prepareText(text)) };
+  // Which extraction path was used is logged and stored (resources.extraction_method).
+  console.info(`[ingest] ${name}: text extracted via ${method}`);
+  return { name, mimetype: file.mimetype, size: file.size, extractionMethod: method, ...(await prepareText(text)) };
 };
 
 /** sha256 of the normalised text; identical material hashes the same. */
@@ -97,6 +100,7 @@ export const insertPreparedResource = async (client, prepared, { userId, visibil
       language: prepared.language,
       chunking_version: CHUNKING_VERSION,
       embedding_model: EMBEDDING_MODEL,
+      extraction_method: prepared.extractionMethod || null,
     },
     client
   );

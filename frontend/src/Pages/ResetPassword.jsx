@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import useAuthStore from "../store/authStore.js";
 import { resetPasswordSchema } from "../schemas/passwordSchemas.js";
 import { validateWith, errorMessage } from "../utils/forms.js";
@@ -8,11 +9,12 @@ import { Alert, Button, Input } from "../components/ui";
 
 /** "Forgot password": request a reset link by email. */
 function ResetPassword() {
+  const { t } = useTranslation();
   const forgotPassword = useAuthStore((state) => state.forgotPassword);
   const [email, setEmail] = useState("");
   const [error, setError] = useState(null);
   const [formError, setFormError] = useState(null);
-  const [sentMessage, setSentMessage] = useState(null);
+  const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const onSubmit = async (e) => {
@@ -25,10 +27,10 @@ function ResetPassword() {
     }
     setLoading(true);
     try {
-      const response = await forgotPassword({ email: email.trim() });
-      setSentMessage(response?.message || "If an account with that email exists, we have sent a reset link.");
+      await forgotPassword({ email: email.trim() });
+      setSent(true);
     } catch (err) {
-      setFormError(errorMessage(err, "Could not send the reset link. Please try again."));
+      setFormError(errorMessage(err, t("auth.resetSendFailed")));
     } finally {
       setLoading(false);
     }
@@ -36,25 +38,26 @@ function ResetPassword() {
 
   return (
     <AuthLayout
-      title="Reset your password"
-      subtitle="Enter your account email and we will send you a reset link."
+      title={t("auth.resetTitle")}
+      subtitle={t("auth.resetSubtitle")}
       footer={
         <Link to="/login" className="inline-flex min-h-11 items-center font-semibold text-primary-700 hover:underline">
-          Back to login
+          {t("auth.backToLogin")}
         </Link>
       }
     >
-      {sentMessage ? (
-        <Alert tone="success" title="Check your inbox">
-          {sentMessage} The link expires in 1 hour. Check your spam folder if you do not see it.
+      {sent ? (
+        <Alert tone="success" title={t("auth.checkInbox")}>
+          {t("auth.resetSent")}
         </Alert>
       ) : (
         <form onSubmit={onSubmit} noValidate className="space-y-4">
           {formError && <Alert tone="danger">{formError}</Alert>}
           <Input
-            label="Email"
+            label={t("auth.email")}
             name="email"
             type="email"
+            dir="ltr"
             autoComplete="email"
             value={email}
             onChange={(e) => {
@@ -65,7 +68,7 @@ function ResetPassword() {
             required
           />
           <Button type="submit" fullWidth loading={loading}>
-            Send reset link
+            {t("auth.sendResetLink")}
           </Button>
         </form>
       )}

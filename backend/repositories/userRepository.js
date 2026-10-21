@@ -9,7 +9,7 @@ export const createUserQuery = async (userData) => {
     INSERT INTO users (name, email, password, role, verified, verification_token,
                        verification_token_expires, provider, uid, created_at, updated_at)
     VALUES ($1, $2, $3, $4, $5, $6, NOW() + INTERVAL '24 hours', $7, $8, NOW(), NOW())
-    RETURNING id, name, email, role, verified, provider, uid, created_at
+    RETURNING id, name, email, role, verified, provider, uid, created_at, language_preference
   `;
   
   const values = [name, email, hashedPassword, role, false, verificationToken, provider, uid];
@@ -23,7 +23,7 @@ export const createGoogleUserQuery = async (userData) => {
   const query = `
     INSERT INTO users (name, email, role, verified, provider, uid, created_at, updated_at)
     VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-    RETURNING id, name, email, role, verified, provider, uid, created_at
+    RETURNING id, name, email, role, verified, provider, uid, created_at, language_preference
   `;
   
   const values = [name, email, role, true, "google", uid];
@@ -52,7 +52,7 @@ export const findUserByEmailQuery = async (email) => {
 };
 
 export const findUserByIdQuery = async (id) => {
-  const query = "SELECT id, name, email, role, verified, provider, uid, created_at FROM users WHERE id = $1";
+  const query = "SELECT id, name, email, role, verified, provider, uid, created_at, language_preference FROM users WHERE id = $1";
   const result = await pool.query(query, [id]);
   return result.rows[0] || null;
 };
@@ -88,7 +88,7 @@ export const verifyUserQuery = async (token) => {
     UPDATE users 
     SET verified = true, verification_token = NULL, verification_token_expires = NULL, updated_at = NOW() 
     WHERE verification_token = $1 
-    RETURNING id, name, email, role, verified
+    RETURNING id, name, email, role, verified, language_preference
   `;
   const result = await pool.query(query, [token]);
   return result.rows[0] || null;
@@ -120,7 +120,7 @@ export const updatePasswordByIdQuery = async (userId, hashedPassword) => {
 
 export const findAllUsersQuery = async () => {
   const query = `
-    SELECT id, name, email, role, verified, created_at 
+    SELECT id, name, email, role, verified, created_at, language_preference 
     FROM users 
     ORDER BY created_at DESC
   `;
@@ -133,7 +133,7 @@ export const updateUserRoleQuery = async (userId, newRole) => {
     UPDATE users 
     SET role = $1, updated_at = NOW() 
     WHERE id = $2 
-    RETURNING id, name, email, role, verified
+    RETURNING id, name, email, role, verified, language_preference
   `;
   const result = await pool.query(query, [newRole, userId]);
   return result.rows[0] || null;
@@ -156,4 +156,12 @@ export const setVerificationTokenQuery = async (userId, token) => {
      WHERE id = $1`,
     [userId, token]
   );
+};
+
+export const setLanguagePreferenceQuery = async (userId, language) => {
+  const { rows } = await pool.query(
+    "UPDATE users SET language_preference = $2, updated_at = NOW() WHERE id = $1 RETURNING id, language_preference",
+    [userId, language]
+  );
+  return rows[0] || null;
 };

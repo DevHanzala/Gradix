@@ -1,0 +1,16 @@
+{
+  "draft": "پیش‌نویس",
+  "extracting": "در حال یافتن اهداف…",
+  "failed": "اهداف لازم است",
+  "objectives_ready": "اهداف آماده",
+  "publishing": "در حال انتشار…",
+  "published": "منتشرشده",
+  "executed": "شروع‌شده · قفل",
+  "progressLabel": "پیشرفت آزمون",
+  "steps": {
+    "draft": "پیش‌نویس",
+    "objectives_ready": "اهداف آماده",
+    "publishing": "انتشار",
+    "published": "منتشرشده"
+  }
+}

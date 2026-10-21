@@ -1,0 +1,22 @@
+{
+  "welcome": "Welcome back",
+  "welcomeName": "Welcome back, {{name}}",
+  "description": "Your assessments and progress.",
+  "enrolled": "Enrolled",
+  "completed": "Completed",
+  "pending": "Pending",
+  "myAssessments": "My assessments",
+  "loadFailed": "Could not load your assessments",
+  "noneDescription": "When an instructor enrolls you, it will appear here.",
+  "viewResults": "View results",
+  "notAvailable": "Not available yet",
+  "resume": "Resume",
+  "start": "Start",
+  "questionCount": "Questions: {{count}}",
+  "score": "Score {{value}}",
+  "status": {
+    "not_started": "Not started",
+    "in_progress": "In progress",
+    "completed": "Completed"
+  }
+}

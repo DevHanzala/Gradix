@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import i18n from "../i18n/index.js";
 import {
   fetchInstructorAssessments,
   fetchAssessmentById,
@@ -35,7 +36,7 @@ const useAssessmentStore = create((set) => ({
         loading: false,
       });
     } catch (error) {
-      const message = error.response?.data?.message || "Failed to fetch assessments";
+      const message = error.response?.data?.message || i18n.t("errors.store.loadAssessments");
       set({ error: message, loading: false });
       throw error;
     }
@@ -48,7 +49,7 @@ const useAssessmentStore = create((set) => ({
       set({ currentAssessment: response.data.data, loading: false });
       return response.data.data;
     } catch (error) {
-      const message = error.response?.data?.message || "Failed to fetch assessment";
+      const message = error.response?.data?.message || i18n.t("errors.store.loadAssessment");
       set({ error: message, loading: false });
       throw error;
     }
@@ -64,7 +65,7 @@ const useAssessmentStore = create((set) => ({
       }));
       return response.data.data;
     } catch (error) {
-      const message = error.response?.data?.message || "Failed to create assessment";
+      const message = error.response?.data?.message || i18n.t("errors.store.createAssessment");
       set({ error: message, loading: false });
       throw error;
     }
@@ -85,7 +86,7 @@ const useAssessmentStore = create((set) => ({
       }));
       return response.data.data;
     } catch (error) {
-      const message = error.response?.data?.message || "Failed to update assessment";
+      const message = error.response?.data?.message || i18n.t("errors.store.updateAssessment");
       set({ error: message, loading: false });
       throw error;
     }
@@ -100,7 +101,7 @@ const useAssessmentStore = create((set) => ({
         loading: false,
       }));
     } catch (error) {
-      const message = error.response?.data?.message || "Failed to delete assessment";
+      const message = error.response?.data?.message || i18n.t("errors.store.deleteAssessment");
       set({ error: message, loading: false });
       throw error;
     }
@@ -126,7 +127,7 @@ const useAssessmentStore = create((set) => ({
     } catch (error) {
       // When responseType is "blob" and the server returns a JSON error,
       // axios gives us a Blob instead of a plain object — we must read it as text first.
-      let message = "Failed to generate physical paper";
+      let message = i18n.t("errors.store.paper");
 
       if (error.response?.data instanceof Blob) {
         try {
@@ -156,7 +157,7 @@ const useAssessmentStore = create((set) => ({
       set({ enrolledStudents: response.data.data, loading: false });
       return response.data.data;
     } catch (error) {
-      const message = error.response?.data?.message || "Failed to fetch enrolled students";
+      const message = error.response?.data?.message || i18n.t("errors.store.loadEnrolled");
       set({ error: message, loading: false });
       throw error;
     }
@@ -172,7 +173,7 @@ const useAssessmentStore = create((set) => ({
       }));
       return response.data.data;
     } catch (error) {
-      const message = error.response?.data?.message || "Failed to enroll student";
+      const message = error.response?.data?.message || i18n.t("errors.store.enroll");
       set({ error: message, loading: false });
       throw error;
     }
@@ -187,7 +188,7 @@ const useAssessmentStore = create((set) => ({
         loading: false,
       }));
     } catch (error) {
-      const message = error.response?.data?.message || "Failed to unenroll student";
+      const message = error.response?.data?.message || i18n.t("errors.store.unenroll");
       set({ error: message, loading: false });
       throw error;
     }
@@ -204,7 +205,7 @@ const useAssessmentStore = create((set) => ({
       set({ loading: false });
       return response.data.questions;
     } catch (error) {
-      const message = error.response?.data?.message || "Failed to generate preview questions";
+      const message = error.response?.data?.message || i18n.t("errors.store.preview");
       set({ error: message, loading: false });
       throw error;
     }

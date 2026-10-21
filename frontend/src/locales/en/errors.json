@@ -1,0 +1,64 @@
+{
+  "generic": "Something went wrong. Please try again.",
+  "network": "You appear to be offline. Check your connection and try again.",
+  "boundary": {
+    "title": "Something went wrong",
+    "body": "The page hit an unexpected error. Reloading usually fixes it; your saved work is not lost.",
+    "reload": "Reload page",
+    "details": "Technical details (development only)"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "body": "The page you are looking for does not exist or has moved."
+  },
+  "forbidden": {
+    "title": "You don’t have access to this page",
+    "body": "This page is not available for your role.",
+    "bodyRole": "This page is not available for your role ({{role}})."
+  },
+  "store": {
+    "loadAssessments": "Could not load assessments.",
+    "loadAssessment": "Could not load this assessment.",
+    "createAssessment": "Could not create the assessment.",
+    "updateAssessment": "Could not update the assessment.",
+    "deleteAssessment": "Could not delete the assessment.",
+    "paper": "Could not generate the paper.",
+    "loadEnrolled": "Could not load enrolled students.",
+    "enroll": "Could not enroll the student.",
+    "unenroll": "Could not remove the student.",
+    "preview": "Could not generate sample questions.",
+    "loadStudents": "Could not load the students.",
+    "loadAnswers": "Could not load the answers.",
+    "loadQuestions": "Could not load the questions for this assessment.",
+    "report": "Could not generate the report."
+  },
+  "codes": {
+    "INVALID_CREDENTIALS": "Invalid email or password.",
+    "WEAK_PASSWORD": "The password is too weak. Use at least 8 characters with upper and lower case letters and a number.",
+    "NOT_ENROLLED": "You are not enrolled in this assessment.",
+    "NOT_PUBLISHED": "This assessment has not been published yet.",
+    "POOL_NOT_READY": "Questions in your language are still being prepared. Please try again in a few minutes.",
+    "POOL_EXHAUSTED": "Your next question is being prepared. Please try again in a moment.",
+    "ALREADY_ATTEMPTED": "You have already completed this assessment.",
+    "ATTEMPT_CLOSED": "This attempt has already been submitted.",
+    "QUESTION_CLOSED": "Time for this question has ended.",
+    "QUESTION_NOT_OPEN": "This question is not open yet.",
+    "GENERATION_FAILED": "Questions could not be prepared right now. Please try again.",
+    "UNSUPPORTED_LANGUAGE": "This language is not available.",
+    "ASSESSMENT_LOCKED": "This assessment is locked and can no longer be changed.",
+    "ASSESSMENT_NOT_FOUND": "Assessment not found.",
+    "ASSESSMENT_FORBIDDEN": "You do not have access to this assessment.",
+    "OBJECTIVES_LOCKED": "Objectives can no longer be changed.",
+    "INVALID_OBJECTIVES": "Check the objectives: each needs at least 3 characters and a weight between 0.5 and 10.",
+    "NOT_READY_TO_PUBLISH": "Review the learning objectives before publishing.",
+    "INVALID_QUESTION": "This question is not valid. Check the text, options and correct answer.",
+    "DUPLICATE_QUESTION": "An active question with the same text already exists.",
+    "UNREADABLE_DOCUMENT": "A file could not be read. Try a clearer scan or a text/PDF version.",
+    "INVALID_ASSESSMENT": "Check the assessment settings and try again.",
+    "ALREADY_ENROLLED": "This student is already enrolled.",
+    "STUDENT_NOT_FOUND": "No account exists with that email.",
+    "NOT_A_STUDENT": "That account is not a student account.",
+    "USER_EXISTS": "An account with this email already exists.",
+    "RATE_LIMITED": "Too many requests. Please wait a moment and try again."
+  }
+}

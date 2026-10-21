@@ -1,16 +1,20 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import useAuthStore from "../../store/authStore.js";
 import { registerStudentSchema } from "../../schemas/studentSchemas.js";
 import { validateWith, errorMessage } from "../../utils/forms.js";
-import { Alert, Button, Card, CardBody, CardHeader, Input, PageHeader } from "../../components/ui";
+import { LANGUAGES } from "../../utils/languages.js";
+import { Alert, Button, Card, CardBody, CardHeader, Input, PageHeader, Select } from "../../components/ui";
 
 const EMPTY = { name: "", email: "", password: "", confirmPassword: "" };
 
-/** Create a student account (the student receives a verification email). */
+/** Create a student account (the student receives a verification email in their language). */
 export function RegisterStudentForm({ onRegistered }) {
+  const { t, i18n } = useTranslation();
   const registerStudent = useAuthStore((s) => s.registerStudent);
   const [form, setForm] = useState(EMPTY);
+  const [language, setLanguage] = useState(i18n.language);
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -30,12 +34,12 @@ export function RegisterStudentForm({ onRegistered }) {
     }
     setSaving(true);
     try {
-      await registerStudent({ name: form.name.trim(), email: form.email.trim(), password: form.password });
-      toast.success(`Account created for ${form.name.trim()}. A verification email was sent.`);
+      await registerStudent({ name: form.name.trim(), email: form.email.trim(), password: form.password, language });
+      toast.success(t("students.created", { name: form.name.trim() }));
       onRegistered?.(form.email.trim());
       setForm(EMPTY);
     } catch (error) {
-      setFormError(errorMessage(error, "Could not create the account."));
+      setFormError(errorMessage(error, t("students.createFailed")));
     } finally {
       setSaving(false);
     }
@@ -44,21 +48,38 @@ export function RegisterStudentForm({ onRegistered }) {
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-4">
       {formError && <Alert tone="danger">{formError}</Alert>}
-      <Input label="Full name" name="name" autoComplete="off" value={form.name} onChange={onChange} error={errors.name} required />
-      <Input label="Email" name="email" type="email" autoComplete="off" value={form.email} onChange={onChange} error={errors.email} required />
+      <Input label={t("auth.fullName")} name="name" autoComplete="off" value={form.name} onChange={onChange} error={errors.name} required />
       <Input
-        label="Temporary password"
+        label={t("auth.email")}
+        name="email"
+        type="email"
+        dir="ltr"
+        autoComplete="off"
+        value={form.email}
+        onChange={onChange}
+        error={errors.email}
+        required
+      />
+      <Select
+        label={t("students.language")}
+        hint={t("students.languageHint")}
+        value={language}
+        onChange={(e) => setLanguage(e.target.value)}
+        options={LANGUAGES.map((l) => ({ value: l.code, label: l.name }))}
+      />
+      <Input
+        label={t("students.tempPassword")}
         name="password"
         type="password"
         autoComplete="new-password"
         value={form.password}
         onChange={onChange}
         error={errors.password}
-        hint="8+ characters with upper and lower case letters and a number. Share it securely; the student can change it later."
+        hint={t("students.tempPasswordHint")}
         required
       />
       <Input
-        label="Confirm password"
+        label={t("students.confirmPassword")}
         name="confirmPassword"
         type="password"
         autoComplete="new-password"
@@ -68,21 +89,19 @@ export function RegisterStudentForm({ onRegistered }) {
         required
       />
       <Button type="submit" loading={saving} className="w-full sm:w-auto">
-        Create student account
+        {t("students.createButton")}
       </Button>
     </form>
   );
 }
 
 function AddStudent() {
+  const { t } = useTranslation();
   return (
     <>
-      <PageHeader
-        title="Register a student"
-        description="Create an account for a student who has not signed up yet. Enroll them from an assessment afterwards."
-      />
+      <PageHeader title={t("students.registerTitle")} description={t("students.registerDescription")} />
       <Card className="max-w-2xl">
-        <CardHeader title="New student account" />
+        <CardHeader title={t("students.newAccount")} />
         <CardBody>
           <RegisterStudentForm />
         </CardBody>

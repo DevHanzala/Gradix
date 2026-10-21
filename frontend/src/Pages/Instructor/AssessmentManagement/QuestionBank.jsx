@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { FaCheck, FaDatabase, FaEdit, FaPlus, FaRedo, FaTrash } from "react-icons/fa";
 import {
   addBankQuestionApi,
@@ -16,18 +17,20 @@ import { Alert, Badge, Button, Card, CardHeader, EmptyState, Input, Modal, PageH
 import { errorMessage } from "../../../utils/forms.js";
 import { LANGUAGE_NAMES, isRtl } from "../../../utils/languages.js";
 
-const TYPE_LABEL = { multiple_choice: "MCQ", true_false: "True/False", short_answer: "Short answer" };
 const PAGE_SIZE = 20;
 
 function CorrectAnswer({ question }) {
+  const { t } = useTranslation();
   const answer = question.correctAnswer;
-  if (question.questionType === "true_false") return <span>{answer ? "True" : "False"}</span>;
+  if (question.questionType === "true_false") return <span>{answer ? t("common.true") : t("common.false")}</span>;
   if (question.questionType === "short_answer") {
     return (
       <span>
         {answer?.answer}
         {answer?.rubric?.length > 0 && (
-          <span className="block text-xs text-ink-muted">Rubric: {answer.rubric.map((r) => [r.concept, ...(r.accept || [])].join(" / ")).join(" · ")}</span>
+          <span className="block text-xs text-ink-muted">
+            {t("bank.rubricShort", { rubric: answer.rubric.map((r) => [r.concept, ...(r.accept || [])].join(" / ")).join(" · ") })}
+          </span>
         )}
       </span>
     );
@@ -36,19 +39,20 @@ function CorrectAnswer({ question }) {
 }
 
 function QuestionCard({ question, objectiveIndex, onEdit, onRegenerate, onApprove, onRetire, busy }) {
+  const { t } = useTranslation();
   const dir = isRtl(question.language) ? "rtl" : "ltr";
   const active = question.status === "active";
   return (
     <li className="p-4 sm:p-6">
       <div className="mb-2 flex flex-wrap gap-1.5">
         <Badge>{LANGUAGE_NAMES[question.language] || question.language}</Badge>
-        <Badge tone="primary">O{objectiveIndex + 1}</Badge>
-        <Badge>{TYPE_LABEL[question.questionType]}</Badge>
-        <Badge>Difficulty {question.difficulty}</Badge>
-        {question.origin === "manual" && <Badge>Manual</Badge>}
-        {question.approved && <Badge tone="success">Approved</Badge>}
-        {question.version > 1 && <Badge>v{question.version}</Badge>}
-        <Badge>Served {question.timesServed}×</Badge>
+        <Badge tone="primary">{t("bank.objectiveShort", { number: objectiveIndex + 1 })}</Badge>
+        <Badge>{t(`questionTypes.${question.questionType}`)}</Badge>
+        <Badge>{t("bank.difficulty", { value: question.difficulty })}</Badge>
+        {question.origin === "manual" && <Badge>{t("objectives.manual")}</Badge>}
+        {question.approved && <Badge tone="success">{t("bank.approved")}</Badge>}
+        {question.version > 1 && <Badge>{t("bank.version", { number: question.version })}</Badge>}
+        <Badge>{t("bank.served", { count: question.timesServed })}</Badge>
       </div>
       <div dir={dir} lang={question.language}>
         <p className="font-medium text-ink">{question.questionText}</p>
@@ -62,7 +66,7 @@ function QuestionCard({ question, objectiveIndex, onEdit, onRegenerate, onApprov
                 }`}
               >
                 {option}
-                {option === question.correctAnswer && <span className="sr-only"> (correct)</span>}
+                {option === question.correctAnswer && <span className="sr-only"> {t("preview.correctMarker")}</span>}
               </li>
             ))}
           </ol>
@@ -76,18 +80,18 @@ function QuestionCard({ question, objectiveIndex, onEdit, onRegenerate, onApprov
       {active && (
         <div className="mt-3 flex flex-wrap gap-2">
           <Button variant="secondary" icon={FaEdit} onClick={() => onEdit(question)} disabled={busy}>
-            Edit
+            {t("common.edit")}
           </Button>
           <Button variant="secondary" icon={FaRedo} onClick={() => onRegenerate(question)} loading={busy === `regen-${question.id}`} disabled={Boolean(busy)}>
-            Regenerate
+            {t("objectives.regenerate")}
           </Button>
           {!question.approved && (
             <Button variant="secondary" icon={FaCheck} onClick={() => onApprove(question)} disabled={Boolean(busy)}>
-              Approve
+              {t("bank.approve")}
             </Button>
           )}
           <Button variant="ghost" icon={FaTrash} className="text-danger-700" onClick={() => onRetire(question)} disabled={Boolean(busy)}>
-            Remove
+            {t("common.remove")}
           </Button>
         </div>
       )}
@@ -96,6 +100,7 @@ function QuestionCard({ question, objectiveIndex, onEdit, onRegenerate, onApprov
 }
 
 function QuestionBank() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const [filters, setFilters] = useState({ language: "", objective_id: "", difficulty: "", question_type: "", status: "active", search: "" });
   const [page, setPage] = useState(1);
@@ -115,8 +120,8 @@ function QuestionBank() {
         setObjectives(o.data.data.objectives);
         setLanguages(p.data.data.languages.map((l) => l.language));
       })
-      .catch((e) => setLoadError(errorMessage(e, "Could not load this assessment.")));
-  }, [id]);
+      .catch((e) => setLoadError(errorMessage(e, t("assessments.loadOneFailed"))));
+  }, [id, t]);
 
   const load = useCallback(async () => {
     setData(null);
@@ -126,9 +131,9 @@ function QuestionBank() {
       setData(res.data.data);
       setLoadError(null);
     } catch (e) {
-      setLoadError(errorMessage(e, "Could not load the questions."));
+      setLoadError(errorMessage(e, t("bank.loadFailed")));
     }
-  }, [id, filters, page]);
+  }, [id, filters, page, t]);
 
   useEffect(() => {
     load();
@@ -162,7 +167,7 @@ function QuestionBank() {
       setEditor(null);
       await load();
     } catch (e) {
-      setEditorError(errorMessage(e, "Could not save the question."));
+      setEditorError(errorMessage(e, t("bank.saveFailed")));
     } finally {
       setBusy(null);
     }
@@ -171,47 +176,84 @@ function QuestionBank() {
   return (
     <>
       <PageHeader
-        title="Question bank"
-        description="Every question students can receive. Edits create a new version; students who already answered keep the version they saw."
+        title={t("bank.title")}
+        description={t("bank.description")}
         backTo={`/instructor/assessments/${id}/objectives`}
-        backLabel="Objectives & publishing"
+        backLabel={t("detail.objectivesAndPublishing")}
         actions={
           <Button icon={FaPlus} onClick={() => { setEditorError(null); setEditor({}); }} disabled={!objectives.length}>
-            Add question
+            {t("bank.addQuestion")}
           </Button>
         }
       />
 
       <Card className="mb-6">
         <div className="grid gap-4 p-4 sm:grid-cols-2 sm:p-6 lg:grid-cols-6">
-          <Select label="Language" value={filters.language} onChange={(e) => setFilter({ language: e.target.value })}
-            options={[{ value: "", label: "All" }, ...languages.map((l) => ({ value: l, label: LANGUAGE_NAMES[l] || l }))]} />
-          <Select label="Objective" value={filters.objective_id} onChange={(e) => setFilter({ objective_id: e.target.value })}
-            options={[{ value: "", label: "All" }, ...objectives.map((o, i) => ({ value: o.id, label: `O${i + 1}. ${o.text}` }))]} />
-          <Select label="Difficulty" value={filters.difficulty} onChange={(e) => setFilter({ difficulty: e.target.value })}
-            options={[{ value: "", label: "All" }, ...[1, 2, 3, 4, 5].map((d) => ({ value: d, label: String(d) }))]} />
-          <Select label="Type" value={filters.question_type} onChange={(e) => setFilter({ question_type: e.target.value })}
-            options={[{ value: "", label: "All" }, ...Object.entries(TYPE_LABEL).map(([value, label]) => ({ value, label }))]} />
-          <Select label="Status" value={filters.status} onChange={(e) => setFilter({ status: e.target.value })}
-            options={[{ value: "active", label: "Active" }, { value: "retired", label: "Removed / old versions" }]} />
-          <Input label="Search" type="search" value={filters.search} onChange={(e) => setFilter({ search: e.target.value })} />
+          <Select
+            label={t("common.language")}
+            value={filters.language}
+            onChange={(e) => setFilter({ language: e.target.value })}
+            options={[{ value: "", label: t("common.all") }, ...languages.map((l) => ({ value: l, label: LANGUAGE_NAMES[l] || l }))]}
+          />
+          <Select
+            label={t("objectives.objective")}
+            value={filters.objective_id}
+            onChange={(e) => setFilter({ objective_id: e.target.value })}
+            options={[
+              { value: "", label: t("common.all") },
+              ...objectives.map((o, i) => ({ value: o.id, label: `${t("bank.objectiveShort", { number: i + 1 })}. ${o.text}` })),
+            ]}
+          />
+          <Select
+            label={t("bank.difficultyLabel")}
+            value={filters.difficulty}
+            onChange={(e) => setFilter({ difficulty: e.target.value })}
+            options={[{ value: "", label: t("common.all") }, ...[1, 2, 3, 4, 5].map((d) => ({ value: d, label: t(`bank.levels.${d}`) }))]}
+          />
+          <Select
+            label={t("resources.type")}
+            value={filters.question_type}
+            onChange={(e) => setFilter({ question_type: e.target.value })}
+            options={[
+              { value: "", label: t("common.all") },
+              ...["multiple_choice", "true_false", "short_answer"].map((value) => ({ value, label: t(`questionTypes.${value}`) })),
+            ]}
+          />
+          <Select
+            label={t("users.status")}
+            value={filters.status}
+            onChange={(e) => setFilter({ status: e.target.value })}
+            options={[
+              { value: "active", label: t("bank.active") },
+              { value: "retired", label: t("bank.retired") },
+            ]}
+          />
+          <Input label={t("common.search")} type="search" value={filters.search} onChange={(e) => setFilter({ search: e.target.value })} />
         </div>
       </Card>
 
       {actionError && <Alert tone="danger" className="mb-6">{actionError}</Alert>}
 
       <Card>
-        <CardHeader title={data ? `${data.total} question${data.total === 1 ? "" : "s"}` : "Questions"} />
+        <CardHeader title={data ? t("studentDashboard.questionCount", { count: data.total }) : t("assessments.questions")} />
         {loadError ? (
           <div className="p-4 sm:p-6">
-            <Alert tone="danger" title="Could not load the questions" action={<Button variant="secondary" onClick={load}>Try again</Button>}>
+            <Alert
+              tone="danger"
+              title={t("bank.loadFailedTitle")}
+              action={
+                <Button variant="secondary" onClick={load}>
+                  {t("common.tryAgain")}
+                </Button>
+              }
+            >
               {loadError}
             </Alert>
           </div>
         ) : !data ? (
           <SkeletonList rows={5} />
         ) : data.items.length === 0 ? (
-          <EmptyState icon={FaDatabase} title="No questions match" description="Change the filters, or wait for publishing to finish." />
+          <EmptyState icon={FaDatabase} title={t("bank.noMatch")} description={t("bank.noMatchBody")} />
         ) : (
           <ul className="divide-y divide-line">
             {data.items.map((q) => (
@@ -229,15 +271,13 @@ function QuestionBank() {
           </ul>
         )}
         {data && data.pages > 1 && (
-          <nav className="flex items-center justify-between gap-2 border-t border-line p-4" aria-label="Pages">
+          <nav className="flex items-center justify-between gap-2 border-t border-line p-4" aria-label={t("common.pages")}>
             <Button variant="secondary" onClick={() => setPage((p) => p - 1)} disabled={page <= 1}>
-              Previous
+              {t("common.previous")}
             </Button>
-            <span className="text-sm text-ink-muted">
-              Page {data.page} of {data.pages}
-            </span>
+            <span className="text-sm text-ink-muted">{t("common.pageOf", { page: data.page, pages: data.pages })}</span>
             <Button variant="secondary" onClick={() => setPage((p) => p + 1)} disabled={page >= data.pages}>
-              Next
+              {t("common.next")}
             </Button>
           </nav>
         )}
@@ -260,16 +300,16 @@ function QuestionBank() {
       <Modal
         isOpen={Boolean(retiring)}
         onClose={() => setRetiring(null)}
-        title="Remove this question?"
+        title={t("bank.removeTitle")}
         type="warning"
-        confirmText="Remove"
+        confirmText={t("common.remove")}
         onConfirm={() => {
           const q = retiring;
           setRetiring(null);
           run(`retire-${q.id}`, () => retireBankQuestionApi(id, q.id));
         }}
       >
-        It will no longer be given to students. Students who already answered it are not affected.
+        {t("bank.removeBody")}
       </Modal>
     </>
   );

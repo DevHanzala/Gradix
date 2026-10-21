@@ -1,0 +1,16 @@
+{
+  "blocks": "كتل الأسئلة",
+  "blocksSummary": "الأسئلة: {{questions}} · {{duration}} · الدرجات: {{marks}}",
+  "correctMarks": "صحيح",
+  "wrongMarks": "خطأ",
+  "secondsEach": "ثوانٍ لكل سؤال",
+  "editableDescription": "لم يُنشر بعد: ما زال بإمكانك تعديله.",
+  "lockedDescription": "تم نشره أو بدأه الطلاب، لذا فإعداداته مقفلة.",
+  "fixedDifficulty": "مزيج صعوبة ثابت",
+  "mode": "الوضع",
+  "noPrompt": "لا يوجد وصف. تُولَّد الأسئلة من المواد المختارة.",
+  "noSources": "لا توجد موارد أو روابط.",
+  "objectivesAndPublishing": "الأهداف والنشر",
+  "printPaper": "طباعة الورقة",
+  "state": "الحالة"
+}

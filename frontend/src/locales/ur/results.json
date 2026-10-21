@@ -1,0 +1,17 @@
+{
+  "listDescription": "دیکھیں آپ نے کیسا کیا اور ہر سوال کا درست جوابات کے ساتھ جائزہ لیں۔",
+  "loadFailed": "آپ کے نتائج لوڈ نہیں ہو سکے",
+  "none": "ابھی کوئی نتائج نہیں",
+  "noneDescription": "امتحان جمع کرنے کے بعد نتائج یہاں نظر آتے ہیں۔",
+  "loading": "نتائج لوڈ ہو رہے ہیں…",
+  "scoreOf": "اسکور {{score}} / {{total}}",
+  "downloadReport": "رپورٹ ڈاؤن لوڈ کریں",
+  "incorrect": "غلط",
+  "unansweredDeducted": "بغیر جواب: {{unanswered}} · غلط جوابات پر کٹے نمبر: {{deducted}}",
+  "review": "جائزہ",
+  "reviewDescription": "سبز درست جواب ہے؛ سرخ آپ کا جواب ہے جب وہ غلط تھا۔",
+  "loadingQuestions": "سوالات لوڈ ہو رہے ہیں…",
+  "raw": "اسکور",
+  "adjusted": "مشکل کے مطابق اسکور",
+  "unanswered": "بغیر جواب"
+}

@@ -1,0 +1,12 @@
+{
+  "loadFailed": "Could not load your dashboard.",
+  "welcome": "Welcome",
+  "welcomeName": "Welcome, {{name}}",
+  "instructorDescription": "Create assessments, enroll students and review results.",
+  "summary": "Summary",
+  "startedByStudents": "Started by students",
+  "recentAssessments": "Recent assessments",
+  "quickActions": "Quick actions",
+  "uploadResources": "Upload resources",
+  "resultsByAssessment": "Results by assessment"
+}

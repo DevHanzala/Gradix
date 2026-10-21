@@ -1,0 +1,19 @@
+{
+  "main": "Main",
+  "account": "Account",
+  "navigation": "Navigation",
+  "openNavigation": "Open navigation",
+  "closeNavigation": "Close navigation",
+  "skipToContent": "Skip to content",
+  "dashboard": "Dashboard",
+  "myDashboard": "My dashboard",
+  "results": "Results & review",
+  "assessments": "Assessments",
+  "newAssessment": "New assessment",
+  "resources": "Resources",
+  "registerStudent": "Register student",
+  "users": "Users",
+  "profile": "My profile",
+  "logout": "Log out",
+  "goToMyDashboard": "Go to my dashboard"
+}

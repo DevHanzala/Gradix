@@ -17,7 +17,9 @@ import {
   findUserByResetToken,
   linkGoogleAccount,
   setVerificationToken,
+  setLanguagePreference,
 } from "../models/userModel.js";
+import { normalizeLanguage, LANGUAGES } from "../helper/i18n.js";
 import { firebaseVerifier } from "../config/firebaseAdmin.js";
 import {
   sendVerificationEmail,
@@ -50,7 +52,7 @@ const invalidCredentials = () => new AppError("INVALID_CREDENTIALS", 401, "Inval
 // ==================== SERVICE FUNCTIONS ====================
 
 // 1. SIGNUP
-export const signupService = async ({ name, email, password }) => {
+export const signupService = async ({ name, email, password, language }) => {
   const normalizedEmail = normalizeEmail(email);
   if (!name || !String(name).trim() || !normalizedEmail) {
     throw new AppError("MISSING_FIELDS", 400, "Name, email and password are required.");
@@ -64,9 +66,12 @@ export const signupService = async ({ name, email, password }) => {
   const hashedPassword = await bcrypt.hash(password, BCRYPT_ROUNDS);
   const verificationToken = crypto.randomBytes(32).toString("hex");
   const newUser = await createUser(String(name).trim(), normalizedEmail, hashedPassword, "student", verificationToken, "manual", null);
+  // The language chosen on the sign-up screen becomes the account's language.
+  const preferred = normalizeLanguage(language);
+  if (preferred !== "en") await setLanguagePreference(newUser.id, preferred);
 
-  sendVerificationEmail(normalizedEmail, newUser.name, verificationToken);
-  return { user: newUser, emailSent: true };
+  sendVerificationEmail({ ...newUser, language: preferred }, verificationToken);
+  return { user: { ...newUser, language_preference: preferred }, emailSent: true };
 };
 
 // 2. GOOGLE AUTH
@@ -160,7 +165,7 @@ export const resendVerificationService = async (email) => {
 
   const token = crypto.randomBytes(32).toString("hex");
   await setVerificationToken(user.id, token);
-  sendVerificationEmail(user.email, user.name, token);
+  sendVerificationEmail(user, token);
 };
 
 // 5. FORGOT PASSWORD (always answers the same way)
@@ -172,7 +177,7 @@ export const forgotPasswordService = async (email) => {
   const resetId = crypto.randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
   await updateResetToken(user.email, resetId, expiresAt);
-  sendPasswordResetEmail(user.email, user.name, resetId);
+  sendPasswordResetEmail(user, resetId);
 };
 
 // 6a. RESET PASSWORD (public, with emailed token)
@@ -190,7 +195,7 @@ export const resetPasswordService = async ({ resetId, newPassword }) => {
   if (!updated) throw new Error("PASSWORD_UPDATE_FAILED");
   await updateResetToken(user.email, null, null);
 
-  sendPasswordChangedEmail(user.email, user.name);
+  sendPasswordChangedEmail(user);
   return { success: true };
 };
 
@@ -216,7 +221,7 @@ export const changePasswordService = async ({ currentPassword, newPassword }, au
   const updated = await updatePasswordById(user.id, hashedPassword);
   if (!updated) throw new Error("PASSWORD_UPDATE_FAILED");
 
-  sendPasswordChangedEmail(user.email, user.name);
+  sendPasswordChangedEmail(user);
   return { success: true };
 };
 
@@ -244,7 +249,7 @@ export const changeUserRoleService = async ({ userId, newRole }, requestingUser)
   const updatedUser = await updateUserRole(targetId, newRole, requestingUser.role, target.role);
   if (!updatedUser) throw new Error("USER_NOT_FOUND");
 
-  sendRoleChangeEmail(updatedUser.email, updatedUser.name, target.role, newRole);
+  sendRoleChangeEmail({ ...updatedUser, language: target.language_preference }, target.role, newRole);
   return updatedUser;
 };
 
@@ -262,7 +267,7 @@ export const removeUserService = async (userId, requestingUser) => {
 };
 
 // 10. REGISTER STUDENT (by admin / instructor / super_admin)
-export const registerStudentService = async ({ name, email, password, roles }, registrarUser) => {
+export const registerStudentService = async ({ name, email, password, roles, language }, registrarUser) => {
   if (roles !== undefined) throw new Error("INVALID_ROLES_FIELD");
   if (!["admin", "instructor", "super_admin"].includes(registrarUser.role)) throw new Error("UNAUTHORIZED_ROLE");
 
@@ -277,9 +282,20 @@ export const registerStudentService = async ({ name, email, password, roles }, r
   const verificationToken = crypto.randomBytes(32).toString("hex");
   const newUser = await createUser(String(name).trim(), normalizedEmail, hashedPassword, "student", verificationToken, "manual", null);
 
-  sendVerificationEmail(normalizedEmail, newUser.name, verificationToken);
+  // The registrar picks the student's language (defaults to English).
+  const preferred = normalizeLanguage(language);
+  if (preferred !== "en") await setLanguagePreference(newUser.id, preferred);
+  sendVerificationEmail({ ...newUser, language: preferred }, verificationToken);
   // No token is returned: the registrar must not receive a session for the new student.
   return { user: newUser, emailSent: true };
+};
+
+// 11. LANGUAGE PREFERENCE (own account)
+export const setLanguagePreferenceService = async (language, authenticatedUser) => {
+  if (!LANGUAGES.includes(language)) throw new AppError("UNSUPPORTED_LANGUAGE", 400, "Unsupported language.");
+  const updated = await setLanguagePreference(authenticatedUser.id, language);
+  if (!updated) throw new Error("USER_NOT_FOUND");
+  return { language: updated.language_preference };
 };
 
 // ==================== HELPERS ====================
@@ -291,4 +307,5 @@ export const formatUserResponse = (user) => ({
   role: user.role,
   verified: user.verified,
   provider: user.provider,
+  language: user.language_preference || "en",
 });

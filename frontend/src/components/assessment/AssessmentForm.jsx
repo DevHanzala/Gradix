@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { FaFileUpload, FaLink, FaPlus, FaTrash } from "react-icons/fa";
 import useResourceStore from "../../store/resourceStore.js";
 import {
@@ -8,6 +9,8 @@ import {
   assessmentFormSchema,
   issuesToErrors,
 } from "../../schemas/assessmentSchemas.js";
+import { errorMessage } from "../../utils/forms.js";
+import { textDirection } from "../../utils/text.js";
 import { Alert, Button, Card, CardBody, CardHeader, Checkbox, Input, Select, Textarea } from "../ui";
 import { NEW_BLOCK } from "./assessmentFormValues.js";
 
@@ -36,6 +39,7 @@ const toFormData = (values, files) => {
 };
 
 function QuestionBlockEditor({ index, block, errors, disabled, onChange, onRemove, canRemove }) {
+  const { t } = useTranslation();
   const err = (field) => errors[`blocks.${index}.${field}`];
   const numberField = (field) => ({
     type: "number",
@@ -49,42 +53,36 @@ function QuestionBlockEditor({ index, block, errors, disabled, onChange, onRemov
   return (
     <fieldset className="rounded-card border border-line p-4">
       <div className="mb-4 flex items-center justify-between gap-2">
-        <legend className="text-sm font-semibold text-ink">Question block {index + 1}</legend>
+        <legend className="text-sm font-semibold text-ink">{t("form.blockTitle", { number: index + 1 })}</legend>
         {canRemove && (
           <Button variant="ghost" icon={FaTrash} onClick={() => onRemove(index)} disabled={disabled} className="text-danger-700 hover:bg-danger-50">
-            Remove
+            {t("common.remove")}
           </Button>
         )}
       </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Select
-          label="Question type"
+          label={t("form.questionType")}
           value={block.question_type}
           onChange={(e) => onChange(index, "question_type", e.target.value)}
-          options={QUESTION_TYPES}
+          options={QUESTION_TYPES.map((q) => ({ value: q.value, label: t(q.labelKey) }))}
           disabled={disabled}
         />
-        <Input label="Number of questions" min={1} max={ASSESSMENT_LIMITS.maxQuestionsPerBlock} {...numberField("question_count")} />
+        <Input label={t("form.questionCount")} min={1} max={ASSESSMENT_LIMITS.maxQuestionsPerBlock} {...numberField("question_count")} />
         <Input
-          label="Seconds per question"
+          label={t("form.secondsPerQuestion")}
           min={ASSESSMENT_LIMITS.minDuration}
           max={ASSESSMENT_LIMITS.maxDuration}
-          hint={`${ASSESSMENT_LIMITS.minDuration}-${ASSESSMENT_LIMITS.maxDuration}`}
+          hint={t("form.secondsHint", { min: ASSESSMENT_LIMITS.minDuration, max: ASSESSMENT_LIMITS.maxDuration })}
           {...numberField("duration_per_question")}
         />
         {block.question_type === "multiple_choice" && (
-          <Input label="Options per question" min={ASSESSMENT_LIMITS.minOptions} max={ASSESSMENT_LIMITS.maxOptions} {...numberField("num_options")} />
+          <Input label={t("form.optionsPerQuestion")} min={ASSESSMENT_LIMITS.minOptions} max={ASSESSMENT_LIMITS.maxOptions} {...numberField("num_options")} />
         )}
-        <Input label="Marks for a correct answer" min={0} step="0.25" {...numberField("positive_marks")} inputMode="decimal" />
-        <Input
-          label="Deduction for a wrong answer"
-          min={0}
-          step="0.25"
-          hint="0 turns negative marking off"
-          {...numberField("negative_marks")}
-          inputMode="decimal"
-        />
+        <Input label={t("form.positiveMarks")} min={0} step="0.25" {...numberField("positive_marks")} inputMode="decimal" />
+        <Input label={t("form.negativeMarks")} min={0} step="0.25" hint={t("form.negativeHint")} {...numberField("negative_marks")} inputMode="decimal" />
       </div>
+      {block.question_type === "short_answer" && <p className="mt-3 text-sm text-ink-subtle">{t("form.shortAnswerNote")}</p>}
     </fieldset>
   );
 }
@@ -94,6 +92,7 @@ function QuestionBlockEditor({ index, block, errors, disabled, onChange, onRemov
  * it throws are shown at the top of the form.
  */
 function AssessmentForm({ initialValues, submitLabel, onSubmit, onCancel, disabled = false }) {
+  const { t } = useTranslation();
   const { resources, fetchAllResources, loading: resourcesLoading, error: resourcesError } = useResourceStore();
   const [values, setValues] = useState(initialValues);
   const [files, setFiles] = useState([]);
@@ -119,8 +118,8 @@ function AssessmentForm({ initialValues, submitLabel, onSubmit, onCancel, disabl
     set("resourceIds", values.resourceIds.includes(id) ? values.resourceIds.filter((r) => r !== id) : [...values.resourceIds, id]);
 
   const fileProblems = useMemo(
-    () => files.filter((f) => f.size > ASSESSMENT_LIMITS.maxFileBytes).map((f) => `${f.name} is larger than 20 MB.`),
-    [files]
+    () => files.filter((f) => f.size > ASSESSMENT_LIMITS.maxFileBytes).map((f) => t("form.fileTooLarge", { name: f.name, size: 20 })),
+    [files, t]
   );
 
   const handleSubmit = async (e) => {
@@ -136,7 +135,7 @@ function AssessmentForm({ initialValues, submitLabel, onSubmit, onCancel, disabl
     try {
       await onSubmit(toFormData(values, files));
     } catch (error) {
-      setSubmitError(error?.response?.data?.message || error?.message || "Could not save the assessment.");
+      setSubmitError(errorMessage(error, t("form.saveFailed")));
     } finally {
       setSubmitting(false);
     }
@@ -146,17 +145,30 @@ function AssessmentForm({ initialValues, submitLabel, onSubmit, onCancel, disabl
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-6">
-      {submitError && <Alert tone="danger" title="Not saved">{submitError}</Alert>}
+      {submitError && (
+        <Alert tone="danger" title={t("form.notSaved")}>
+          {submitError}
+        </Alert>
+      )}
 
       <Card>
-        <CardHeader title="Details" description="Only a title and one source (prompt, resource, file or link) are required." />
+        <CardHeader title={t("form.details")} description={t("form.detailsDescription")} />
         <CardBody className="space-y-4">
-          <Input label="Title" value={values.title} onChange={(e) => set("title", e.target.value)} error={errors.title} required disabled={disabled} />
+          <Input
+            label={t("form.title")}
+            value={values.title}
+            dir={textDirection(values.title)}
+            onChange={(e) => set("title", e.target.value)}
+            error={errors.title}
+            required
+            disabled={disabled}
+          />
           <Textarea
-            label="Prompt"
-            hint="Describe the topic, level and anything the questions should focus on. Optional if you add material below."
+            label={t("form.prompt")}
+            hint={t("form.promptHint")}
             rows={5}
             value={values.prompt}
+            dir={textDirection(values.prompt)}
             onChange={(e) => set("prompt", e.target.value)}
             error={errors.prompt}
             disabled={disabled}
@@ -165,25 +177,32 @@ function AssessmentForm({ initialValues, submitLabel, onSubmit, onCancel, disabl
       </Card>
 
       <Card>
-        <CardHeader title="Source material" description="Questions are generated from the prompt and everything selected here." />
+        <CardHeader title={t("form.sourceMaterial")} description={t("form.sourceDescription")} />
         <CardBody className="space-y-6">
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-ink">Your resource library</h3>
+            <h3 className="mb-2 text-sm font-semibold text-ink">{t("form.library")}</h3>
             {resourcesLoading ? (
-              <p className="text-sm text-ink-muted">Loading resources…</p>
+              <p className="text-sm text-ink-muted">{t("form.loadingResources")}</p>
             ) : resourcesError ? (
-              <Alert tone="danger" action={<Button variant="secondary" onClick={() => fetchAllResources()}>Try again</Button>}>
-                Could not load resources.
+              <Alert
+                tone="danger"
+                action={
+                  <Button variant="secondary" onClick={() => fetchAllResources()}>
+                    {t("common.tryAgain")}
+                  </Button>
+                }
+              >
+                {t("form.resourcesFailed")}
               </Alert>
             ) : resources.length === 0 ? (
-              <p className="text-sm text-ink-muted">No resources yet. Upload files below or from the Resources page.</p>
+              <p className="text-sm text-ink-muted">{t("form.noResources")}</p>
             ) : (
               <div className="max-h-64 space-y-1 overflow-y-auto rounded-control border border-line p-2">
                 {resources.map((r) => (
                   <Checkbox
                     key={r.id}
                     label={r.name}
-                    description={r.visibility === "public" ? `Public · ${r.uploader_name || ""}` : "Private"}
+                    description={r.visibility === "public" ? t("form.publicBy", { name: r.uploader_name || "" }) : t("resources.private")}
                     checked={values.resourceIds.includes(r.id)}
                     onChange={() => toggleResource(r.id)}
                     disabled={disabled}
@@ -195,7 +214,7 @@ function AssessmentForm({ initialValues, submitLabel, onSubmit, onCancel, disabl
 
           <div>
             <label htmlFor="assessment-files" className="mb-1.5 block text-sm font-semibold text-ink">
-              Upload new files
+              {t("form.uploadFiles")}
             </label>
             <input
               id="assessment-files"
@@ -208,13 +227,13 @@ function AssessmentForm({ initialValues, submitLabel, onSubmit, onCancel, disabl
               aria-describedby="assessment-files-hint"
             />
             <p id="assessment-files-hint" className="mt-1 text-sm text-ink-subtle">
-              PDF, Word, PowerPoint, text or images, up to 20 MB each. Scans are read with OCR.
+              {t("form.filesHint")}
             </p>
             {files.length > 0 && (
               <ul className="mt-2 space-y-1 text-sm text-ink-muted">
                 {files.map((f) => (
                   <li key={f.name} className="flex items-center gap-2">
-                    <FaFileUpload aria-hidden="true" /> {f.name}
+                    <FaFileUpload aria-hidden="true" /> <span dir="auto">{f.name}</span>
                   </li>
                 ))}
               </ul>
@@ -222,16 +241,17 @@ function AssessmentForm({ initialValues, submitLabel, onSubmit, onCancel, disabl
           </div>
 
           <div>
-            <h3 className="mb-2 text-sm font-semibold text-ink">Reference links</h3>
-            <p className="mb-3 text-sm text-ink-subtle">Link titles are passed to the AI; page contents are not downloaded.</p>
+            <h3 className="mb-2 text-sm font-semibold text-ink">{t("form.links")}</h3>
+            <p className="mb-3 text-sm text-ink-subtle">{t("form.linksHint")}</p>
             <div className="space-y-3">
               {values.links.map((link, i) => (
                 <div key={i} className="flex items-start gap-2">
                   <Input
                     className="flex-1"
-                    label={`Link ${i + 1}`}
+                    label={t("form.linkLabel", { number: i + 1 })}
                     type="url"
                     inputMode="url"
+                    dir="ltr"
                     placeholder="https://"
                     value={link}
                     onChange={(e) => set("links", values.links.map((l, j) => (j === i ? e.target.value : l)))}
@@ -242,26 +262,32 @@ function AssessmentForm({ initialValues, submitLabel, onSubmit, onCancel, disabl
                     <Button
                       variant="ghost"
                       className="mt-7"
-                      aria-label={`Remove link ${i + 1}`}
+                      aria-label={t("form.removeLink", { number: i + 1 })}
                       icon={FaTrash}
                       onClick={() => set("links", values.links.filter((_, j) => j !== i))}
                       disabled={disabled}
                     >
-                      <span className="sr-only">Remove</span>
+                      <span className="sr-only">{t("common.remove")}</span>
                     </Button>
                   )}
                 </div>
               ))}
             </div>
-            <Button variant="secondary" icon={FaLink} className="mt-3" onClick={() => set("links", [...values.links, ""])} disabled={disabled || values.links.length >= 10}>
-              Add link
+            <Button
+              variant="secondary"
+              icon={FaLink}
+              className="mt-3"
+              onClick={() => set("links", [...values.links, ""])}
+              disabled={disabled || values.links.length >= 10}
+            >
+              {t("form.addLink")}
             </Button>
           </div>
         </CardBody>
       </Card>
 
       <Card>
-        <CardHeader title="Questions and marking" description="Each student gets their own questions following these blocks." />
+        <CardHeader title={t("form.questionsAndMarking")} description={t("form.questionsDescription")} />
         <CardBody className="space-y-4">
           {errors.blocks && <Alert tone="danger">{errors.blocks}</Alert>}
           {values.blocks.map((block, i) => (
@@ -282,24 +308,24 @@ function AssessmentForm({ initialValues, submitLabel, onSubmit, onCancel, disabl
             onClick={() => set("blocks", [...values.blocks, { ...NEW_BLOCK }])}
             disabled={disabled || values.blocks.length >= ASSESSMENT_LIMITS.maxBlocks}
           >
-            Add question block
+            {t("form.addBlock")}
           </Button>
         </CardBody>
       </Card>
 
       <Card>
-        <CardHeader title="Exam behaviour" />
+        <CardHeader title={t("form.examBehaviour")} />
         <CardBody className="space-y-1">
           <Checkbox
-            label="Adaptive difficulty"
-            description="Each student starts at medium difficulty; it goes up after strong answers and down after weak ones. Every student still covers the same objectives."
+            label={t("form.adaptive")}
+            description={t("form.adaptiveDescription")}
             checked={Boolean(values.adaptive)}
             onChange={(e) => set("adaptive", e.target.checked)}
             disabled={disabled}
           />
           <Checkbox
-            label="Show live score"
-            description="Students see whether each answer was correct and their running score during the exam. Off by default."
+            label={t("form.liveScore")}
+            description={t("form.liveScoreDescription")}
             checked={Boolean(values.showLiveScore)}
             onChange={(e) => set("showLiveScore", e.target.checked)}
             disabled={disabled}
@@ -311,11 +337,11 @@ function AssessmentForm({ initialValues, submitLabel, onSubmit, onCancel, disabl
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           {onCancel && (
             <Button variant="secondary" onClick={onCancel} disabled={submitting}>
-              Cancel
+              {t("common.cancel")}
             </Button>
           )}
           <Button type="submit" loading={submitting}>
-            {submitting && files.length ? "Processing files…" : submitLabel}
+            {submitting && files.length ? t("form.processingFiles") : submitLabel}
           </Button>
         </div>
       )}

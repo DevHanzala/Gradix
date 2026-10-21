@@ -1,0 +1,22 @@
+{
+  "welcome": "خوش برگشتید",
+  "welcomeName": "خوش برگشتید، {{name}}",
+  "description": "آزمون‌ها و پیشرفت شما.",
+  "enrolled": "ثبت‌نام‌شده",
+  "completed": "تکمیل‌شده",
+  "pending": "در انتظار",
+  "myAssessments": "آزمون‌های من",
+  "loadFailed": "بارگذاری آزمون‌های شما ممکن نشد",
+  "noneDescription": "وقتی مدرسی شما را ثبت‌نام کند، آزمون اینجا نمایش داده می‌شود.",
+  "viewResults": "مشاهده نتایج",
+  "notAvailable": "هنوز در دسترس نیست",
+  "resume": "ادامه",
+  "start": "شروع",
+  "questionCount": "پرسش‌ها: {{count}}",
+  "score": "نمره {{value}}",
+  "status": {
+    "not_started": "شروع نشده",
+    "in_progress": "در حال انجام",
+    "completed": "تکمیل‌شده"
+  }
+}

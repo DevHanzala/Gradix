@@ -1,0 +1,22 @@
+{
+  "welcome": "مرحبًا بعودتك",
+  "welcomeName": "مرحبًا بعودتك، {{name}}",
+  "description": "تقييماتك وتقدّمك.",
+  "enrolled": "مسجّل",
+  "completed": "مكتمل",
+  "pending": "قيد الانتظار",
+  "myAssessments": "تقييماتي",
+  "loadFailed": "تعذّر تحميل تقييماتك",
+  "noneDescription": "عندما يسجّلك مدرّس، سيظهر التقييم هنا.",
+  "viewResults": "عرض النتائج",
+  "notAvailable": "غير متاح بعد",
+  "resume": "متابعة",
+  "start": "ابدأ",
+  "questionCount": "الأسئلة: {{count}}",
+  "score": "الدرجة {{value}}",
+  "status": {
+    "not_started": "لم يبدأ",
+    "in_progress": "قيد التقدم",
+    "completed": "مكتمل"
+  }
+}

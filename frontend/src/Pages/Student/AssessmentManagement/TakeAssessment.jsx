@@ -1,23 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { FaClock, FaCheckCircle, FaCloud, FaCloudUploadAlt, FaExclamationTriangle, FaWifi } from "react-icons/fa";
 import useStudentAssessmentStore from "../../../store/studentAssessmentStore.js";
 import LoadingSpinner from "../../../components/ui/LoadingSpinner";
 import { Button } from "../../../components/ui";
-
-const RTL_LANGUAGES = ["ur", "ar", "fa"];
-const LANGUAGES = [
-  { value: "en", label: "English" },
-  { value: "ur", label: "اردو (Urdu)" },
-  { value: "ar", label: "العربية (Arabic)" },
-  { value: "fa", label: "فارسی (Persian)" },
-];
-
-const formatTime = (seconds) => {
-  const s = Math.max(0, seconds);
-  const m = Math.floor(s / 60);
-  return `${m}:${String(s % 60).padStart(2, "0")}`;
-};
+import { LANGUAGES, isRtl } from "../../../utils/languages.js";
+import { formatClock, formatDuration, formatNumber, formatPercent } from "../../../utils/format.js";
 
 /** Re-render every 250 ms while active so countdowns stay smooth. */
 const useNow = (active) => {
@@ -30,24 +19,27 @@ const useNow = (active) => {
   return now;
 };
 
-const SaveIndicator = ({ status }) => {
-  const map = {
-    saving: { icon: <FaCloudUploadAlt aria-hidden="true" />, text: "Saving…", cls: "text-warning-700 bg-warning-50" },
-    saved: { icon: <FaCloud aria-hidden="true" />, text: "Saved", cls: "text-success-700 bg-success-50" },
-    offline: { icon: <FaWifi aria-hidden="true" />, text: "Offline – will retry", cls: "text-danger-700 bg-danger-50" },
-    error: { icon: <FaExclamationTriangle aria-hidden="true" />, text: "Not saved", cls: "text-danger-700 bg-danger-50" },
-  };
-  const item = map[status];
+const SAVE_STATES = {
+  saving: { icon: FaCloudUploadAlt, cls: "text-warning-700 bg-warning-50" },
+  saved: { icon: FaCloud, cls: "text-success-700 bg-success-50" },
+  offline: { icon: FaWifi, cls: "text-danger-700 bg-danger-50" },
+  error: { icon: FaExclamationTriangle, cls: "text-danger-700 bg-danger-50" },
+};
+
+const SaveIndicator = ({ status, t }) => {
+  const item = SAVE_STATES[status];
   if (!item) return null;
+  const Icon = item.icon;
   return (
     <span role="status" aria-live="polite" className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${item.cls}`}>
-      {item.icon}
-      {item.text}
+      <Icon aria-hidden="true" />
+      {t(`exam.save.${status}`)}
     </span>
   );
 };
 
 function TakeAssessment() {
+  const { t: tUi, i18n } = useTranslation();
   const { assessmentId } = useParams();
   const {
     phase,
@@ -75,7 +67,7 @@ function TakeAssessment() {
     reset,
   } = useStudentAssessmentStore();
 
-  const [selectedLanguage, setSelectedLanguage] = useState("en");
+  const [selectedLanguage, setSelectedLanguage] = useState(i18n.language);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
   const firedForIndex = useRef(null);
 
@@ -92,7 +84,7 @@ function TakeAssessment() {
     return () => window.removeEventListener("online", onOnline);
   }, [flushPending]);
 
-  const inProgress = phase === "in_progress";
+  const inProgress = phase === "in_progress" || phase === "submitting";
   const now = useNow(inProgress);
   const questionRemaining = inProgress ? Math.ceil((questionDeadline - now) / 1000) : 0;
   const overallRemaining = inProgress ? Math.ceil((overallDeadline - now) / 1000) : 0;
@@ -101,7 +93,7 @@ function TakeAssessment() {
   // Per-question timeout auto-advances (last question auto-submits);
   // overall timeout auto-submits. Fire once per question index.
   useEffect(() => {
-    if (!inProgress || !currentQuestion || preparing) return;
+    if (phase !== "in_progress" || !currentQuestion || preparing) return;
     if (overallRemaining <= 0) {
       if (firedForIndex.current !== "overall") {
         firedForIndex.current = "overall";
@@ -113,9 +105,12 @@ function TakeAssessment() {
       firedForIndex.current = currentIndex;
       advance();
     }
-  }, [inProgress, questionRemaining, overallRemaining, currentIndex, currentQuestion, preparing, advance, submit]);
+  }, [phase, questionRemaining, overallRemaining, currentIndex, currentQuestion, preparing, advance, submit]);
 
-  const dir = RTL_LANGUAGES.includes(inProgress ? language : selectedLanguage) ? "rtl" : "ltr";
+  // During (and right after) an attempt the interface speaks the exam's language.
+  const examLanguage = inProgress || phase === "completed" ? language || selectedLanguage : selectedLanguage;
+  const t = i18n.getFixedT(examLanguage);
+  const dir = isRtl(examLanguage) ? "rtl" : "ltr";
 
   // ---------------------------------------------------------------- states
 
@@ -123,7 +118,7 @@ function TakeAssessment() {
     return (
       <CenteredPanel>
         <LoadingSpinner size="lg" />
-        <p className="mt-4 text-ink-muted">Loading assessment…</p>
+        <p className="mt-4 text-ink-muted">{tUi("exam.loading")}</p>
       </CenteredPanel>
     );
   }
@@ -132,16 +127,14 @@ function TakeAssessment() {
     return (
       <CenteredPanel>
         <FaExclamationTriangle className="mx-auto text-4xl text-danger-600" aria-hidden="true" />
-        <h1 className="mt-4 text-xl font-bold text-ink">
-          {errorCode === "NOT_ENROLLED" ? "You are not enrolled in this assessment" : "Something went wrong"}
-        </h1>
+        <h1 className="mt-4 text-xl font-bold text-ink">{errorCode === "NOT_ENROLLED" ? tUi("exam.notEnrolled") : tUi("errors.boundary.title")}</h1>
         <p className="mt-2 text-ink-muted">{error}</p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <button type="button" onClick={() => loadAttempt(assessmentId)} className="btn-secondary">
-            Try again
+            {tUi("common.tryAgain")}
           </button>
           <Link to="/student/dashboard" className="btn-primary">
-            Back to dashboard
+            {tUi("exam.backToDashboard")}
           </Link>
         </div>
       </CenteredPanel>
@@ -149,22 +142,20 @@ function TakeAssessment() {
   }
 
   if (phase === "completed" && result) {
-    return <ResultSummary result={result} />;
+    return <ResultSummary result={result} t={t} dir={dir} lang={examLanguage} />;
   }
 
   if ((phase === "not_started" || phase === "starting") && availableLanguages.length === 0) {
     return (
       <CenteredPanel>
         <FaClock className="mx-auto text-4xl text-primary-600" aria-hidden="true" />
-        <h1 className="mt-4 text-xl font-bold text-ink">Not available yet</h1>
-        <p className="mt-2 text-ink-muted">
-          Your instructor has not published this assessment yet, or its questions are still being prepared. Please check again later.
-        </p>
+        <h1 className="mt-4 text-xl font-bold text-ink">{tUi("studentDashboard.notAvailable")}</h1>
+        <p className="mt-2 text-ink-muted">{tUi("exam.notAvailableBody")}</p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Button variant="secondary" onClick={() => loadAttempt(assessmentId)}>
-            Check again
+            {tUi("exam.checkAgain")}
           </Button>
-          <Button to="/student/dashboard">Back to dashboard</Button>
+          <Button to="/student/dashboard">{tUi("exam.backToDashboard")}</Button>
         </div>
       </CenteredPanel>
     );
@@ -172,16 +163,17 @@ function TakeAssessment() {
 
   if (phase === "not_started" || phase === "starting") {
     const starting = phase === "starting";
-    const offered = LANGUAGES.filter((l) => availableLanguages.includes(l.value));
-    const chosenLanguage = availableLanguages.includes(selectedLanguage) ? selectedLanguage : offered[0].value;
+    const offered = LANGUAGES.filter((l) => availableLanguages.includes(l.code));
+    const chosenLanguage = availableLanguages.includes(selectedLanguage) ? selectedLanguage : offered[0].code;
+    const tChosen = i18n.getFixedT(chosenLanguage);
     return (
-      <CenteredPanel dir={dir}>
-        <h1 className="text-2xl font-bold text-ink sm:text-3xl">Ready to begin?</h1>
-        <p className="mt-2 text-ink-muted">Choose the language for your questions, then start.</p>
+      <CenteredPanel dir={isRtl(chosenLanguage) ? "rtl" : "ltr"} lang={chosenLanguage}>
+        <h1 className="text-2xl font-bold text-ink sm:text-3xl">{tChosen("exam.readyTitle")}</h1>
+        <p className="mt-2 text-ink-muted">{tChosen("exam.readyBody")}</p>
 
         <div className="mt-6 text-start">
           <label htmlFor="exam-language" className="mb-2 block text-sm font-semibold text-ink">
-            Question language
+            {tChosen("exam.questionLanguage")}
           </label>
           <select
             id="exam-language"
@@ -191,18 +183,18 @@ function TakeAssessment() {
             className="w-full min-h-11 rounded-control border border-line-strong bg-surface px-3 py-2 text-base focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-200"
           >
             {offered.map((l) => (
-              <option key={l.value} value={l.value}>
-                {l.label}
+              <option key={l.code} value={l.code} lang={l.code}>
+                {l.name}
               </option>
             ))}
           </select>
         </div>
 
         <ul className="mt-6 space-y-2 rounded-control bg-primary-50 p-4 text-start text-sm text-primary-800">
-          <li>• Each question has its own timer. When it runs out you move on automatically.</li>
-          <li>• You cannot go back to a previous question.</li>
-          <li>• Your answers are saved automatically as you choose them.</li>
-          <li>• You can take this assessment only once. If you refresh, you continue where you left off.</li>
+          <li>• {tChosen("exam.rules.timer")}</li>
+          <li>• {tChosen("exam.rules.noBack")}</li>
+          <li>• {tChosen("exam.rules.autosave")}</li>
+          <li>• {tChosen("exam.rules.once")}</li>
         </ul>
 
         {error && (
@@ -211,19 +203,14 @@ function TakeAssessment() {
           </p>
         )}
 
-        <button
-          type="button"
-          onClick={() => startAssessment(assessmentId, chosenLanguage)}
-          disabled={starting}
-          className="btn-primary mt-6 w-full"
-        >
+        <button type="button" onClick={() => startAssessment(assessmentId, chosenLanguage)} disabled={starting} className="btn-primary mt-6 w-full">
           {starting ? (
             <>
               <LoadingSpinner size="sm" color="white" />
-              <span>Preparing your questions…</span>
+              <span>{tChosen("exam.preparing")}</span>
             </>
           ) : (
-            "Start assessment"
+            tChosen("exam.start")
           )}
         </button>
       </CenteredPanel>
@@ -235,10 +222,10 @@ function TakeAssessment() {
   const question = currentQuestion;
   if (!question || preparing) {
     return (
-      <CenteredPanel dir={dir}>
+      <CenteredPanel dir={dir} lang={examLanguage}>
         <LoadingSpinner size="lg" />
         <p className="mt-4 text-ink-muted" role="status">
-          Preparing your next question…
+          {t("exam.preparingNext")}
         </p>
       </CenteredPanel>
     );
@@ -247,34 +234,32 @@ function TakeAssessment() {
   const submitting = phase === "submitting";
 
   return (
-    <div dir={dir} className="flex min-h-screen flex-col bg-canvas">
+    <div dir={dir} lang={examLanguage} className="flex min-h-screen flex-col bg-canvas">
       {/* Top bar */}
       <header className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur">
         <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2 px-4 py-3">
           <span className="text-sm font-semibold text-ink-muted">
-            Question {currentIndex + 1} / {totalQuestions}
+            {t("exam.progress", { current: formatNumber(currentIndex + 1), total: formatNumber(totalQuestions) })}
           </span>
           <div className="flex flex-wrap items-center gap-2">
-            <SaveIndicator status={saveStatus} />
+            <SaveIndicator status={saveStatus} t={t} />
             <span
+              dir="ltr"
               className={`inline-flex items-center gap-1.5 rounded-control px-3 py-1.5 text-sm font-bold tabular-nums ${
                 questionRemaining <= 10 ? "bg-danger-600 text-white" : "bg-primary-600 text-white"
               }`}
-              aria-label={`Time left for this question: ${formatTime(questionRemaining)}`}
+              aria-label={t("exam.questionTimeLeft", { time: formatClock(questionRemaining) })}
             >
               <FaClock aria-hidden="true" />
-              {formatTime(questionRemaining)}
+              {formatClock(questionRemaining)}
             </span>
             <span className="rounded-control bg-gray-100 px-3 py-1.5 text-sm font-semibold tabular-nums text-ink-muted">
-              Total {formatTime(overallRemaining)}
+              {t("exam.total")} <span dir="ltr">{formatClock(overallRemaining)}</span>
             </span>
           </div>
         </div>
         <div className="h-1 bg-gray-100" aria-hidden="true">
-          <div
-            className="h-1 bg-primary-600 transition-all"
-            style={{ width: `${((currentIndex + 1) / Math.max(1, totalQuestions)) * 100}%` }}
-          />
+          <div className="h-1 bg-primary-600 transition-all" style={{ width: `${((currentIndex + 1) / Math.max(1, totalQuestions)) * 100}%` }} />
         </div>
       </header>
 
@@ -284,18 +269,20 @@ function TakeAssessment() {
           <div className="mb-4 flex flex-wrap items-center gap-2 text-sm" role="status" aria-live="polite">
             {lastAnswer && (
               <span className={`rounded-full px-3 py-1 font-semibold ${lastAnswer.correct ? "bg-success-50 text-success-700" : "bg-danger-50 text-danger-700"}`}>
-                {lastAnswer.correct ? "Previous answer: correct" : "Previous answer: incorrect"}
+                {lastAnswer.correct ? t("exam.previousCorrect") : t("exam.previousIncorrect")}
               </span>
             )}
             <span className="rounded-full bg-gray-100 px-3 py-1 font-semibold text-ink-muted">
-              Score so far: <span dir="ltr">{liveScore.score}</span>
+              {t("exam.scoreSoFar")} <span dir="ltr">{liveScore.score}</span>
             </span>
           </div>
         )}
         <div className="mb-4 flex flex-wrap gap-2 text-xs font-semibold">
-          <span dir="ltr" className="rounded-full bg-success-50 px-3 py-1 text-success-700">+{question.positive_marks} correct</span>
+          <span className="rounded-full bg-success-50 px-3 py-1 text-success-700">
+            {t("exam.correctMarks", { marks: question.positive_marks })}
+          </span>
           {question.negative_marks > 0 && (
-            <span dir="ltr" className="rounded-full bg-danger-50 px-3 py-1 text-danger-700">−{question.negative_marks} wrong</span>
+            <span className="rounded-full bg-danger-50 px-3 py-1 text-danger-700">{t("exam.wrongMarks", { marks: question.negative_marks })}</span>
           )}
         </div>
 
@@ -303,7 +290,7 @@ function TakeAssessment() {
 
         <div className="mt-6">
           {question.question_type === "multiple_choice" && (
-            <div role="radiogroup" aria-label="Answer options" className="grid gap-3 sm:grid-cols-2">
+            <div role="radiogroup" aria-label={t("exam.answerOptions")} className="grid gap-3 sm:grid-cols-2">
               {question.options?.map((option, i) => {
                 const selected = answer === option;
                 return (
@@ -332,7 +319,7 @@ function TakeAssessment() {
           )}
 
           {question.question_type === "true_false" && (
-            <div role="radiogroup" aria-label="True or false" className="grid grid-cols-2 gap-3">
+            <div role="radiogroup" aria-label={t("exam.trueOrFalse")} className="grid grid-cols-2 gap-3">
               {[true, false].map((value) => {
                 const selected = answer !== undefined && answer !== null && String(answer) === String(value);
                 return (
@@ -346,7 +333,7 @@ function TakeAssessment() {
                       selected ? "border-primary-600 bg-primary-50 text-primary-800" : "border-line bg-surface text-ink hover:border-primary-300"
                     }`}
                   >
-                    {value ? "True" : "False"}
+                    {value ? t("common.true") : t("common.false")}
                   </button>
                 );
               })}
@@ -356,7 +343,7 @@ function TakeAssessment() {
           {question.question_type === "short_answer" && (
             <div>
               <label htmlFor={`answer-${question.id}`} className="mb-2 block text-sm font-semibold text-ink">
-                Your answer
+                {t("exam.yourAnswer")}
               </label>
               <textarea
                 id={`answer-${question.id}`}
@@ -381,11 +368,11 @@ function TakeAssessment() {
         <div className="mx-auto flex max-w-4xl justify-end">
           {isLast ? (
             <button type="button" onClick={() => setConfirmSubmit(true)} disabled={submitting} className="btn-primary w-full sm:w-auto">
-              {submitting ? "Submitting…" : "Submit assessment"}
+              {submitting ? t("exam.submitting") : t("exam.submit")}
             </button>
           ) : (
             <button type="button" onClick={() => advance()} disabled={submitting} className="btn-primary w-full sm:w-auto">
-              Next question
+              {t("exam.next")}
             </button>
           )}
         </div>
@@ -395,12 +382,12 @@ function TakeAssessment() {
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="confirm-submit-title">
           <div className="w-full max-w-md rounded-t-2xl bg-surface p-6 sm:rounded-card">
             <h2 id="confirm-submit-title" className="text-lg font-bold text-ink">
-              Submit your assessment?
+              {t("exam.confirmTitle")}
             </h2>
-            <p className="mt-2 text-ink-muted">You cannot change your answers after submitting.</p>
+            <p className="mt-2 text-ink-muted">{t("exam.confirmBody")}</p>
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button type="button" className="btn-secondary" onClick={() => setConfirmSubmit(false)}>
-                Keep working
+                {t("exam.keepWorking")}
               </button>
               <button
                 type="button"
@@ -410,7 +397,7 @@ function TakeAssessment() {
                   submit();
                 }}
               >
-                Submit
+                {t("exam.submitShort")}
               </button>
             </div>
           </div>
@@ -420,41 +407,39 @@ function TakeAssessment() {
       {submitting && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-surface/80" role="status">
           <LoadingSpinner size="lg" />
-          <span className="ms-3 font-semibold text-ink-muted">Submitting…</span>
+          <span className="ms-3 font-semibold text-ink-muted">{t("exam.submitting")}</span>
         </div>
       )}
     </div>
   );
 }
 
-function CenteredPanel({ children, dir = "ltr" }) {
+function CenteredPanel({ children, dir = "ltr", lang }) {
   return (
-    <div dir={dir} className="flex min-h-screen items-center justify-center bg-canvas p-4">
+    <div dir={dir} lang={lang} className="flex min-h-screen items-center justify-center bg-canvas p-4">
       <div className="w-full max-w-lg rounded-card bg-surface p-6 text-center shadow-sm ring-1 ring-line sm:p-8">{children}</div>
     </div>
   );
 }
 
-function ResultSummary({ result }) {
-  const minutes = Math.floor((result.timeTakenSeconds || 0) / 60);
-  const seconds = (result.timeTakenSeconds || 0) % 60;
+/** Short summary right after submitting; the full results page has the details. */
+function ResultSummary({ result, t, dir, lang }) {
   const stats = [
-    { label: "Score", value: `${result.score} / ${result.totalMarks}` },
-    { label: "Percentage", value: `${result.percentage}%` },
+    { label: t("results.raw"), value: formatPercent(result.rawPercentage ?? result.percentage) },
     ...(result.adjustedPercentage !== null && result.adjustedPercentage !== undefined
-      ? [{ label: "Difficulty-adjusted", value: `${result.adjustedPercentage}%` }]
+      ? [{ label: t("results.adjusted"), value: formatPercent(result.adjustedPercentage) }]
       : []),
-    { label: "Correct", value: result.correctCount },
-    { label: "Incorrect", value: result.incorrectCount },
-    { label: "Unanswered", value: result.unansweredCount },
-    { label: "Time taken", value: `${minutes}m ${seconds}s` },
+    { label: t("analytics.correct"), value: formatNumber(result.correctCount) },
+    { label: t("results.incorrect"), value: formatNumber(result.incorrectCount) },
+    { label: t("results.unanswered"), value: formatNumber(result.unansweredCount) },
+    { label: t("review.timeTaken"), value: formatDuration(result.timeTakenSeconds) },
   ];
 
   return (
-    <CenteredPanel>
+    <CenteredPanel dir={dir} lang={lang}>
       <FaCheckCircle className="mx-auto text-5xl text-success-700" aria-hidden="true" />
-      <h1 className="mt-4 text-2xl font-bold text-ink">Assessment submitted</h1>
-      <p className="mt-1 text-ink-muted">Here is how you did.</p>
+      <h1 className="mt-4 text-2xl font-bold text-ink">{t("exam.submittedTitle")}</h1>
+      <p className="mt-1 text-ink-muted">{t("exam.submittedBody")}</p>
       <dl className="mt-6 grid grid-cols-2 gap-3 text-start sm:grid-cols-3">
         {stats.map((s) => (
           <div key={s.label} className="rounded-card bg-canvas p-3">
@@ -464,11 +449,11 @@ function ResultSummary({ result }) {
         ))}
       </dl>
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-        <Link to={`/student/analytics?assessment=${result.assessmentId}`} className="btn-primary">
-          Review answers
+        <Link to={`/student/results/${result.assessmentId}`} className="btn-primary">
+          {t("exam.seeResults")}
         </Link>
         <Link to="/student/dashboard" className="btn-secondary">
-          Back to dashboard
+          {t("exam.backToDashboard")}
         </Link>
       </div>
     </CenteredPanel>

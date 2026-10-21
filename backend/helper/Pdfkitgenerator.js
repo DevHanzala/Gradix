@@ -1,13 +1,8 @@
 import puppeteer from "puppeteer";
-import path from "path";
-import fs from "fs";
-import { fileURLToPath } from "url";
+import { pdfFontCss } from "./pdfFonts.js";
 import { escapeHtml, escapeHtmlMultiline } from "../utils/escapeHtml.js";
 import { normalizeOptions, canonicalOptionIndex, parseBoolean, decodeStoredValue } from "../utils/grading.js";
 
-// Works correctly in both ESM and CJS, dev and production
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 export const generatePhysicalPaperPDF = async (
   questions,
@@ -19,16 +14,8 @@ export const generatePhysicalPaperPDF = async (
   let browser;
 
   try {
-    // ── Font — resolve relative to THIS file, not process.cwd() ─────────────
-    // This is the fix: __dirname always points to the helper/ folder regardless
-    // of where the Node process was started (dev vs production)
-    const fontPath = path.join(__dirname, "../fonts/NotoSansArabic-Regular.ttf");
-
-    if (!fs.existsSync(fontPath)) {
-      throw new Error(`Font file not found at: ${fontPath}`);
-    }
-
-    const fontData = fs.readFileSync(fontPath).toString("base64");
+    // Script fonts (Nastaliq for Urdu, Naskh for Arabic/Persian), embedded.
+    const fonts = pdfFontCss(language);
 
     // ── Puppeteer launch — production-safe args ───────────────────────────────
     browser = await puppeteer.launch({
@@ -142,15 +129,13 @@ export const generatePhysicalPaperPDF = async (
     <head>
       <meta charset="UTF-8" />
       <style>
-        @font-face {
-          font-family: 'NotoSansArabic';
-          src: url(data:font/ttf;base64,${fontData}) format('truetype');
-        }
+        ${fonts.css}
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-          font-family: ${isRTL ? "'NotoSansArabic', Arial" : "Arial, Helvetica, sans-serif"};
+          font-family: ${fonts.family};
+          line-height: ${fonts.lineHeight};
           font-size: ${form.questionFontSize || 10}pt;
           color: #1a1a2e;
           direction: ${isRTL ? "rtl" : "ltr"};

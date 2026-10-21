@@ -5,7 +5,11 @@ import {
   passwordChangedEmailTemplate,
   roleChangeEmailTemplate,
   assessmentEnrollmentTemplate,
+  accountDeletedEmailTemplate,
+  assessmentPublishedTemplate,
+  resultsReadyTemplate,
 } from "../utils/emailTemplates.js";
+import { formatDateTime, normalizeLanguage } from "./i18n.js";
 
 let transporter = null;
 const getTransporter = () => {
@@ -46,20 +50,60 @@ const deliver = (to, { subject, html }) => {
 
 const appUrl = (path) => `${process.env.FRONTEND_URL || ""}${path}`;
 
-export const sendVerificationEmail = (email, name, token) =>
-  deliver(email, verificationEmailTemplate({ name, verificationUrl: appUrl(`/verify-email?token=${token}`) }));
+/**
+ * Senders take the recipient { email, name, language } so every email is
+ * written in the recipient's own language (users.language_preference).
+ */
+const lang = (recipient) => normalizeLanguage(recipient?.language || recipient?.language_preference);
 
-export const sendPasswordResetEmail = (email, name, token) =>
-  deliver(email, passwordResetEmailTemplate({ name, resetUrl: appUrl(`/reset-password/${token}`) }));
-
-export const sendPasswordChangedEmail = (email, name) =>
-  deliver(email, passwordChangedEmailTemplate({ name, changedAt: new Date().toISOString().replace("T", " ").slice(0, 16) }));
-
-export const sendRoleChangeEmail = (email, name, oldRole, newRole) =>
-  deliver(email, roleChangeEmailTemplate({ name, oldRole, newRole, dashboardUrl: appUrl("/login") }));
-
-export const sendAssessmentEnrollmentEmail = (email, name, assessmentTitle, instructorName) =>
+export const sendVerificationEmail = (recipient, token) =>
   deliver(
-    email,
-    assessmentEnrollmentTemplate({ name, assessmentTitle, instructorName, dashboardUrl: appUrl("/student/dashboard") })
+    recipient.email,
+    verificationEmailTemplate({ lang: lang(recipient), name: recipient.name, verificationUrl: appUrl(`/verify-email?token=${token}`) })
+  );
+
+export const sendPasswordResetEmail = (recipient, token) =>
+  deliver(recipient.email, passwordResetEmailTemplate({ lang: lang(recipient), name: recipient.name, resetUrl: appUrl(`/reset-password/${token}`) }));
+
+export const sendPasswordChangedEmail = (recipient) =>
+  deliver(
+    recipient.email,
+    passwordChangedEmailTemplate({ lang: lang(recipient), name: recipient.name, changedAt: formatDateTime(lang(recipient)) })
+  );
+
+export const sendRoleChangeEmail = (recipient, oldRole, newRole) =>
+  deliver(recipient.email, roleChangeEmailTemplate({ lang: lang(recipient), name: recipient.name, oldRole, newRole, dashboardUrl: appUrl("/login") }));
+
+export const sendAssessmentEnrollmentEmail = (recipient, assessmentTitle, instructorName) =>
+  deliver(
+    recipient.email,
+    assessmentEnrollmentTemplate({
+      lang: lang(recipient),
+      name: recipient.name,
+      assessmentTitle,
+      instructorName,
+      enrolledAt: formatDateTime(lang(recipient)),
+      dashboardUrl: appUrl("/student/dashboard"),
+    })
+  );
+
+export const sendAccountDeletedEmail = (recipient) =>
+  deliver(recipient.email, accountDeletedEmailTemplate({ lang: lang(recipient), name: recipient.name }));
+
+export const sendAssessmentPublishedEmail = (recipient, assessmentTitle) =>
+  deliver(
+    recipient.email,
+    assessmentPublishedTemplate({ lang: lang(recipient), name: recipient.name, assessmentTitle, dashboardUrl: appUrl("/student/dashboard") })
+  );
+
+export const sendResultsReadyEmail = (recipient, assessmentTitle, percentage, assessmentId) =>
+  deliver(
+    recipient.email,
+    resultsReadyTemplate({
+      lang: lang(recipient),
+      name: recipient.name,
+      assessmentTitle,
+      percentage,
+      resultsUrl: appUrl(`/student/results/${assessmentId}`),
+    })
   );

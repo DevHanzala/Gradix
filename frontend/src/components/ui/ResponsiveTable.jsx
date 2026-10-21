@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 /**
  * A table on medium+ screens that turns into stacked cards on phones.
  *
@@ -14,6 +15,7 @@ const BREAKPOINTS = {
 };
 
 function ResponsiveTable({ columns, rows, rowKey = (row) => row.id, actions, caption, breakpoint = "md" }) {
+  const { t } = useTranslation();
   const bp = BREAKPOINTS[breakpoint] || BREAKPOINTS.md;
   const cell = (column, row) => (column.render ? column.render(row) : row[column.key]);
   const primary = columns.filter((c) => c.primary);
@@ -34,7 +36,7 @@ function ResponsiveTable({ columns, rows, rowKey = (row) => row.id, actions, cap
               ))}
               {actions && (
                 <th scope="col" className="px-4 py-3 text-end font-semibold text-ink-muted">
-                  <span className="sr-only">Actions</span>
+                  <span className="sr-only">{t("common.actions")}</span>
                 </th>
               )}
             </tr>

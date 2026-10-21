@@ -1,0 +1,16 @@
+{
+  "blocks": "بلوک‌های پرسش",
+  "blocksSummary": "پرسش‌ها: {{questions}} · {{duration}} · نمره: {{marks}}",
+  "correctMarks": "درست",
+  "wrongMarks": "نادرست",
+  "secondsEach": "ثانیه برای هر پرسش",
+  "editableDescription": "هنوز منتشر نشده: هنوز می‌توانید آن را ویرایش کنید.",
+  "lockedDescription": "منتشر شده یا دانش‌آموزان آن را شروع کرده‌اند، پس تنظیماتش قفل است.",
+  "fixedDifficulty": "ترکیب دشواری ثابت",
+  "mode": "حالت",
+  "noPrompt": "توضیحی وجود ندارد. پرسش‌ها از مطالب انتخاب‌شده ساخته می‌شوند.",
+  "noSources": "منبع یا پیوندی وجود ندارد.",
+  "objectivesAndPublishing": "اهداف و انتشار",
+  "printPaper": "چاپ برگه",
+  "state": "وضعیت"
+}

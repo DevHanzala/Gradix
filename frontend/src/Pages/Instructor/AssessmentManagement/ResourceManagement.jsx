@@ -1,32 +1,35 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { FaCloudUploadAlt, FaFolderOpen, FaTrash } from "react-icons/fa";
 import useResourceStore from "../../../store/resourceStore.js";
 import { validateFiles } from "../../../schemas/resourceSchema.js";
 import { ACCEPTED_FILE_TYPES } from "../../../schemas/assessmentSchemas.js";
 import { errorMessage } from "../../../utils/forms.js";
+import { formatDate, formatNumber } from "../../../utils/format.js";
 import { Alert, Badge, Button, Card, CardBody, CardHeader, Checkbox, EmptyState, Modal, PageHeader, ResponsiveTable, SkeletonList } from "../../../components/ui";
 
+/** File size in the UI language (Intl unit formatting). */
 const formatSize = (bytes) => {
   const n = Number(bytes);
   if (!n) return "–";
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  if (n < 1024 * 1024) return formatNumber(Math.max(1, Math.round(n / 1024)), { style: "unit", unit: "kilobyte", unitDisplay: "short" });
+  return formatNumber(n / (1024 * 1024), { style: "unit", unit: "megabyte", unitDisplay: "short", maximumFractionDigits: 1 });
 };
 
-const shortType = (mime, contentType) => {
-  if (contentType === "link") return "Link";
-  if (!mime) return "File";
-  if (mime.includes("pdf")) return "PDF";
-  if (mime.includes("word")) return "Word";
-  if (mime.includes("presentation") || mime.includes("powerpoint")) return "PowerPoint";
-  if (mime.startsWith("image/")) return "Image";
-  if (mime.startsWith("text/")) return "Text";
-  return "File";
+const typeKey = (mime, contentType) => {
+  if (contentType === "link") return "link";
+  if (!mime) return "file";
+  if (mime.includes("pdf")) return "pdf";
+  if (mime.includes("word")) return "word";
+  if (mime.includes("presentation") || mime.includes("powerpoint")) return "powerpoint";
+  if (mime.startsWith("image/")) return "image";
+  if (mime.startsWith("text/")) return "text";
+  return "file";
 };
 
 function ResourceManagement() {
+  const { t } = useTranslation();
   const { resources, fetchResources, uploadResources, deleteResource } = useResourceStore();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -62,10 +65,10 @@ function ResourceManagement() {
     try {
       const result = await uploadResources(files, { visibility: shared ? "public" : "private" });
       setSkipped(result.skipped);
-      toast.success(`${result.resources.length} resource${result.resources.length === 1 ? "" : "s"} added.`);
+      toast.success(t("resources.added", { count: formatNumber(result.resources.length) }));
       await load();
     } catch (error) {
-      toast.error(errorMessage(error, "Upload failed."));
+      toast.error(errorMessage(error, t("resources.uploadFailed")));
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = "";
@@ -81,18 +84,18 @@ function ResourceManagement() {
   const confirmDelete = async () => {
     try {
       await deleteResource(deleteTarget.id);
-      toast.success(`"${deleteTarget.name}" was deleted.`);
+      toast.success(t("resources.deleted", { name: deleteTarget.name }));
     } catch (error) {
-      toast.error(errorMessage(error, "Could not delete the resource."));
+      toast.error(errorMessage(error, t("resources.deleteFailed")));
     }
   };
 
   return (
     <>
-      <PageHeader title="Resources" description="Teaching material your assessments can generate questions from." />
+      <PageHeader title={t("nav.resources")} description={t("resources.description")} />
 
       <Card className="mb-6">
-        <CardHeader title="Upload material" />
+        <CardHeader title={t("resources.uploadTitle")} />
         <CardBody className="space-y-4">
           <div
             onDragEnter={(e) => {
@@ -107,12 +110,12 @@ function ResourceManagement() {
             }`}
           >
             <FaCloudUploadAlt className="text-4xl text-primary-600" aria-hidden="true" />
-            <p className="font-semibold text-ink">Drag files here or choose them</p>
-            <p className="text-sm text-ink-subtle">PDF, Word, PowerPoint, text or images, up to 10 files of 10 MB. Scans are read with OCR.</p>
+            <p className="font-semibold text-ink">{t("resources.dropHere")}</p>
+            <p className="text-sm text-ink-subtle">{t("resources.uploadHint")}</p>
             <input
               ref={inputRef}
               id="resource-files"
-              aria-label="Choose files to upload"
+              aria-label={t("resources.chooseFilesLabel")}
               type="file"
               multiple
               accept={ACCEPTED_FILE_TYPES}
@@ -121,17 +124,12 @@ function ResourceManagement() {
               disabled={uploading}
             />
             <Button loading={uploading} onClick={() => inputRef.current?.click()}>
-              {uploading ? "Reading and indexing…" : "Choose files"}
+              {uploading ? t("resources.indexing") : t("resources.chooseFiles")}
             </Button>
           </div>
-          <Checkbox
-            label="Share with other instructors"
-            description="Public resources can be selected by any instructor. Private ones are visible only to you."
-            checked={shared}
-            onChange={(e) => setShared(e.target.checked)}
-          />
+          <Checkbox label={t("resources.share")} description={t("resources.shareDescription")} checked={shared} onChange={(e) => setShared(e.target.checked)} />
           {skipped.length > 0 && (
-            <Alert tone="warning" title="Some files could not be used">
+            <Alert tone="warning" title={t("resources.skippedTitle")}>
               <ul className="list-disc space-y-1 ps-5">
                 {skipped.map((s) => (
                   <li key={s.file}>{s.reason || s.file}</li>
@@ -143,35 +141,51 @@ function ResourceManagement() {
       </Card>
 
       <Card>
-        <CardHeader title="My resources" />
+        <CardHeader title={t("resources.mine")} />
         {loading ? (
           <SkeletonList rows={4} />
         ) : loadError ? (
           <div className="p-4 sm:p-6">
-            <Alert tone="danger" action={<Button variant="secondary" onClick={load}>Try again</Button>}>
+            <Alert
+              tone="danger"
+              action={
+                <Button variant="secondary" onClick={load}>
+                  {t("common.tryAgain")}
+                </Button>
+              }
+            >
               {loadError}
             </Alert>
           </div>
         ) : resources.length === 0 ? (
-          <EmptyState icon={FaFolderOpen} title="No resources yet" description="Upload your first file above." />
+          <EmptyState icon={FaFolderOpen} title={t("resources.none")} description={t("resources.noneDescription")} />
         ) : (
           <ResponsiveTable
-            caption="My resources"
+            caption={t("resources.mine")}
             rows={resources}
             columns={[
-              { key: "name", header: "Name", primary: true, render: (r) => <span className="break-all">{r.name}</span> },
-              { key: "type", header: "Type", render: (r) => shortType(r.file_type, r.content_type) },
-              { key: "size", header: "Size", render: (r) => formatSize(r.file_size) },
+              {
+                key: "name",
+                header: t("profile.name"),
+                primary: true,
+                render: (r) => (
+                  <span className="break-all" dir="auto">
+                    {r.name}
+                  </span>
+                ),
+              },
+              { key: "type", header: t("resources.type"), render: (r) => t(`resources.types.${typeKey(r.file_type, r.content_type)}`) },
+              { key: "size", header: t("resources.size"), render: (r) => formatSize(r.file_size) },
               {
                 key: "visibility",
-                header: "Visibility",
-                render: (r) => (r.visibility === "public" ? <Badge tone="primary">Public</Badge> : <Badge>Private</Badge>),
+                header: t("resources.visibility"),
+                render: (r) => (r.visibility === "public" ? <Badge tone="primary">{t("resources.public")}</Badge> : <Badge>{t("resources.private")}</Badge>),
               },
-              { key: "created_at", header: "Added", render: (r) => (r.created_at ? new Date(r.created_at).toLocaleDateString() : "–") },
+              { key: "created_at", header: t("resources.addedOn"), render: (r) => formatDate(r.created_at) },
             ]}
             actions={(r) => (
               <Button variant="ghost" icon={FaTrash} className="text-danger-700 hover:bg-danger-50" onClick={() => setDeleteTarget(r)}>
-                Delete
+                {t("common.delete")}
               </Button>
             )}
           />
@@ -182,12 +196,12 @@ function ResourceManagement() {
         isOpen={Boolean(deleteTarget)}
         onClose={() => setDeleteTarget(null)}
         type="warning"
-        title={deleteTarget ? `Delete "${deleteTarget.name}"?` : ""}
+        title={deleteTarget ? t("resources.deleteTitle", { name: deleteTarget.name }) : ""}
         onConfirm={confirmDelete}
-        confirmText="Delete resource"
+        confirmText={t("resources.deleteConfirm")}
         confirmVariant="danger"
       >
-        Assessments that use it will no longer generate questions from it.
+        {t("resources.deleteBody")}
       </Modal>
     </>
   );

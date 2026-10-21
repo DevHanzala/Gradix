@@ -1,0 +1,12 @@
+{
+  "timedOut": "زمان تمام شد",
+  "state": {
+    "correct": "درست",
+    "wrong": "نادرست",
+    "unanswered": "پاسخ داده نشد"
+  },
+  "objective": "هدف {{number}}: {{text}}",
+  "chosenMarker": "(پاسخ شما)",
+  "answerGiven": "پاسخ داده‌شده",
+  "timeTaken": "زمان صرف‌شده"
+}

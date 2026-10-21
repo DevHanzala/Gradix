@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { FaArrowLeft, FaCheckCircle, FaExclamationTriangle, FaInfoCircle, FaTimesCircle } from "react-icons/fa";
 
 const TONES = {
@@ -20,7 +21,8 @@ export function Badge({ tone = "neutral", icon: Icon, className = "", children }
 }
 
 /** Page title block used at the top of every page. */
-export function PageHeader({ title, description, actions, backTo, backLabel = "Back" }) {
+export function PageHeader({ title, description, actions, backTo, backLabel }) {
+  const { t } = useTranslation();
   return (
     <header className="mb-6 sm:mb-8">
       {backTo && (
@@ -29,7 +31,7 @@ export function PageHeader({ title, description, actions, backTo, backLabel = "B
           className="mb-3 inline-flex min-h-11 items-center gap-2 rounded-control text-sm font-semibold text-primary-700 hover:underline"
         >
           <FaArrowLeft aria-hidden="true" className="rtl:rotate-180" />
-          {backLabel}
+          {backLabel || t("common.back")}
         </Link>
       )}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -107,8 +109,9 @@ export function Skeleton({ className = "h-4 w-full" }) {
 
 /** Stack of skeleton rows for list loading states. */
 export function SkeletonList({ rows = 4 }) {
+  const { t } = useTranslation();
   return (
-    <div className="space-y-4 p-4 sm:p-6" role="status" aria-label="Loading">
+    <div className="space-y-4 p-4 sm:p-6" role="status" aria-label={t("common.loading")}>
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="space-y-2">
           <Skeleton className="h-4 w-1/3" />

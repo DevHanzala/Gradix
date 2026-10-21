@@ -1,0 +1,17 @@
+{
+  "description": "آپ کے اکاؤنٹ کی تفصیلات، زبان اور حفاظتی ترتیبات۔",
+  "goToDashboard": "ڈیش بورڈ پر جائیں",
+  "account": "اکاؤنٹ",
+  "name": "نام",
+  "role": "کردار",
+  "signInMethod": "سائن اِن کا طریقہ",
+  "methodGoogle": "Google",
+  "methodPassword": "ای میل اور پاس ورڈ",
+  "languageTitle": "زبان",
+  "languageDescription": "ایپ، آپ کی ای میلز اور رپورٹس کے لیے استعمال ہوتی ہے۔",
+  "changePassword": "پاس ورڈ تبدیل کریں",
+  "currentPassword": "موجودہ پاس ورڈ",
+  "passwordChanged": "پاس ورڈ تبدیل ہو گیا۔ ہم نے تصدیقی ای میل بھیجی ہے۔",
+  "passwordChangeFailed": "آپ کا پاس ورڈ تبدیل نہیں ہو سکا۔",
+  "googleNoPassword": "آپ Google سے سائن اِن کرتے ہیں، اس لیے تبدیل کرنے کے لیے کوئی Gradix پاس ورڈ نہیں۔"
+}

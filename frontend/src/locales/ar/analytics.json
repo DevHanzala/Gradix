@@ -1,0 +1,19 @@
+{
+  "titleFor": "النتائج: {{title}}",
+  "description": "درجات الطلاب الذين أكملوا هذا التقييم. لكل طالب أسئلته الخاصة.",
+  "averageScore": "متوسط الدرجة",
+  "averageTime": "متوسط الوقت",
+  "students": "الطلاب",
+  "none": "لا توجد محاولات مكتملة بعد",
+  "noneDescription": "تظهر النتائج هنا فور تسليم الطلاب.",
+  "studentResults": "نتائج الطلاب",
+  "student": "الطالب",
+  "correct": "صحيح",
+  "correctOf": "{{correct}} / {{total}}",
+  "score": "الدرجة",
+  "time": "الوقت",
+  "reviewAnswers": "مراجعة الإجابات",
+  "loadingAnswers": "جارٍ تحميل الإجابات…",
+  "answersOf": "الإجابات: {{name}}",
+  "answersSummary": "صحيح: {{correct}} · {{score}}"
+}

@@ -1,0 +1,21 @@
+{
+  "loadFailed": "Could not load publishing progress.",
+  "startFailed": "Could not start publishing.",
+  "retryFailed": "Could not retry.",
+  "title": "Publish",
+  "titlePublishing": "Publishing",
+  "description": "Prepare a checked pool of questions in each language. Objectives and settings are locked after publishing.",
+  "descriptionPublishing": "Questions are prepared and checked in advance for every language, so students never wait for the AI.",
+  "languages": "Languages students can choose",
+  "saveFirst": "Save at least one objective first.",
+  "publish": "Publish",
+  "questionsOf": "Questions: {{have}} / {{target}}",
+  "failed": "Failed",
+  "failedBody": "Not enough valid questions could be generated for this language. Retry, or add questions manually.",
+  "ready": "Students can start",
+  "preparing": "Preparing…",
+  "progressFor": "Progress: {{language}}",
+  "retry": "Retry failed languages",
+  "confirmTitle": "Publish this assessment?",
+  "confirmBody": "Objectives, question settings and source material will be locked. Questions are then prepared in the selected languages ({{count}}); students can start as soon as their language is ready."
+}

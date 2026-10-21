@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import i18n from "../i18n/index.js";
 import {
   fetchAssessmentsAPI,
   fetchAssessmentDetailsAPI,
@@ -24,7 +25,7 @@ const useStudentAnalyticsStore = create((set) => ({
       const res = await fetchAssessmentsAPI();
       set({ assessments: res.data.data || [] });
     } catch (err) {
-      set({ assessments: [], error: reportError(err, "Could not load your assessments.", { silent: true }) });
+      set({ assessments: [], error: reportError(err, i18n.t("studentDashboard.loadFailed"), { silent: true }) });
     } finally {
       set({ loading: false });
     }
@@ -38,7 +39,7 @@ const useStudentAnalyticsStore = create((set) => ({
       const res = await fetchAssessmentDetailsAPI(id);
       set({ selectedAssessmentDetails: res.data.data });
     } catch (err) {
-      reportError(err, "Could not load the results for this assessment.");
+      reportError(err, i18n.t("results.loadFailed"));
     } finally {
       set({ loading: false });
     }
@@ -50,7 +51,7 @@ const useStudentAnalyticsStore = create((set) => ({
       const res = await fetchAssessmentQuestionsAPI(assessmentId);
       set({ questions: res.data.data || [] });
     } catch (err) {
-      reportError(err, "Could not load the questions for this assessment.");
+      reportError(err, i18n.t("errors.store.loadQuestions"));
     } finally {
       set({ questionsLoading: false });
     }
@@ -67,7 +68,7 @@ const useStudentAnalyticsStore = create((set) => ({
       const pdf = await buildStudentReportPdf(res.data.data);
       pdf.save(`Assessment_Report_${assessmentId}.pdf`);
     } catch (err) {
-      reportError(err, "Could not generate the report.");
+      reportError(err, i18n.t("errors.store.report"));
     } finally {
       set({ downloading: false });
     }

@@ -1,0 +1,19 @@
+{
+  "titleFor": "Results: {{title}}",
+  "description": "Scores of students who completed this assessment. Each student had their own questions.",
+  "averageScore": "Average score",
+  "averageTime": "Average time",
+  "students": "Students",
+  "none": "No completed attempts yet",
+  "noneDescription": "Results appear here as soon as students submit.",
+  "studentResults": "Student results",
+  "student": "Student",
+  "correct": "Correct",
+  "correctOf": "{{correct}} / {{total}}",
+  "score": "Score",
+  "time": "Time",
+  "reviewAnswers": "Review answers",
+  "loadingAnswers": "Loading answers…",
+  "answersOf": "Answers: {{name}}",
+  "answersSummary": "{{correct}} correct · {{score}}"
+}

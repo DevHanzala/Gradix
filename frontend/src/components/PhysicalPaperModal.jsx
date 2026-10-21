@@ -3,7 +3,8 @@ import { saveAs } from "file-saver";
 import toast from "react-hot-toast";
 import { FaArrowLeft, FaDownload } from "react-icons/fa";
 import { sanitizeFileName } from "../utils/paperUtils";
-import { LANGUAGE_OPTIONS, getTranslation, isRTLLanguage } from "../utils/translations";
+import { useTranslation } from "react-i18next";
+import { LANGUAGES, isRtl } from "../utils/languages.js";
 import useAssessmentStore from "../store/assessmentStore";
 import { Button, Input, Modal, Select, Textarea } from "./ui";
 
@@ -20,7 +21,7 @@ const INITIAL_FORM = {
   optionFontSize: 9,
 };
 
-const PAGE_SIZES = ["A4", "A5", "Letter"].map((v) => ({ value: v, label: v }));
+const PAGE_SIZES = ["A4", "A5", "Letter"].map((v) => ({ value: v, label: v })); // paper size names, not translated
 const fontOptions = (min, max) => Array.from({ length: max - min + 1 }, (_, i) => ({ value: min + i, label: `${min + i} pt` }));
 
 /**
@@ -35,8 +36,11 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
   const [form, setForm] = useState(INITIAL_FORM);
   const [loading, setLoading] = useState(false);
 
-  const t = (key) => getTranslation(language, key);
-  const isRTL = isRTLLanguage(language);
+  const { i18n } = useTranslation();
+  // The dialog speaks the paper's language (header labels are printed in it).
+  const tPaper = i18n.getFixedT(language);
+  const tp = (key) => tPaper(`paper.${key}`);
+  const isRTL = isRtl(language);
 
   const reset = () => {
     setStep("language");
@@ -57,18 +61,18 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
 
   const handleSubmit = async () => {
     if (!assessmentId) {
-      toast.error(t("noAssessment"));
+      toast.error(tp("noAssessment"));
       return;
     }
     setLoading(true);
     try {
       const blob = await generatePhysicalPaper(assessmentId, { language, ...form });
       saveAs(blob, `${sanitizeFileName(assessmentTitle)}_Paper_${language.toUpperCase()}.pdf`);
-      toast.success(t("paperGenerated"));
+      toast.success(tp("paperGenerated"));
       reset();
       onClose();
     } catch (error) {
-      toast.error(error?.message || t("generationFailed"));
+      toast.error(error?.message || tp("generationFailed"));
     } finally {
       setLoading(false);
     }
@@ -77,36 +81,37 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
   const footer =
     step === "language" ? (
       <Button variant="secondary" onClick={close}>
-        {t("cancel")}
+        {tp("cancel")}
       </Button>
     ) : (
       <>
         <Button variant="secondary" onClick={close} disabled={loading}>
-          {t("cancel")}
+          {tp("cancel")}
         </Button>
         <Button icon={FaDownload} loading={loading} onClick={handleSubmit}>
-          {loading ? t("generating") : t("generateDownload")}
+          {loading ? tp("generating") : tp("generateDownload")}
         </Button>
       </>
     );
 
   return (
-    <Modal isOpen={isOpen} onClose={close} title={t("modalTitle")} size="lg" footer={footer} dir={isRTL ? "rtl" : "ltr"}>
+    <Modal isOpen={isOpen} onClose={close} title={tp("modalTitle")} size="lg" footer={footer} dir={isRTL ? "rtl" : "ltr"}>
       {step === "language" ? (
         <div>
-          <p className="mb-4 text-ink-muted">{t("selectLanguageDesc")}</p>
-          <div className="grid gap-3 sm:grid-cols-2" role="group" aria-label={t("selectLanguage")}>
-            {LANGUAGE_OPTIONS.map((lang) => (
+          <p className="mb-4 text-ink-muted">{tp("selectLanguageDesc")}</p>
+          <div className="grid gap-3 sm:grid-cols-2" role="group" aria-label={tp("selectLanguage")}>
+            {LANGUAGES.map((lang) => (
               <button
-                key={lang.value}
+                key={lang.code}
+                lang={lang.code}
                 type="button"
                 onClick={() => {
-                  setLanguage(lang.value);
+                  setLanguage(lang.code);
                   setStep("form");
                 }}
                 className="flex min-h-14 items-center justify-center rounded-card border-2 border-line px-4 text-lg font-semibold text-ink transition hover:border-primary-300 hover:bg-primary-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary-200"
               >
-                {lang.label}
+                {lang.name}
               </button>
             ))}
           </div>
@@ -120,28 +125,28 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
             className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary-700 hover:underline"
           >
             <FaArrowLeft aria-hidden="true" className="rtl:rotate-180" />
-            {t("back")}
+            {tp("back")}
           </button>
           <p className="text-sm text-ink-muted">
-            {LANGUAGE_OPTIONS.find((l) => l.value === language)?.label} · {assessmentTitle}
+            {LANGUAGES.find((l) => l.code === language)?.name} · {assessmentTitle}
           </p>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Input label={t("instituteName")} name="instituteName" placeholder={t("instituteNamePlaceholder")} value={form.instituteName} onChange={onChange} className="sm:col-span-2" />
-            <Input label={t("teacherName")} name="teacherName" placeholder={t("teacherNamePlaceholder")} value={form.teacherName} onChange={onChange} />
-            <Input label={t("subjectName")} name="subjectName" placeholder={t("subjectNamePlaceholder")} value={form.subjectName} onChange={onChange} />
-            <Input label={t("paperDate")} name="paperDate" type="date" value={form.paperDate} onChange={onChange} />
-            <Input label={t("paperTime")} name="paperTime" type="time" value={form.paperTime} onChange={onChange} />
-            <Textarea label={t("notes")} name="notes" rows={3} placeholder={t("notesPlaceholder")} value={form.notes} onChange={onChange} className="sm:col-span-2" />
+            <Input label={tp("instituteName")} name="instituteName" placeholder={tp("instituteNamePlaceholder")} value={form.instituteName} onChange={onChange} className="sm:col-span-2" />
+            <Input label={tp("teacherName")} name="teacherName" placeholder={tp("teacherNamePlaceholder")} value={form.teacherName} onChange={onChange} />
+            <Input label={tp("subjectName")} name="subjectName" placeholder={tp("subjectNamePlaceholder")} value={form.subjectName} onChange={onChange} />
+            <Input label={tp("paperDate")} name="paperDate" type="date" value={form.paperDate} onChange={onChange} />
+            <Input label={tp("paperTime")} name="paperTime" type="time" value={form.paperTime} onChange={onChange} />
+            <Textarea label={tp("notes")} name="notes" rows={3} placeholder={tp("notesPlaceholder")} value={form.notes} onChange={onChange} className="sm:col-span-2" />
           </div>
 
           <fieldset>
-            <legend className="mb-3 text-sm font-semibold text-ink">{t("formattingTitle")}</legend>
+            <legend className="mb-3 text-sm font-semibold text-ink">{tp("formattingTitle")}</legend>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Select label={t("pageSize")} name="pageSize" value={form.pageSize} onChange={onChange} options={PAGE_SIZES} />
-              <Select label={t("headerSize")} name="headerFontSize" value={form.headerFontSize} onChange={onChange} options={fontOptions(14, 28)} />
-              <Select label={t("questionSize")} name="questionFontSize" value={form.questionFontSize} onChange={onChange} options={fontOptions(8, 16)} />
-              <Select label={t("optionSize")} name="optionFontSize" value={form.optionFontSize} onChange={onChange} options={fontOptions(7, 14)} />
+              <Select label={tp("pageSize")} name="pageSize" value={form.pageSize} onChange={onChange} options={PAGE_SIZES} />
+              <Select label={tp("headerSize")} name="headerFontSize" value={form.headerFontSize} onChange={onChange} options={fontOptions(14, 28)} />
+              <Select label={tp("questionSize")} name="questionFontSize" value={form.questionFontSize} onChange={onChange} options={fontOptions(8, 16)} />
+              <Select label={tp("optionSize")} name="optionFontSize" value={form.optionFontSize} onChange={onChange} options={fontOptions(7, 14)} />
             </div>
           </fieldset>
         </div>

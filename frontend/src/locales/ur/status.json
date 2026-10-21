@@ -1,0 +1,16 @@
+{
+  "draft": "مسودہ",
+  "extracting": "مقاصد تلاش ہو رہے ہیں…",
+  "failed": "مقاصد درکار",
+  "objectives_ready": "مقاصد تیار",
+  "publishing": "اشاعت جاری…",
+  "published": "شائع شدہ",
+  "executed": "شروع · مقفل",
+  "progressLabel": "امتحان کی پیش رفت",
+  "steps": {
+    "draft": "مسودہ",
+    "objectives_ready": "مقاصد تیار",
+    "publishing": "اشاعت",
+    "published": "شائع شدہ"
+  }
+}

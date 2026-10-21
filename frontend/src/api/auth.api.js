@@ -43,3 +43,6 @@ export const changeUserRoleApi = (data) =>
 
 export const deleteUserApi = (userId) =>
   apiClient.delete(`/auth/users/${userId}`);
+
+export const setLanguageApi = (language) =>
+  apiClient.put("/auth/me/language", { language });

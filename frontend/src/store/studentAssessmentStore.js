@@ -1,4 +1,6 @@
 import { create } from "zustand";
+import i18n from "../i18n/index.js";
+import { errorMessage } from "../utils/forms.js";
 import {
   getAttemptStateApi,
   startAssessmentApi,
@@ -26,7 +28,6 @@ const saveTimers = new Map(); // questionId -> timeout id
 let retryTimer = null;
 
 const errorCode = (error) => error?.response?.data?.code;
-const errorMessage = (error, fallback) => error?.response?.data?.message || fallback;
 const isNetworkError = (error) => !error?.response;
 
 const toDeadline = (seconds) => Date.now() + Math.max(0, Number(seconds) || 0) * 1000;
@@ -155,7 +156,7 @@ const useStudentAssessmentStore = create((set, get) => {
       } catch (error) {
         set({
           phase: "error",
-          error: errorMessage(error, "Could not load this assessment."),
+          error: errorMessage(error, i18n.t("assessments.loadOneFailed")),
           errorCode: errorCode(error) || null,
         });
       }
@@ -175,7 +176,7 @@ const useStudentAssessmentStore = create((set, get) => {
         }
         set({
           phase: "not_started",
-          error: errorMessage(error, "Could not start the assessment. Please try again."),
+          error: errorMessage(error, i18n.t("exam.startFailed")),
           errorCode: code || null,
         });
       }
@@ -256,7 +257,7 @@ const useStudentAssessmentStore = create((set, get) => {
           setTimeout(() => get().resync(), PREPARING_RETRY_MS);
           return;
         }
-        set({ phase: "error", error: errorMessage(error, "Could not load this assessment."), preparing: false });
+        set({ phase: "error", error: errorMessage(error, i18n.t("assessments.loadOneFailed")), preparing: false });
       }
     },
 
@@ -279,7 +280,7 @@ const useStudentAssessmentStore = create((set, get) => {
           set({
             phase: "in_progress",
             saveStatus: "offline",
-            error: "You appear to be offline. Your answers are kept; submitting again when you are back online.",
+            error: i18n.t("exam.offlineSubmit"),
           });
           setTimeout(() => get().submit(), RETRY_DELAY_MS);
           return;

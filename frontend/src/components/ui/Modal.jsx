@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
+import { useTranslation } from "react-i18next";
 import { FaCheckCircle, FaExclamationTriangle, FaInfoCircle, FaTimes, FaTimesCircle } from "react-icons/fa";
 
 const TYPE_STYLES = {
@@ -26,13 +27,14 @@ function Modal({
   children,
   type = "info",
   onConfirm,
-  confirmText = "Confirm",
-  cancelText = "Cancel",
+  confirmText,
+  cancelText,
   confirmVariant,
   size = "md",
   footer,
   dir,
 }) {
+  const { t } = useTranslation();
   const titleId = useId();
   const panelRef = useRef(null);
   const onCloseRef = useRef(onClose);
@@ -113,7 +115,7 @@ function Modal({
             type="button"
             onClick={() => onCloseRef.current?.()}
             className="-me-2 inline-flex h-11 w-11 items-center justify-center rounded-lg text-ink-muted hover:bg-gray-100 focus:outline-none focus-visible:ring-4 focus-visible:ring-primary-200"
-            aria-label="Close"
+            aria-label={t("common.close")}
           >
             <FaTimes aria-hidden="true" />
           </button>
@@ -129,15 +131,15 @@ function Modal({
           ) : isConfirm ? (
             <>
               <button type="button" className="btn-secondary" onClick={() => onCloseRef.current?.()}>
-                {cancelText}
+                {cancelText || t("common.cancel")}
               </button>
               <button type="button" className={danger ? "btn-danger" : "btn-primary"} onClick={handleConfirm}>
-                {confirmText}
+                {confirmText || t("common.confirm")}
               </button>
             </>
           ) : (
             <button type="button" className="btn-primary" onClick={() => onCloseRef.current?.()}>
-              OK
+              {t("common.ok")}
             </button>
           )}
         </div>

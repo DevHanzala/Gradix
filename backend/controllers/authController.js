@@ -13,6 +13,7 @@ import {
   removeUserService,
   registerStudentService,
   formatUserResponse,
+  setLanguagePreferenceService,
 } from "../services/auth.service.js";
 
 /** Map known service error codes to HTTP responses; anything else goes to the error middleware. */
@@ -43,8 +44,8 @@ const handleError = (error, res, next) => {
 
 export const signup = async (req, res, next) => {
   try {
-    const { name, email, password } = req.body || {};
-    const { user } = await signupService({ name, email, password });
+    const { name, email, password, language } = req.body || {};
+    const { user } = await signupService({ name, email, password, language });
     res.status(201).json({
       success: true,
       message: "Account created. Please check your email to verify your account.",
@@ -167,10 +168,19 @@ export const removeUser = async (req, res, next) => {
   }
 };
 
+export const setLanguage = async (req, res, next) => {
+  try {
+    const data = await setLanguagePreferenceService(req.body?.language, req.user);
+    res.status(200).json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const registerStudent = async (req, res, next) => {
   try {
-    const { name, email, password, roles } = req.body || {};
-    const { user } = await registerStudentService({ name, email, password, roles }, req.user);
+    const { name, email, password, roles, language } = req.body || {};
+    const { user } = await registerStudentService({ name, email, password, roles, language }, req.user);
     res.status(201).json({
       success: true,
       message: "Student registered successfully. A verification email has been sent.",

@@ -1,0 +1,12 @@
+{
+  "timedOut": "انتهى الوقت",
+  "state": {
+    "correct": "صحيح",
+    "wrong": "خاطئ",
+    "unanswered": "لم تتم الإجابة"
+  },
+  "objective": "الهدف {{number}}: {{text}}",
+  "chosenMarker": "(إجابتك)",
+  "answerGiven": "الإجابة المقدّمة",
+  "timeTaken": "الوقت المستغرق"
+}

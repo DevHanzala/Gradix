@@ -1,0 +1,17 @@
+{
+  "listDescription": "اطّلع على أدائك وراجع كل سؤال مع الإجابات الصحيحة.",
+  "loadFailed": "تعذّر تحميل نتائجك",
+  "none": "لا توجد نتائج بعد",
+  "noneDescription": "تظهر النتائج هنا بعد تسليم التقييم.",
+  "loading": "جارٍ تحميل النتائج…",
+  "scoreOf": "الدرجة {{score}} / {{total}}",
+  "downloadReport": "تنزيل التقرير",
+  "incorrect": "خاطئ",
+  "unansweredDeducted": "دون إجابة: {{unanswered}} · الدرجات المخصومة على الإجابات الخاطئة: {{deducted}}",
+  "review": "المراجعة",
+  "reviewDescription": "الأخضر هو الإجابة الصحيحة؛ والأحمر يميّز إجابتك عندما كانت خاطئة.",
+  "loadingQuestions": "جارٍ تحميل الأسئلة…",
+  "raw": "الدرجة",
+  "adjusted": "معدّلة حسب الصعوبة",
+  "unanswered": "دون إجابة"
+}

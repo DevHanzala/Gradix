@@ -196,3 +196,5 @@ export const deleteUser = async (userId, requestingUserRole) => {
 // ==================== USER STATISTICS ====================
 
 export const setVerificationToken = async (userId, token) => userRepo.setVerificationTokenQuery(userId, token);
+
+export const setLanguagePreference = async (userId, language) => userRepo.setLanguagePreferenceQuery(userId, language);

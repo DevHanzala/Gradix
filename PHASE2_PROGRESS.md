@@ -10,18 +10,18 @@ Resume rule: read this file, check `git log --oneline main..phase-2`, continue w
 | 0. Prep (audit, pg-boss worker, LLM usage log) | done | 3266e49 |
 | 1. Learning objectives + real RAG | done | da46b32 |
 | 2. Question pool + pre-generation | done | 3e2fadb |
-| 3. Adaptive difficulty engine | done | (this commit) |
-| 4. Full multilingual app | todo | |
+| 3. Adaptive difficulty engine | done | e462b21 |
+| 4. Full multilingual app | done | (this commit) |
 | 5. Learning pathways | todo | |
 | 6. Institutions, roles, notifications | todo | |
 | 7. Remaining SRS features | todo | |
 | Final verification + PHASE2_REPORT.md | todo | |
 
 ## Next
-Section 4: i18n (react-i18next en/ur/ar + fa for exam/reports; every string incl. zod + emails; i18n:check in lint;
-dir/lang + RTL logical classes + mirrored icons; Noto Nastaliq Urdu / Noto Naskh Arabic in app + PDFs;
-users.language_preference + selectors; Intl formatting; emails in recipient language; TRANSLATION_REVIEW.md;
-fas.traineddata + optional Gemini OCR fallback behind an env flag with logging).
+Section 5: learning pathways (results page: raw/adjusted, accuracy, time, per-objective bars, difficulty chart;
+review with objective per question after submit; weak areas by objective; AI study plan in the student's
+language with source passages; server Puppeteer PDF report persisted in learning_reports; ungraded practice quiz;
+remove or wire the dead analytics endpoints). Note: /student/results/:id currently redirects to /student/analytics.
 
 ## Section 0 summary
 - npm audit: non-breaking fixes applied (lockfile only). Upgraded nodemailer 6 -> 10 and puppeteer 24 -> 25
@@ -119,6 +119,33 @@ fas.traineddata + optional Gemini OCR fallback behind an env flag with logging).
   browser". Tests: 209 (23 new in engine.test.js incl. strong vs weak path, same objective order, timeouts,
   resume, parallel advance, early submit, offline catch-up).
 
+## Section 4 summary
+- react-i18next with catalogs per area in frontend/src/locales/{en,ur,ar,fa}/<area>.json (673 keys each;
+  Persian is complete, not only exam/reports). Language: account preference > saved choice > browser.
+  <html lang dir> follow the language; layout uses logical classes (ms/me/ps/pe/start/end) and arrow icons
+  mirror with rtl:rotate-180 (scan found no physical classes left).
+- `npm run i18n:check` (frontend/scripts/i18n-check.mjs) runs inside `npm run lint`: key parity en/ur/ar,
+  Persian coverage of the required areas, identical {{placeholders}} and <tags>, every static t() key exists,
+  and no hard-coded user-facing text (JSX text, user-facing attributes, toast/message literals, labels).
+- zod messages are i18n keys ("key|value" for numbers) translated by validateWith/issuesToErrors.
+  API errors: English shows the server's specific message; other languages show the translated error code.
+- Intl formatting helpers (utils/format.js): numbers, percentages, dates, durations, file sizes; countdown
+  timers keep Latin digits.
+- Fonts (SIL OFL, self-hosted): Noto Nastaliq Urdu for ur, Noto Naskh Arabic for ar/fa, in the app (:lang
+  rules) and in PDFs (backend/helper/pdfFonts.js, used by the printed paper).
+- Migration 1760000000500: users.language_preference (CHECK en/ur/ar/fa), resources.extraction_method.
+  PUT /api/auth/me/language; selectors on login/signup (AuthLayout), top bar, home header and profile;
+  sign-up and instructor-registered students get their language set.
+- Emails (and the notification texts for section 6) are rendered from backend/locales/<lang>.json in the
+  RECIPIENT's language with dir/lang/font, Intl dates; parity tested.
+- The exam page speaks the exam's language during the attempt (getFixedT), independent of the UI language.
+- OCR: fas.traineddata added (Tesseract eng+ara+urd+fas). OCR_GEMINI_FALLBACK=true sends page images to
+  Gemini only when Tesseract output fails the quality check; the path used is logged and stored in
+  resources.extraction_method. Fixed a crash: tesseract.js re-threw worker errors as uncaught exceptions on
+  degenerate images (errorHandler added; per-image failures become "no text" -> clear 422).
+- TRANSLATION_REVIEW.md lists terminology choices and uncertain strings.
+- New env: OCR_GEMINI_FALLBACK. Tests: 220 (11 new backend i18n/OCR tests).
+
 ## Decisions
 - D0.1 npm audit majors NOT applied (risk noted): firebase (frontend; vulnerable firestore/grpc code is never
   imported, only firebase/auth), jest/nodemon (dev-only; npm suggests downgrades), office-text-extractor 4
@@ -156,6 +183,12 @@ fas.traineddata + optional Gemini OCR fallback behind an env flag with logging).
   student never had a chance to answer, and marks still count in the total.
 - D3.3 Adjusted % is normalised to medium difficulty (weight 1.0) and capped at 100 so it reads like a normal
   percentage; the raw % is always shown alongside (no student is told "100% correct = 85%").
+
+- D4.1 No i18next plural keys: counts are phrased "Label: {{count}}" so Arabic (6 plural forms) and Urdu stay
+  correct without per-language plural catalogs.
+- D4.2 Non-English UIs show translated error codes instead of English server messages (losing some detail,
+  e.g. which question block is invalid) rather than mixing languages.
+- D4.3 The Gemini OCR fallback is opt-in because it sends the instructor's documents to a third party.
 
 ## Open issues
 - office-text-extractor major upgrade still pending (D0.1).

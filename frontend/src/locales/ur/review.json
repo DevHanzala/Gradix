@@ -1,0 +1,12 @@
+{
+  "timedOut": "وقت ختم ہو گیا",
+  "state": {
+    "correct": "درست",
+    "wrong": "غلط",
+    "unanswered": "جواب نہیں دیا"
+  },
+  "objective": "مقصد {{number}}: {{text}}",
+  "chosenMarker": "(آپ کا جواب)",
+  "answerGiven": "دیا گیا جواب",
+  "timeTaken": "لگنے والا وقت"
+}

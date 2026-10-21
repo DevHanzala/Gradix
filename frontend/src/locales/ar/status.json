@@ -1,0 +1,16 @@
+{
+  "draft": "مسودة",
+  "extracting": "جارٍ استخراج الأهداف…",
+  "failed": "الأهداف مطلوبة",
+  "objectives_ready": "الأهداف جاهزة",
+  "publishing": "جارٍ النشر…",
+  "published": "منشور",
+  "executed": "بدأ · مقفل",
+  "progressLabel": "تقدّم التقييم",
+  "steps": {
+    "draft": "مسودة",
+    "objectives_ready": "الأهداف جاهزة",
+    "publishing": "النشر",
+    "published": "منشور"
+  }
+}

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import useAuthStore from "../store/authStore.js";
 import { getCaptchaToken } from "../config/captcha.js";
 import useRecaptchaInit from "../hooks/useRecaptchaInit.js";
@@ -11,6 +12,7 @@ import GoogleButton, { OrDivider } from "../components/GoogleButton.jsx";
 import { Alert, Button, Input } from "../components/ui";
 
 function Login() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { login, googleAuth } = useAuthStore();
@@ -48,7 +50,7 @@ function Login() {
       const user = await login({ ...form, captchaToken });
       goToApp(user);
     } catch (error) {
-      setFormError(errorMessage(error, "Login failed. Please try again."));
+      setFormError(errorMessage(error, t("auth.loginFailed")));
     } finally {
       setLoading(false);
     }
@@ -60,7 +62,7 @@ function Login() {
     try {
       goToApp(await googleAuth());
     } catch (error) {
-      setFormError(errorMessage(error, "Google sign-in failed. Please try again."));
+      setFormError(errorMessage(error, t("auth.googleFailed")));
     } finally {
       setGoogleLoading(false);
     }
@@ -68,14 +70,14 @@ function Login() {
 
   return (
     <AuthLayout
-      title="Log in"
-      subtitle="Welcome back to Gradix."
+      title={t("auth.login")}
+      subtitle={t("auth.loginSubtitle")}
       showRecaptchaNotice
       footer={
         <>
-          New to Gradix?{" "}
+          {t("auth.newHere")}{" "}
           <Link to="/signup" className="inline-flex min-h-11 items-center font-semibold text-primary-700 hover:underline">
-            Create an account
+            {t("auth.createAccountLink")}
           </Link>
         </>
       }
@@ -90,9 +92,19 @@ function Login() {
       )}
 
       <form onSubmit={onSubmit} noValidate className="space-y-4">
-        <Input label="Email" name="email" type="email" autoComplete="email" value={form.email} onChange={onChange} error={errors.email} required />
         <Input
-          label="Password"
+          label={t("auth.email")}
+          name="email"
+          type="email"
+          dir="ltr"
+          autoComplete="email"
+          value={form.email}
+          onChange={onChange}
+          error={errors.email}
+          required
+        />
+        <Input
+          label={t("auth.password")}
           name="password"
           type="password"
           autoComplete="current-password"
@@ -103,11 +115,11 @@ function Login() {
         />
         <div className="flex justify-end">
           <Link to="/forgot-password" className="inline-flex min-h-11 items-center text-sm font-semibold text-primary-700 hover:underline">
-            Forgot your password?
+            {t("auth.forgotPassword")}
           </Link>
         </div>
         <Button type="submit" fullWidth loading={loading}>
-          Log in
+          {t("auth.login")}
         </Button>
       </form>
     </AuthLayout>

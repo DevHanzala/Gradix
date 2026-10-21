@@ -1,0 +1,19 @@
+{
+  "main": "اصلی",
+  "account": "حساب",
+  "navigation": "پیمایش",
+  "openNavigation": "باز کردن پیمایش",
+  "closeNavigation": "بستن پیمایش",
+  "skipToContent": "رفتن به محتوا",
+  "dashboard": "داشبورد",
+  "myDashboard": "داشبورد من",
+  "results": "نتایج و مرور",
+  "assessments": "آزمون‌ها",
+  "newAssessment": "آزمون جدید",
+  "resources": "منابع",
+  "registerStudent": "ثبت دانش‌آموز",
+  "users": "کاربران",
+  "profile": "نمایه من",
+  "logout": "خروج",
+  "goToMyDashboard": "رفتن به داشبورد من"
+}

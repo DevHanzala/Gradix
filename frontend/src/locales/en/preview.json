@@ -1,0 +1,16 @@
+{
+  "failed": "Could not generate sample questions.",
+  "title": "Preview",
+  "titleFor": "Preview: {{title}}",
+  "description": "Generate a sample question set in English to check the topic and difficulty. Each student gets their own set.",
+  "again": "Generate another sample",
+  "generate": "Generate sample questions",
+  "sample": "Sample questions",
+  "sampleDescription": "Correct answers are highlighted. Students never see this view.",
+  "generating": "Generating questions with AI. This can take up to a minute…",
+  "none": "No sample yet",
+  "noneDescription": "Generating a sample uses the AI, so it runs only when you ask.",
+  "questionNumber": "Question {{number}}",
+  "correctMarker": "(correct answer)",
+  "correctAnswer": "Correct answer:"
+}

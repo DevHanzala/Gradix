@@ -1,0 +1,63 @@
+{
+  "email": {
+    "greeting": "Hi {{name}},",
+    "footer": "Gradix",
+    "verify": {
+      "subject": "Verify your email - Gradix",
+      "body": "Please verify your email address to activate your account.",
+      "button": "Verify email",
+      "expiry": "This link expires in 24 hours."
+    },
+    "reset": {
+      "subject": "Reset your password - Gradix",
+      "body": "We received a request to reset your password.",
+      "button": "Reset password",
+      "expiry": "This link expires in 1 hour. If you did not ask for this, you can ignore this email."
+    },
+    "passwordChanged": {
+      "subject": "Your password was changed - Gradix",
+      "body": "The password for your Gradix account was changed on {{date}}.",
+      "warning": "If this was not you, reset your password immediately and contact your administrator."
+    },
+    "roleChanged": {
+      "subject": "Your role has been updated - Gradix",
+      "body": "Your role changed from {{oldRole}} to {{newRole}}.",
+      "button": "Open Gradix"
+    },
+    "enrolled": {
+      "subject": "New assessment: {{title}}",
+      "body": "You have been enrolled in {{title}}.",
+      "bodyBy": "You have been enrolled in {{title}} by {{instructor}}.",
+      "date": "Enrolled on {{date}}.",
+      "button": "View assessment"
+    },
+    "accountDeleted": {
+      "subject": "Your Gradix account was deleted",
+      "body": "Your Gradix account has been deleted by an administrator. Your personal details were removed; anonymous results may be kept for your institution's records.",
+      "contact": "If you think this is a mistake, contact your administrator."
+    },
+    "published": {
+      "subject": "Assessment available: {{title}}",
+      "body": "{{title}} is now available. You can start it from your dashboard.",
+      "button": "Open dashboard"
+    },
+    "resultsReady": {
+      "subject": "Your results: {{title}}",
+      "body": "Your results for {{title}} are ready: {{percentage}}%.",
+      "button": "View results"
+    }
+  },
+  "role": {
+    "student": "Student",
+    "instructor": "Instructor",
+    "admin": "Admin",
+    "super_admin": "Super Admin"
+  },
+  "notification": {
+    "roleChanged": "Your role changed from {{oldRole}} to {{newRole}}.",
+    "passwordChanged": "Your password was changed.",
+    "enrolled": "You were enrolled in {{title}}.",
+    "published": "{{title}} is now available.",
+    "resultsReady": "Your results for {{title}} are ready."
+  }
+}

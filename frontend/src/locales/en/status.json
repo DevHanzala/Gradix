@@ -1,0 +1,16 @@
+{
+  "draft": "Draft",
+  "extracting": "Finding objectives…",
+  "failed": "Objectives needed",
+  "objectives_ready": "Objectives ready",
+  "publishing": "Publishing…",
+  "published": "Published",
+  "executed": "Started · locked",
+  "progressLabel": "Assessment progress",
+  "steps": {
+    "draft": "Draft",
+    "objectives_ready": "Objectives ready",
+    "publishing": "Publishing",
+    "published": "Published"
+  }
+}

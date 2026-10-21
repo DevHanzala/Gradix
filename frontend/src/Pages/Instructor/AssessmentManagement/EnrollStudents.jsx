@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { FaUserMinus, FaUsers } from "react-icons/fa";
 import useAssessmentStore from "../../../store/assessmentStore.js";
 import { enrollStudentSchema } from "../../../schemas/studentSchemas.js";
 import { validateWith, errorMessage } from "../../../utils/forms.js";
+import { formatNumber } from "../../../utils/format.js";
 import { RegisterStudentForm } from "../AddStudent.jsx";
 import { Alert, Button, Card, CardBody, CardHeader, EmptyState, Input, Modal, PageHeader, ResponsiveTable, SkeletonList } from "../../../components/ui";
 
 function EnrollByEmail({ assessmentId, onEnrolled }) {
+  const { t } = useTranslation();
   const enrollStudent = useAssessmentStore((s) => s.enrollStudent);
   const [email, setEmail] = useState("");
   const [error, setError] = useState(null);
@@ -24,11 +27,11 @@ function EnrollByEmail({ assessmentId, onEnrolled }) {
     setSaving(true);
     try {
       await enrollStudent(assessmentId, email.trim());
-      toast.success(`${email.trim()} was enrolled and notified by email.`);
+      toast.success(t("enroll.enrolled", { email: email.trim() }));
       setEmail("");
       onEnrolled();
     } catch (err) {
-      setError(errorMessage(err, "Could not enroll this student."));
+      setError(errorMessage(err, t("enroll.enrollFailed")));
     } finally {
       setSaving(false);
     }
@@ -37,25 +40,27 @@ function EnrollByEmail({ assessmentId, onEnrolled }) {
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-4">
       <Input
-        label="Student email"
+        label={t("enroll.studentEmail")}
         type="email"
+        dir="ltr"
         value={email}
         onChange={(e) => {
           setEmail(e.target.value);
           setError(null);
         }}
         error={error}
-        hint="The student must already have a Gradix account."
+        hint={t("enroll.emailHint")}
         required
       />
       <Button type="submit" loading={saving} className="w-full sm:w-auto">
-        Enroll student
+        {t("enroll.enrollButton")}
       </Button>
     </form>
   );
 }
 
 function EnrollStudents() {
+  const { t } = useTranslation();
   const { assessmentId } = useParams();
   const { enrolledStudents, getEnrolledStudents, unenrollStudent } = useAssessmentStore();
   const [loading, setLoading] = useState(true);
@@ -69,11 +74,11 @@ function EnrollStudents() {
     try {
       await getEnrolledStudents(assessmentId);
     } catch (error) {
-      setLoadError(errorMessage(error, "Could not load enrolled students."));
+      setLoadError(errorMessage(error, t("enroll.loadFailed")));
     } finally {
       setLoading(false);
     }
-  }, [assessmentId, getEnrolledStudents]);
+  }, [assessmentId, getEnrolledStudents, t]);
 
   useEffect(() => {
     load();
@@ -82,10 +87,10 @@ function EnrollStudents() {
   const confirmRemove = async () => {
     try {
       await unenrollStudent(assessmentId, removeTarget.id);
-      toast.success(`${removeTarget.name} was removed.`);
+      toast.success(t("enroll.removed", { name: removeTarget.name }));
       await load();
     } catch (error) {
-      toast.error(errorMessage(error, "Could not remove the student."));
+      toast.error(errorMessage(error, t("enroll.removeFailed")));
     }
   };
 
@@ -94,25 +99,25 @@ function EnrollStudents() {
   return (
     <>
       <PageHeader
-        title="Enroll students"
-        description="Enrolled students see this assessment on their dashboard."
+        title={t("enroll.title")}
+        description={t("enroll.description")}
         backTo={`/instructor/assessments/${assessmentId}`}
-        backLabel="Back to assessment"
+        backLabel={t("assessments.backToAssessment")}
       />
       <div className="grid gap-6 lg:grid-cols-5">
         <div className="space-y-6 lg:col-span-2">
           <Card>
-            <CardHeader title="Add a student" />
+            <CardHeader title={t("enroll.addStudent")} />
             <CardBody>
               <EnrollByEmail assessmentId={assessmentId} onEnrolled={load} />
             </CardBody>
           </Card>
           <Card>
             <CardHeader
-              title="Student has no account?"
+              title={t("enroll.noAccount")}
               actions={
                 <Button variant="secondary" onClick={() => setShowRegister((v) => !v)} aria-expanded={showRegister}>
-                  {showRegister ? "Hide" : "Register student"}
+                  {showRegister ? t("common.hide") : t("nav.registerStudent")}
                 </Button>
               }
             />
@@ -125,28 +130,35 @@ function EnrollStudents() {
         </div>
 
         <Card className="lg:col-span-3">
-          <CardHeader title="Enrolled" description={loading ? undefined : `${students.length} student${students.length === 1 ? "" : "s"}`} />
+          <CardHeader title={t("enroll.enrolledTitle")} description={loading ? undefined : t("enroll.count", { count: formatNumber(students.length) })} />
           {loading ? (
             <SkeletonList rows={3} />
           ) : loadError ? (
             <div className="p-4 sm:p-6">
-              <Alert tone="danger" action={<Button variant="secondary" onClick={load}>Try again</Button>}>
+              <Alert
+                tone="danger"
+                action={
+                  <Button variant="secondary" onClick={load}>
+                    {t("common.tryAgain")}
+                  </Button>
+                }
+              >
                 {loadError}
               </Alert>
             </div>
           ) : students.length === 0 ? (
-            <EmptyState icon={FaUsers} title="No students enrolled yet" description="Add students by email using the form." />
+            <EmptyState icon={FaUsers} title={t("enroll.none")} description={t("enroll.noneDescription")} />
           ) : (
             <ResponsiveTable
-              caption="Enrolled students"
+              caption={t("enroll.enrolledTitle")}
               rows={students}
               columns={[
-                { key: "name", header: "Name", primary: true },
-                { key: "email", header: "Email" },
+                { key: "name", header: t("profile.name"), primary: true },
+                { key: "email", header: t("auth.email"), render: (s) => <span dir="ltr">{s.email}</span> },
               ]}
               actions={(s) => (
                 <Button variant="ghost" icon={FaUserMinus} className="text-danger-700 hover:bg-danger-50" onClick={() => setRemoveTarget(s)}>
-                  Remove
+                  {t("common.remove")}
                 </Button>
               )}
             />
@@ -158,12 +170,12 @@ function EnrollStudents() {
         isOpen={Boolean(removeTarget)}
         onClose={() => setRemoveTarget(null)}
         type="warning"
-        title={removeTarget ? `Remove ${removeTarget.name}?` : ""}
+        title={removeTarget ? t("enroll.removeTitle", { name: removeTarget.name }) : ""}
         onConfirm={confirmRemove}
-        confirmText="Remove student"
+        confirmText={t("enroll.removeConfirm")}
         confirmVariant="danger"
       >
-        The student will no longer see this assessment. Results of an attempt they already made are kept.
+        {t("enroll.removeBody")}
       </Modal>
     </>
   );

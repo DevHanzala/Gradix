@@ -1,60 +1,124 @@
 import { escapeHtml } from "./escapeHtml.js";
+import { translate, isRtl, normalizeLanguage } from "../helper/i18n.js";
 
-// Every interpolated value is escaped; URLs are built by the server but are
-// escaped as attribute values too.
+// Every email is written in the recipient's language (users.language_preference)
+// with the right direction and fonts. Every interpolated value is escaped; URLs
+// are built by the server but are escaped as attribute values too.
 
-const layout = (body) => `<!DOCTYPE html>
-<html>
-<body style="font-family: Arial, Helvetica, sans-serif; color: #1f2937; line-height: 1.5;">
+const FONTS = {
+  ur: "'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', Tahoma, serif",
+  ar: "'Noto Naskh Arabic', Tahoma, serif",
+  fa: "'Noto Naskh Arabic', Tahoma, serif",
+  en: "Arial, Helvetica, sans-serif",
+};
+
+const layout = (lang, body) => {
+  const language = normalizeLanguage(lang);
+  const dir = isRtl(language) ? "rtl" : "ltr";
+  return `<!DOCTYPE html>
+<html lang="${language}" dir="${dir}">
+<body dir="${dir}" style="font-family: ${FONTS[language]}; color: #1f2937; line-height: ${language === "ur" ? 2.2 : 1.6}; text-align: ${dir === "rtl" ? "right" : "left"};">
 ${body}
-<p style="color: #6b7280; font-size: 12px;">Gradix</p>
+<p style="color: #6b7280; font-size: 12px;">${escapeHtml(translate(language, "email.footer"))}</p>
 </body>
 </html>`;
+};
 
 const button = (url, label) =>
   `<p><a href="${escapeHtml(url)}" style="display:inline-block;padding:10px 18px;background:#4f46e5;color:#fff;border-radius:8px;text-decoration:none;">${escapeHtml(label)}</a></p>`;
 
-export const verificationEmailTemplate = ({ name, verificationUrl }) => ({
-  subject: "Verify your email - Gradix",
-  html: layout(`
-  <h2>Hi ${escapeHtml(name)},</h2>
-  <p>Please verify your email address to activate your account.</p>
-  ${button(verificationUrl, "Verify email")}
-  <p>This link expires in 24 hours.</p>`),
+/** Translate with every parameter HTML-escaped. */
+const tx = (lang, key, params = {}) =>
+  translate(lang, key, Object.fromEntries(Object.entries(params).map(([k, v]) => [k, escapeHtml(v)])));
+
+const greeting = (lang, name) => `<h2>${tx(lang, "email.greeting", { name })}</h2>`;
+
+export const verificationEmailTemplate = ({ lang, name, verificationUrl }) => ({
+  subject: translate(lang, "email.verify.subject"),
+  html: layout(
+    lang,
+    `${greeting(lang, name)}
+  <p>${tx(lang, "email.verify.body")}</p>
+  ${button(verificationUrl, translate(lang, "email.verify.button"))}
+  <p>${tx(lang, "email.verify.expiry")}</p>`
+  ),
 });
 
-export const passwordResetEmailTemplate = ({ name, resetUrl }) => ({
-  subject: "Reset your password - Gradix",
-  html: layout(`
-  <h2>Hi ${escapeHtml(name)},</h2>
-  <p>We received a request to reset your password.</p>
-  ${button(resetUrl, "Reset password")}
-  <p>This link expires in 1 hour. If you did not ask for this, you can ignore this email.</p>`),
+export const passwordResetEmailTemplate = ({ lang, name, resetUrl }) => ({
+  subject: translate(lang, "email.reset.subject"),
+  html: layout(
+    lang,
+    `${greeting(lang, name)}
+  <p>${tx(lang, "email.reset.body")}</p>
+  ${button(resetUrl, translate(lang, "email.reset.button"))}
+  <p>${tx(lang, "email.reset.expiry")}</p>`
+  ),
 });
 
-export const passwordChangedEmailTemplate = ({ name, changedAt }) => ({
-  subject: "Your password was changed - Gradix",
-  html: layout(`
-  <h2>Hi ${escapeHtml(name)},</h2>
-  <p>The password for your Gradix account was changed on ${escapeHtml(changedAt)} (UTC).</p>
-  <p>If this was not you, reset your password immediately and contact your administrator.</p>`),
+export const passwordChangedEmailTemplate = ({ lang, name, changedAt }) => ({
+  subject: translate(lang, "email.passwordChanged.subject"),
+  html: layout(
+    lang,
+    `${greeting(lang, name)}
+  <p>${tx(lang, "email.passwordChanged.body", { date: changedAt })}</p>
+  <p>${tx(lang, "email.passwordChanged.warning")}</p>`
+  ),
 });
 
-export const roleChangeEmailTemplate = ({ name, oldRole, newRole, dashboardUrl }) => ({
-  subject: "Your role has been updated - Gradix",
-  html: layout(`
-  <h2>Hi ${escapeHtml(name)},</h2>
-  <p>Your role changed from <b>${escapeHtml(oldRole)}</b> to <b>${escapeHtml(newRole)}</b>.</p>
-  ${button(dashboardUrl, "Open Gradix")}`),
+export const roleChangeEmailTemplate = ({ lang, name, oldRole, newRole, dashboardUrl }) => ({
+  subject: translate(lang, "email.roleChanged.subject"),
+  html: layout(
+    lang,
+    `${greeting(lang, name)}
+  <p>${tx(lang, "email.roleChanged.body", {
+    oldRole: translate(lang, `role.${oldRole}`),
+    newRole: translate(lang, `role.${newRole}`),
+  })}</p>
+  ${button(dashboardUrl, translate(lang, "email.roleChanged.button"))}`
+  ),
 });
 
-export const assessmentEnrollmentTemplate = ({ name, assessmentTitle, instructorName, dashboardUrl }) => ({
-  subject: `New assessment: ${assessmentTitle}`,
-  html: layout(`
-  <h2>Hi ${escapeHtml(name)},</h2>
-  <p>You have been enrolled in <strong>${escapeHtml(assessmentTitle)}</strong>${
-    instructorName ? ` by ${escapeHtml(instructorName)}` : ""
-  }.</p>
-  <p>Enrolled on ${escapeHtml(new Date().toUTCString())}.</p>
-  ${button(dashboardUrl, "View assessment")}`),
+export const assessmentEnrollmentTemplate = ({ lang, name, assessmentTitle, instructorName, enrolledAt, dashboardUrl }) => ({
+  subject: translate(lang, "email.enrolled.subject", { title: assessmentTitle }),
+  html: layout(
+    lang,
+    `${greeting(lang, name)}
+  <p>${
+    instructorName
+      ? tx(lang, "email.enrolled.bodyBy", { title: assessmentTitle, instructor: instructorName })
+      : tx(lang, "email.enrolled.body", { title: assessmentTitle })
+  }</p>
+  <p>${tx(lang, "email.enrolled.date", { date: enrolledAt })}</p>
+  ${button(dashboardUrl, translate(lang, "email.enrolled.button"))}`
+  ),
+});
+
+export const accountDeletedEmailTemplate = ({ lang, name }) => ({
+  subject: translate(lang, "email.accountDeleted.subject"),
+  html: layout(
+    lang,
+    `${greeting(lang, name)}
+  <p>${tx(lang, "email.accountDeleted.body")}</p>
+  <p>${tx(lang, "email.accountDeleted.contact")}</p>`
+  ),
+});
+
+export const assessmentPublishedTemplate = ({ lang, name, assessmentTitle, dashboardUrl }) => ({
+  subject: translate(lang, "email.published.subject", { title: assessmentTitle }),
+  html: layout(
+    lang,
+    `${greeting(lang, name)}
+  <p>${tx(lang, "email.published.body", { title: assessmentTitle })}</p>
+  ${button(dashboardUrl, translate(lang, "email.published.button"))}`
+  ),
+});
+
+export const resultsReadyTemplate = ({ lang, name, assessmentTitle, percentage, resultsUrl }) => ({
+  subject: translate(lang, "email.resultsReady.subject", { title: assessmentTitle }),
+  html: layout(
+    lang,
+    `${greeting(lang, name)}
+  <p>${tx(lang, "email.resultsReady.body", { title: assessmentTitle, percentage })}</p>
+  ${button(resultsUrl, translate(lang, "email.resultsReady.button"))}`
+  ),
 });

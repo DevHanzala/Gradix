@@ -1,0 +1,13 @@
+{
+  "created": "Account created for {{name}}. A verification email was sent.",
+  "createFailed": "Could not create the account.",
+  "language": "Student's language",
+  "languageHint": "Used for their emails and the app until they change it.",
+  "tempPassword": "Temporary password",
+  "tempPasswordHint": "8+ characters with upper and lower case letters and a number. Share it securely; the student can change it later.",
+  "confirmPassword": "Confirm password",
+  "createButton": "Create student account",
+  "registerTitle": "Register a student",
+  "registerDescription": "Create an account for a student who has not signed up yet. Enroll them from an assessment afterwards.",
+  "newAccount": "New student account"
+}

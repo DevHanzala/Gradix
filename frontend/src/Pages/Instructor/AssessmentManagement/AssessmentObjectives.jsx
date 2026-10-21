@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { FaArrowDown, FaArrowUp, FaListOl, FaPlus, FaRedo, FaSave, FaTrash } from "react-icons/fa";
 import { fetchObjectivesApi, regenerateObjectivesApi, saveObjectivesApi } from "../../../api/assessment.api.js";
 import AssessmentStatus, { StatusSteps } from "../../../components/assessment/AssessmentStatus.jsx";
@@ -10,12 +11,12 @@ import { textDirection } from "../../../utils/text.js";
 
 const POLL_MS = 3000;
 const MAX_OBJECTIVES = 15;
-const TYPE_LABEL = { multiple_choice: "MCQ", true_false: "True/False", short_answer: "Short answer" };
 
 let draftKey = 0;
 const toDraft = (o) => ({ key: o.id ? `o${o.id}` : `n${++draftKey}`, id: o.id ?? null, text: o.text, description: o.description || "", weight: Number(o.weight) || 1, origin: o.origin || "manual" });
 
 function AssessmentObjectives() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const [view, setView] = useState(null);
   const [drafts, setDrafts] = useState([]);
@@ -44,10 +45,10 @@ function AssessmentObjectives() {
         applyView(res.data.data, options);
         setLoadError(null);
       } catch (error) {
-        setLoadError(errorMessage(error, "Could not load the objectives."));
+        setLoadError(errorMessage(error, t("objectives.loadFailed")));
       }
     },
-    [id, applyView]
+    [id, applyView, t]
   );
 
   useEffect(() => {
@@ -99,7 +100,7 @@ function AssessmentObjectives() {
       applyView(res.data.data, { force: true });
       setSaved(true);
     } catch (error) {
-      setSaveError(errorMessage(error, "Could not save the objectives."));
+      setSaveError(errorMessage(error, t("objectives.saveFailed")));
     } finally {
       setSaving(false);
     }
@@ -112,16 +113,16 @@ function AssessmentObjectives() {
       const res = await regenerateObjectivesApi(id);
       applyView(res.data.data, { force: true });
     } catch (error) {
-      setSaveError(errorMessage(error, "Could not start regeneration."));
+      setSaveError(errorMessage(error, t("objectives.regenerateFailed")));
     }
   };
 
   const header = (
     <PageHeader
-      title="Learning objectives"
-      description="What this assessment measures. Every student is tested on the same objectives in the same proportions."
+      title={t("objectives.title")}
+      description={t("objectives.description")}
       backTo={`/instructor/assessments/${id}`}
-      backLabel="Back to assessment"
+      backLabel={t("assessments.backToAssessment")}
     />
   );
 
@@ -129,7 +130,15 @@ function AssessmentObjectives() {
     return (
       <>
         {header}
-        <Alert tone="danger" title="Could not load the objectives" action={<Button variant="secondary" onClick={() => load({ force: true })}>Try again</Button>}>
+        <Alert
+          tone="danger"
+          title={t("objectives.loadFailedTitle")}
+          action={
+            <Button variant="secondary" onClick={() => load({ force: true })}>
+              {t("common.tryAgain")}
+            </Button>
+          }
+        >
           {loadError}
         </Alert>
       </>
@@ -162,18 +171,18 @@ function AssessmentObjectives() {
       </Card>
 
       {extracting && (
-        <Alert tone="info" title="Reading your material…" className="mb-6">
-          Objectives are being extracted from the uploaded material. This page updates by itself.
+        <Alert tone="info" title={t("objectives.extractingTitle")} className="mb-6">
+          {t("objectives.extractingBody")}
         </Alert>
       )}
       {view.objectivesState === "failed" && (
-        <Alert tone="warning" title="Objectives could not be generated" className="mb-6">
-          {view.objectivesError || "Add objectives manually or try again."}
+        <Alert tone="warning" title={t("objectives.failedTitle")} className="mb-6">
+          {t("objectives.failedBody")}
         </Alert>
       )}
       {!editable && (
-        <Alert tone="info" title="Locked" className="mb-6">
-          This assessment is being published or has been published, so its objectives can no longer change.
+        <Alert tone="info" title={t("objectives.lockedTitle")} className="mb-6">
+          {t("objectives.lockedBody")}
         </Alert>
       )}
       {saveError && (
@@ -183,22 +192,22 @@ function AssessmentObjectives() {
       )}
       {saved && !dirty && (
         <Alert tone="success" className="mb-6">
-          Objectives saved. The question plan has been updated.
+          {t("objectives.saved")}
         </Alert>
       )}
 
       <Card>
         <CardHeader
-          title={`Objectives (${drafts.length}/${MAX_OBJECTIVES})`}
-          description="Higher weight means more questions on that objective."
+          title={t("objectives.count", { count: drafts.length, max: MAX_OBJECTIVES })}
+          description={t("objectives.weightHint")}
           actions={
             editable && (
               <div className="flex flex-wrap gap-2">
                 <Button variant="secondary" icon={FaRedo} onClick={() => setConfirmRegenerate(true)} disabled={extracting}>
-                  Regenerate
+                  {t("objectives.regenerate")}
                 </Button>
                 <Button icon={FaSave} onClick={save} loading={saving} disabled={!dirty || invalid}>
-                  Save
+                  {t("common.save")}
                 </Button>
               </div>
             )
@@ -207,9 +216,16 @@ function AssessmentObjectives() {
         {drafts.length === 0 ? (
           <EmptyState
             icon={FaListOl}
-            title={extracting ? "Waiting for objectives" : "No objectives yet"}
-            description={extracting ? "They will appear here in a moment." : "Add the outcomes this assessment should measure."}
-            action={editable && !extracting && <Button icon={FaPlus} onClick={add}>Add objective</Button>}
+            title={extracting ? t("objectives.waiting") : t("objectives.none")}
+            description={extracting ? t("objectives.waitingBody") : t("objectives.noneBody")}
+            action={
+              editable &&
+              !extracting && (
+                <Button icon={FaPlus} onClick={add}>
+                  {t("objectives.add")}
+                </Button>
+              )
+            }
           />
         ) : (
           <ol className="divide-y divide-line">
@@ -221,17 +237,17 @@ function AssessmentObjectives() {
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-50 font-semibold text-primary-700">{i + 1}</span>
                     <div className="min-w-0 flex-1 space-y-3">
                       <Input
-                        label="Objective"
+                        label={t("objectives.objective")}
                         value={d.text}
                         dir={textDirection(d.text)}
                         onChange={(e) => update(d.key, { text: e.target.value })}
                         disabled={!editable}
                         maxLength={300}
-                        error={d.text.trim().length > 0 && d.text.trim().length < 3 ? "Write at least 3 characters." : undefined}
+                        error={d.text.trim().length > 0 && d.text.trim().length < 3 ? t("objectives.min3") : undefined}
                         required
                       />
                       <Textarea
-                        label="What exactly is assessed (optional)"
+                        label={t("objectives.whatAssessed")}
                         value={d.description}
                         dir={textDirection(d.description)}
                         rows={2}
@@ -240,13 +256,13 @@ function AssessmentObjectives() {
                         maxLength={1000}
                       />
                       <div className="flex flex-wrap items-center gap-2 text-xs">
-                        {d.origin === "ai" ? <Badge tone="primary">AI</Badge> : <Badge>Manual</Badge>}
+                        {d.origin === "ai" ? <Badge tone="primary">{t("objectives.ai")}</Badge> : <Badge>{t("objectives.manual")}</Badge>}
                         {plan && (
                           <>
-                            <Badge tone="success">{plan.count} question{plan.count === 1 ? "" : "s"}</Badge>
+                            <Badge tone="success">{t("studentDashboard.questionCount", { count: plan.count })}</Badge>
                             {Object.entries(plan.types).map(([type, n]) => (
                               <Badge key={type}>
-                                {n} × {TYPE_LABEL[type] || type}
+                                {n} × {t(`questionTypes.${type}`)}
                               </Badge>
                             ))}
                           </>
@@ -255,7 +271,7 @@ function AssessmentObjectives() {
                     </div>
                     <div className="flex flex-wrap items-end gap-2 lg:w-56 lg:flex-col lg:items-stretch">
                       <Input
-                        label="Weight"
+                        label={t("objectives.weight")}
                         type="number"
                         min={0.5}
                         max={10}
@@ -267,14 +283,14 @@ function AssessmentObjectives() {
                       />
                       {editable && (
                         <div className="flex gap-2">
-                          <Button variant="ghost" icon={FaArrowUp} onClick={() => move(i, -1)} disabled={i === 0} aria-label={`Move objective ${i + 1} up`}>
-                            <span className="sr-only">Up</span>
+                          <Button variant="ghost" icon={FaArrowUp} onClick={() => move(i, -1)} disabled={i === 0} aria-label={t("objectives.moveUp", { number: i + 1 })}>
+                            <span className="sr-only">{t("objectives.up")}</span>
                           </Button>
-                          <Button variant="ghost" icon={FaArrowDown} onClick={() => move(i, 1)} disabled={i === drafts.length - 1} aria-label={`Move objective ${i + 1} down`}>
-                            <span className="sr-only">Down</span>
+                          <Button variant="ghost" icon={FaArrowDown} onClick={() => move(i, 1)} disabled={i === drafts.length - 1} aria-label={t("objectives.moveDown", { number: i + 1 })}>
+                            <span className="sr-only">{t("objectives.down")}</span>
                           </Button>
-                          <Button variant="ghost" icon={FaTrash} onClick={() => remove(d.key)} aria-label={`Delete objective ${i + 1}`} className="text-danger-700">
-                            <span className="sr-only">Delete</span>
+                          <Button variant="ghost" icon={FaTrash} onClick={() => remove(d.key)} aria-label={t("objectives.deleteOne", { number: i + 1 })} className="text-danger-700">
+                            <span className="sr-only">{t("common.delete")}</span>
                           </Button>
                         </div>
                       )}
@@ -288,7 +304,7 @@ function AssessmentObjectives() {
         {editable && drafts.length > 0 && (
           <CardBody className="border-t border-line">
             <Button variant="secondary" icon={FaPlus} onClick={add} disabled={drafts.length >= MAX_OBJECTIVES}>
-              Add objective
+              {t("objectives.add")}
             </Button>
           </CardBody>
         )}
@@ -297,17 +313,17 @@ function AssessmentObjectives() {
       {view.blueprint?.slots?.length > 0 && (
         <Card className="mt-6">
           <CardHeader
-            title="Question plan"
-            description={`${view.blueprint.total} questions per student${view.blueprint.adaptive ? ", difficulty adapts to each student" : ", fixed difficulty mix"}.`}
+            title={t("objectives.plan")}
+            description={view.blueprint.adaptive ? t("objectives.planAdaptive", { count: view.blueprint.total }) : t("objectives.planFixed", { count: view.blueprint.total })}
           />
           <CardBody>
-            <ol className="flex flex-wrap gap-2" aria-label="Question order">
+            <ol className="flex flex-wrap gap-2" aria-label={t("objectives.order")}>
               {view.blueprint.slots.map((slot) => {
                 const index = drafts.findIndex((d) => d.id === slot.objective_id);
                 return (
                   <li key={slot.slot} className="rounded-control border border-line px-2 py-1 text-xs text-ink-muted">
-                    Q{slot.slot + 1} · O{index + 1} · {TYPE_LABEL[slot.question_type]}
-                    {slot.difficulty ? ` · D${slot.difficulty}` : ""}
+                    {t("objectives.slot", { q: slot.slot + 1, o: index + 1, type: t(`questionTypes.${slot.question_type}`) })}
+                    {slot.difficulty ? ` · ${t("bank.difficulty", { value: slot.difficulty })}` : ""}
                   </li>
                 );
               })}
@@ -328,12 +344,12 @@ function AssessmentObjectives() {
       <Modal
         isOpen={confirmRegenerate}
         onClose={() => setConfirmRegenerate(false)}
-        title="Regenerate objectives?"
+        title={t("objectives.regenerateTitle")}
         type="warning"
         onConfirm={regenerate}
-        confirmText="Regenerate"
+        confirmText={t("objectives.regenerate")}
       >
-        The current objectives, including your edits, will be replaced by a new AI-generated list.
+        {t("objectives.regenerateBody")}
       </Modal>
     </>
   );

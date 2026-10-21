@@ -1,16 +1,14 @@
 import { useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { FaChartBar, FaCheckCircle, FaClock, FaDownload, FaMinusCircle, FaTimesCircle } from "react-icons/fa";
 import useStudentAnalyticsStore from "../../store/useStudentAnalyticsStore.js";
 import AnswerReview from "../../components/assessment/AnswerReview.jsx";
+import { formatDuration, formatNumber, formatPercent } from "../../utils/format.js";
 import { Alert, Button, Card, CardBody, CardHeader, EmptyState, PageHeader, PageSpinner, Select, SkeletonList, StatCard } from "../../components/ui";
 
-const formatSeconds = (s) => {
-  const total = Math.round(Number(s) || 0);
-  return `${Math.floor(total / 60)}m ${total % 60}s`;
-};
-
 function StudentAnalytics() {
+  const { t } = useTranslation();
   const [searchParams, setSearchParams] = useSearchParams();
   const {
     assessments,
@@ -45,19 +43,32 @@ function StudentAnalytics() {
 
   return (
     <>
-      <PageHeader title="Results & review" description="See how you did and review every question with the correct answers." />
+      <PageHeader title={t("nav.results")} description={t("results.listDescription")} />
 
       {loading && !completed.length ? (
         <Card>
           <SkeletonList rows={3} />
         </Card>
       ) : error ? (
-        <Alert tone="danger" title="Could not load your results" action={<Button variant="secondary" onClick={() => fetchAssessments()}>Try again</Button>}>
+        <Alert
+          tone="danger"
+          title={t("results.loadFailed")}
+          action={
+            <Button variant="secondary" onClick={() => fetchAssessments()}>
+              {t("common.tryAgain")}
+            </Button>
+          }
+        >
           {error}
         </Alert>
       ) : completed.length === 0 ? (
         <Card>
-          <EmptyState icon={FaChartBar} title="No results yet" description="Results appear here after you submit an assessment." action={<Button to="/student/dashboard">Go to dashboard</Button>} />
+          <EmptyState
+            icon={FaChartBar}
+            title={t("results.none")}
+            description={t("results.noneDescription")}
+            action={<Button to="/student/dashboard">{t("profile.goToDashboard")}</Button>}
+          />
         </Card>
       ) : (
         <div className="grid gap-6 lg:grid-cols-4">
@@ -65,14 +76,14 @@ function StudentAnalytics() {
           <div className="lg:col-span-1">
             <div className="lg:hidden">
               <Select
-                label="Assessment"
+                label={t("assessments.assessment")}
                 value={selectedId ?? ""}
                 onChange={(e) => select(Number(e.target.value))}
-                options={completed.map((a) => ({ value: a.id, label: `${a.title} (${a.percentage ?? 0}%)` }))}
+                options={completed.map((a) => ({ value: a.id, label: `${a.title} (${formatPercent(a.percentage ?? 0)})` }))}
               />
             </div>
             <Card className="hidden lg:block">
-              <CardHeader title="Completed" />
+              <CardHeader title={t("studentDashboard.completed")} />
               <ul className="p-2">
                 {completed.map((a) => (
                   <li key={a.id}>
@@ -85,7 +96,7 @@ function StudentAnalytics() {
                       }`}
                     >
                       <span className="truncate">{a.title}</span>
-                      <span className="shrink-0 tabular-nums">{a.percentage ?? 0}%</span>
+                      <span className="shrink-0 tabular-nums">{formatPercent(a.percentage ?? 0)}</span>
                     </button>
                   </li>
                 ))}
@@ -95,36 +106,39 @@ function StudentAnalytics() {
 
           <div className="space-y-6 lg:col-span-3">
             {!details ? (
-              <PageSpinner label="Loading results…" />
+              <PageSpinner label={t("results.loading")} />
             ) : (
               <>
                 <Card>
                   <CardHeader
                     title={details.assessment_title}
-                    description={`Score ${details.student_score} / ${details.total_marks}`}
+                    description={t("results.scoreOf", { score: formatNumber(details.student_score), total: formatNumber(details.total_marks) })}
                     actions={
                       <Button variant="secondary" icon={FaDownload} loading={downloading} onClick={() => downloadReport(selectedId)}>
-                        Download report
+                        {t("results.downloadReport")}
                       </Button>
                     }
                   />
                   <CardBody>
                     <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                      <StatCard label="Score" value={`${details.score ?? 0}%`} icon={FaChartBar} />
-                      <StatCard label="Correct" value={details.correct_answers} icon={FaCheckCircle} />
-                      <StatCard label="Incorrect" value={details.incorrect_answers} icon={FaTimesCircle} />
-                      <StatCard label="Time" value={formatSeconds(details.time_taken)} icon={FaClock} />
+                      <StatCard label={t("analytics.score")} value={formatPercent(details.score ?? 0)} icon={FaChartBar} />
+                      <StatCard label={t("analytics.correct")} value={formatNumber(details.correct_answers)} icon={FaCheckCircle} />
+                      <StatCard label={t("results.incorrect")} value={formatNumber(details.incorrect_answers)} icon={FaTimesCircle} />
+                      <StatCard label={t("analytics.time")} value={formatDuration(details.time_taken)} icon={FaClock} />
                     </div>
                     <p className="mt-4 text-sm text-ink-muted">
                       <FaMinusCircle className="me-1 inline" aria-hidden="true" />
-                      {unanswered} unanswered · {Number(details.negative_marks_applied) || 0} marks deducted for wrong answers
+                      {t("results.unansweredDeducted", {
+                        unanswered: formatNumber(unanswered),
+                        deducted: formatNumber(Number(details.negative_marks_applied) || 0),
+                      })}
                     </p>
                   </CardBody>
                 </Card>
 
                 <Card>
-                  <CardHeader title="Review" description="Green is the correct answer; red marks your answer when it was wrong." />
-                  <CardBody>{questionsLoading ? <PageSpinner label="Loading questions…" /> : <AnswerReview items={questions} />}</CardBody>
+                  <CardHeader title={t("results.review")} description={t("results.reviewDescription")} />
+                  <CardBody>{questionsLoading ? <PageSpinner label={t("results.loadingQuestions")} /> : <AnswerReview items={questions} />}</CardBody>
                 </Card>
               </>
             )}

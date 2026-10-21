@@ -1,0 +1,17 @@
+{
+  "description": "تفاصيل حسابك ولغتك وإعدادات الأمان.",
+  "goToDashboard": "الذهاب إلى لوحة التحكم",
+  "account": "الحساب",
+  "name": "الاسم",
+  "role": "الدور",
+  "signInMethod": "طريقة تسجيل الدخول",
+  "methodGoogle": "Google",
+  "methodPassword": "البريد الإلكتروني وكلمة المرور",
+  "languageTitle": "اللغة",
+  "languageDescription": "تُستخدم للتطبيق ورسائلك الإلكترونية وتقاريرك.",
+  "changePassword": "تغيير كلمة المرور",
+  "currentPassword": "كلمة المرور الحالية",
+  "passwordChanged": "تم تغيير كلمة المرور. أرسلنا لك رسالة تأكيد.",
+  "passwordChangeFailed": "تعذّر تغيير كلمة المرور.",
+  "googleNoPassword": "تسجّل الدخول عبر Google، لذا لا توجد كلمة مرور Gradix لتغييرها."
+}

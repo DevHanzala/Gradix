@@ -1,15 +1,12 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { FaPlus, FaTrash } from "react-icons/fa";
 import { Alert, Button, Input, Modal, Select, Textarea } from "../ui";
 import { textDirection } from "../../utils/text.js";
 import { LANGUAGE_NAMES, isRtl } from "../../utils/languages.js";
 
-const TYPES = [
-  { value: "multiple_choice", label: "Multiple choice" },
-  { value: "true_false", label: "True / False" },
-  { value: "short_answer", label: "Short answer" },
-];
-const DIFFICULTIES = [1, 2, 3, 4, 5].map((d) => ({ value: d, label: `${d} – ${["Recall", "Understand", "Apply", "Analyse", "Evaluate"][d - 1]}` }));
+const TYPES = ["multiple_choice", "true_false", "short_answer"];
+const DIFFICULTIES = [1, 2, 3, 4, 5];
 
 /** "concept: other wording, another" per line <-> rubric items. */
 const rubricToText = (rubric = []) => rubric.map((r) => [r.concept, ...(r.accept || [])].join(", ")).join("\n");
@@ -43,6 +40,7 @@ const initialState = (question, defaults) => {
  * language (they define the bucket) and saves a new version.
  */
 function QuestionEditor({ isOpen, onClose, onSave, question, objectives, languages, defaults = {}, saving, error }) {
+  const { t } = useTranslation();
   const editing = Boolean(question);
   const [form, setForm] = useState(() => initialState(question, defaults));
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
@@ -68,15 +66,15 @@ function QuestionEditor({ isOpen, onClose, onSave, question, objectives, languag
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={editing ? "Edit question (saves a new version)" : "Add a question"}
+      title={editing ? t("bank.editTitle") : t("bank.addTitle")}
       size="lg"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button type="submit" form="question-editor" loading={saving}>
-            Save
+            {t("common.save")}
           </Button>
         </>
       }
@@ -86,27 +84,45 @@ function QuestionEditor({ isOpen, onClose, onSave, question, objectives, languag
         {!editing && (
           <div className="grid gap-4 sm:grid-cols-3">
             <Select
-              label="Objective"
+              label={t("objectives.objective")}
               value={form.objective_id}
               onChange={(e) => set({ objective_id: e.target.value })}
               required
-              options={[{ value: "", label: "Choose…" }, ...objectives.map((o, i) => ({ value: o.id, label: `${i + 1}. ${o.text}` }))]}
+              options={[{ value: "", label: t("common.choose") }, ...objectives.map((o, i) => ({ value: o.id, label: `${i + 1}. ${o.text}` }))]}
             />
-            <Select label="Type" value={form.question_type} onChange={(e) => set({ question_type: e.target.value })} options={TYPES} />
             <Select
-              label="Language"
+              label={t("resources.type")}
+              value={form.question_type}
+              onChange={(e) => set({ question_type: e.target.value })}
+              options={TYPES.map((type) => ({ value: type, label: t(`questionTypes.${type}`) }))}
+            />
+            <Select
+              label={t("common.language")}
               value={form.language}
               onChange={(e) => set({ language: e.target.value })}
               options={languages.map((l) => ({ value: l, label: LANGUAGE_NAMES[l] || l }))}
             />
           </div>
         )}
-        <Select label="Difficulty" value={form.difficulty} onChange={(e) => set({ difficulty: e.target.value })} options={DIFFICULTIES} />
-        <Textarea label="Question" value={form.question_text} dir={dir} rows={3} required onChange={(e) => set({ question_text: e.target.value })} />
+        <Select
+          label={t("bank.difficultyLabel")}
+          value={form.difficulty}
+          onChange={(e) => set({ difficulty: e.target.value })}
+          options={DIFFICULTIES.map((d) => ({ value: d, label: t(`bank.levels.${d}`) }))}
+        />
+        <Textarea
+          label={t("bank.question")}
+          value={form.question_text}
+          dir={dir}
+          lang={form.language}
+          rows={3}
+          required
+          onChange={(e) => set({ question_text: e.target.value })}
+        />
 
         {form.question_type === "multiple_choice" && (
           <fieldset className="space-y-2">
-            <legend className="mb-1 text-sm font-semibold text-ink">Options (select the correct one)</legend>
+            <legend className="mb-1 text-sm font-semibold text-ink">{t("bank.optionsLegend")}</legend>
             {form.options.map((option, i) => (
               <div key={i} className="flex items-center gap-2">
                 <input
@@ -115,11 +131,11 @@ function QuestionEditor({ isOpen, onClose, onSave, question, objectives, languag
                   className="h-5 w-5 shrink-0"
                   checked={form.correctIndex === i}
                   onChange={() => set({ correctIndex: i })}
-                  aria-label={`Option ${i + 1} is correct`}
+                  aria-label={t("bank.optionCorrect", { number: i + 1 })}
                 />
                 <Input
                   className="flex-1"
-                  aria-label={`Option ${i + 1}`}
+                  aria-label={t("bank.option", { number: i + 1 })}
                   value={option}
                   dir={textDirection(option) === "rtl" ? "rtl" : dir}
                   required
@@ -129,7 +145,7 @@ function QuestionEditor({ isOpen, onClose, onSave, question, objectives, languag
                   <Button
                     variant="ghost"
                     icon={FaTrash}
-                    aria-label={`Remove option ${i + 1}`}
+                    aria-label={t("bank.removeOption", { number: i + 1 })}
                     onClick={() =>
                       set({
                         options: form.options.filter((_, j) => j !== i),
@@ -137,14 +153,14 @@ function QuestionEditor({ isOpen, onClose, onSave, question, objectives, languag
                       })
                     }
                   >
-                    <span className="sr-only">Remove</span>
+                    <span className="sr-only">{t("common.remove")}</span>
                   </Button>
                 )}
               </div>
             ))}
             {form.options.length < 6 && (
               <Button variant="secondary" icon={FaPlus} onClick={() => set({ options: [...form.options, ""] })}>
-                Add option
+                {t("bank.addOption")}
               </Button>
             )}
           </fieldset>
@@ -152,28 +168,28 @@ function QuestionEditor({ isOpen, onClose, onSave, question, objectives, languag
 
         {form.question_type === "true_false" && (
           <Select
-            label="Correct answer"
+            label={t("preview.correctAnswer")}
             value={form.tfAnswer}
             onChange={(e) => set({ tfAnswer: e.target.value })}
             options={[
-              { value: "true", label: "True" },
-              { value: "false", label: "False" },
+              { value: "true", label: t("common.true") },
+              { value: "false", label: t("common.false") },
             ]}
           />
         )}
 
         {form.question_type === "short_answer" && (
           <>
-            <Textarea label="Model answer" value={form.modelAnswer} dir={dir} rows={2} onChange={(e) => set({ modelAnswer: e.target.value })} />
+            <Textarea label={t("bank.modelAnswer")} value={form.modelAnswer} dir={dir} rows={2} onChange={(e) => set({ modelAnswer: e.target.value })} />
             <Textarea
-              label="Rubric: one concept per line"
-              hint="Write the concept first, then other accepted wordings, separated by commas."
+              label={t("bank.rubric")}
+              hint={t("bank.rubricHint")}
               value={form.rubricText}
               dir={dir}
               rows={3}
               onChange={(e) => set({ rubricText: e.target.value })}
             />
-            <Input label="Concepts required" type="number" min={1} max={10} value={form.minMatch} onChange={(e) => set({ minMatch: e.target.value })} />
+            <Input label={t("bank.conceptsRequired")} type="number" min={1} max={10} value={form.minMatch} onChange={(e) => set({ minMatch: e.target.value })} />
           </>
         )}
       </form>

@@ -1,12 +1,9 @@
+import { useTranslation } from "react-i18next";
 import UserManagement from "../../components/UserManagement.jsx";
 
 function AdminDashboard() {
-  return (
-    <UserManagement
-      title="Admin dashboard"
-      subtitle="Manage students and instructors. Admin and Super Admin accounts can only be changed by a Super Admin."
-    />
-  );
+  const { t } = useTranslation();
+  return <UserManagement title={t("users.adminTitle")} subtitle={t("users.adminSubtitle")} />;
 }
 
 export default AdminDashboard;

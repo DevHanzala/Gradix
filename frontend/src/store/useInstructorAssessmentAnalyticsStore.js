@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import i18n from "../i18n/index.js";
 import toast from "react-hot-toast";
 import {
   fetchInstructorAssessmentsAPI,
@@ -42,7 +43,7 @@ const useInstructorAnalyticsStore = create((set) => ({
         loading: false,
       });
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || "Failed to fetch overview";
+      const msg = err.response?.data?.message || err.message || i18n.t("dashboard.loadFailed");
       set({ error: msg, loading: false });
       toast.error(msg);
       throw err;
@@ -69,7 +70,7 @@ const useInstructorAnalyticsStore = create((set) => ({
         loading: false,
       });
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || "Failed to fetch assessments";
+      const msg = err.response?.data?.message || err.message || i18n.t("errors.store.loadAssessments");
       set({ error: msg, loading: false });
       toast.error(msg);
     }
@@ -92,7 +93,7 @@ const useInstructorAnalyticsStore = create((set) => ({
         loading: false,
       });
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || "Failed to fetch students";
+      const msg = err.response?.data?.message || err.message || i18n.t("errors.store.loadStudents");
       set({ error: msg, loading: false });
       toast.error(msg);
     }
@@ -114,7 +115,7 @@ const useInstructorAnalyticsStore = create((set) => ({
         loading: false,
       });
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || "Failed to load answers";
+      const msg = err.response?.data?.message || err.message || i18n.t("errors.store.loadAnswers");
       set({
         error: msg,
         studentQuestions: [],

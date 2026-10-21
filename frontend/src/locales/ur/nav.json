@@ -1,0 +1,19 @@
+{
+  "main": "مرکزی",
+  "account": "اکاؤنٹ",
+  "navigation": "نیویگیشن",
+  "openNavigation": "نیویگیشن کھولیں",
+  "closeNavigation": "نیویگیشن بند کریں",
+  "skipToContent": "مواد پر جائیں",
+  "dashboard": "ڈیش بورڈ",
+  "myDashboard": "میرا ڈیش بورڈ",
+  "results": "نتائج اور جائزہ",
+  "assessments": "امتحانات",
+  "newAssessment": "نیا امتحان",
+  "resources": "وسائل",
+  "registerStudent": "طالب علم رجسٹر کریں",
+  "users": "صارفین",
+  "profile": "میری پروفائل",
+  "logout": "لاگ آؤٹ",
+  "goToMyDashboard": "میرے ڈیش بورڈ پر جائیں"
+}

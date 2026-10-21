@@ -1,0 +1,19 @@
+{
+  "titleFor": "نتایج: {{title}}",
+  "description": "نمرات دانش‌آموزانی که این آزمون را کامل کرده‌اند. هر دانش‌آموز پرسش‌های خودش را داشت.",
+  "averageScore": "میانگین نمره",
+  "averageTime": "میانگین زمان",
+  "students": "دانش‌آموزان",
+  "none": "هنوز تلاش کاملی ثبت نشده",
+  "noneDescription": "نتایج به محض ارسال دانش‌آموزان اینجا نمایش داده می‌شود.",
+  "studentResults": "نتایج دانش‌آموزان",
+  "student": "دانش‌آموز",
+  "correct": "درست",
+  "correctOf": "{{correct}} / {{total}}",
+  "score": "نمره",
+  "time": "زمان",
+  "reviewAnswers": "مرور پاسخ‌ها",
+  "loadingAnswers": "در حال بارگذاری پاسخ‌ها…",
+  "answersOf": "پاسخ‌ها: {{name}}",
+  "answersSummary": "درست: {{correct}} · {{score}}"
+}

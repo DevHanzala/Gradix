@@ -1,28 +1,31 @@
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import { useTranslation } from "react-i18next";
 import { FaChalkboardTeacher, FaCrown, FaSearch, FaTrash, FaUserGraduate, FaUserShield, FaUsers } from "react-icons/fa";
 import useAuthStore from "../store/authStore.js";
-import { ROLE_LABELS, assignableRoles, canDeleteUser } from "../utils/rolePermissions.js";
+import { assignableRoles, canDeleteUser } from "../utils/rolePermissions.js";
 import { errorMessage } from "../utils/forms.js";
+import { formatDate, formatNumber } from "../utils/format.js";
 import { Alert, Badge, Button, Card, CardHeader, EmptyState, Modal, PageHeader, ResponsiveTable, SkeletonList, StatCard } from "./ui";
 
 const ROLE_TONE = { student: "success", instructor: "primary", admin: "warning", super_admin: "danger" };
 const ROLE_ICON = { student: FaUserGraduate, instructor: FaChalkboardTeacher, admin: FaUserShield, super_admin: FaCrown };
 
 function RoleControl({ requester, target, busy, onChange }) {
+  const { t } = useTranslation();
   const options = assignableRoles(requester, target);
   const [value, setValue] = useState("");
   // The table renders each row twice (desktop table + mobile card), so ids must be per instance.
   const selectId = useId();
 
   if (options.length === 0) {
-    return <span className="text-sm text-ink-subtle">{requester.id === target.id ? "This is you" : "No actions"}</span>;
+    return <span className="text-sm text-ink-subtle">{requester.id === target.id ? t("users.thisIsYou") : t("users.noActions")}</span>;
   }
 
   return (
     <div className="flex items-center gap-2">
       <label className="sr-only" htmlFor={selectId}>
-        New role for {target.name}
+        {t("users.newRoleFor", { name: target.name })}
       </label>
       <select
         id={selectId}
@@ -31,10 +34,10 @@ function RoleControl({ requester, target, busy, onChange }) {
         disabled={busy}
         className="min-h-11 rounded-control border border-line-strong bg-surface px-2 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-200"
       >
-        <option value="">Change role…</option>
+        <option value="">{t("users.changeRole")}</option>
         {options.map((role) => (
           <option key={role} value={role}>
-            {ROLE_LABELS[role]}
+            {t(`roles.${role}`)}
           </option>
         ))}
       </select>
@@ -47,7 +50,7 @@ function RoleControl({ requester, target, busy, onChange }) {
           setValue("");
         }}
       >
-        Apply
+        {t("common.apply")}
       </Button>
     </div>
   );
@@ -58,6 +61,7 @@ function RoleControl({ requester, target, busy, onChange }) {
  * appear depends on the viewer's role (utils/rolePermissions mirrors the API).
  */
 function UserManagement({ title, subtitle }) {
+  const { t } = useTranslation();
   const { user: requester, getUsers, changeUserRole, deleteUser } = useAuthStore();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -73,11 +77,11 @@ function UserManagement({ title, subtitle }) {
       const response = await getUsers();
       setUsers(response.users || []);
     } catch (error) {
-      setLoadError(errorMessage(error, "Failed to load users."));
+      setLoadError(errorMessage(error, t("users.loadFailed")));
     } finally {
       setLoading(false);
     }
-  }, [getUsers]);
+  }, [getUsers, t]);
 
   useEffect(() => {
     fetchUsers();
@@ -87,10 +91,10 @@ function UserManagement({ title, subtitle }) {
     setBusyId(target.id);
     try {
       await changeUserRole({ userId: target.id, newRole });
-      toast.success(`${target.name} is now ${ROLE_LABELS[newRole]}.`);
+      toast.success(t("users.roleChanged", { name: target.name, role: t(`roles.${newRole}`) }));
       await fetchUsers();
     } catch (error) {
-      toast.error(errorMessage(error, "Could not change role."));
+      toast.error(errorMessage(error, t("users.roleChangeFailed")));
     } finally {
       setBusyId(null);
     }
@@ -101,10 +105,10 @@ function UserManagement({ title, subtitle }) {
     setBusyId(target.id);
     try {
       await deleteUser(target.id);
-      toast.success(`${target.name} was deleted.`);
+      toast.success(t("users.deleted", { name: target.name }));
       await fetchUsers();
     } catch (error) {
-      toast.error(errorMessage(error, "Could not delete user."));
+      toast.error(errorMessage(error, t("users.deleteFailed")));
     } finally {
       setBusyId(null);
     }
@@ -125,33 +129,35 @@ function UserManagement({ title, subtitle }) {
   const columns = [
     {
       key: "name",
-      header: "User",
+      header: t("users.user"),
       primary: true,
       render: (u) => (
         <div className="min-w-0">
           <p className="truncate font-semibold text-ink">{u.name}</p>
-          <p className="truncate text-sm font-normal text-ink-subtle">{u.email}</p>
+          <p className="truncate text-sm font-normal text-ink-subtle" dir="ltr">
+            {u.email}
+          </p>
         </div>
       ),
     },
     {
       key: "role",
-      header: "Role",
+      header: t("profile.role"),
       render: (u) => (
         <Badge tone={ROLE_TONE[u.role]} icon={ROLE_ICON[u.role]}>
-          {ROLE_LABELS[u.role] || u.role}
+          {t(`roles.${u.role}`)}
         </Badge>
       ),
     },
     {
       key: "verified",
-      header: "Status",
-      render: (u) => (u.verified ? <Badge tone="success">Verified</Badge> : <Badge>Unverified</Badge>),
+      header: t("users.status"),
+      render: (u) => (u.verified ? <Badge tone="success">{t("users.verified")}</Badge> : <Badge>{t("users.unverified")}</Badge>),
     },
     {
       key: "created_at",
-      header: "Joined",
-      render: (u) => (u.created_at ? new Date(u.created_at).toLocaleDateString() : "–"),
+      header: t("users.joined"),
+      render: (u) => formatDate(u.created_at),
     },
   ];
 
@@ -159,27 +165,27 @@ function UserManagement({ title, subtitle }) {
     <>
       <PageHeader title={title} description={subtitle} />
 
-      <section aria-label="User counts" className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <section aria-label={t("users.counts")} className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         {Object.entries(counts).map(([role, count]) => (
-          <StatCard key={role} label={`${ROLE_LABELS[role]}s`} value={loading ? "–" : count} icon={ROLE_ICON[role]} />
+          <StatCard key={role} label={t(`users.plural.${role}`)} value={loading ? "–" : formatNumber(count)} icon={ROLE_ICON[role]} />
         ))}
       </section>
 
       <Card>
         <CardHeader
-          title="Users"
+          title={t("nav.users")}
           actions={
             <div className="relative w-full sm:w-72">
               <FaSearch className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-ink-subtle" aria-hidden="true" />
               <label htmlFor="user-search" className="sr-only">
-                Search users
+                {t("users.search")}
               </label>
               <input
                 id="user-search"
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search name or email"
+                placeholder={t("users.searchPlaceholder")}
                 className="min-h-11 w-full rounded-control border border-line-strong ps-9 pe-3 text-sm focus:border-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-200"
               />
             </div>
@@ -190,24 +196,38 @@ function UserManagement({ title, subtitle }) {
           <SkeletonList rows={5} />
         ) : loadError ? (
           <div className="p-4 sm:p-6">
-            <Alert tone="danger" title="Could not load users" action={<Button variant="secondary" onClick={fetchUsers}>Try again</Button>}>
+            <Alert
+              tone="danger"
+              title={t("users.loadFailedTitle")}
+              action={
+                <Button variant="secondary" onClick={fetchUsers}>
+                  {t("common.tryAgain")}
+                </Button>
+              }
+            >
               {loadError}
             </Alert>
           </div>
         ) : filtered.length === 0 ? (
-          <EmptyState icon={FaUsers} title={users.length ? "No users match your search" : "No users yet"} />
+          <EmptyState icon={FaUsers} title={users.length ? t("users.noMatch") : t("users.none")} />
         ) : (
           <ResponsiveTable
             breakpoint="lg"
-            caption="Users"
+            caption={t("nav.users")}
             columns={columns}
             rows={filtered}
             actions={(u) => (
               <>
                 <RoleControl requester={requester} target={u} busy={busyId === u.id} onChange={handleRoleChange} />
                 {canDeleteUser(requester, u) && (
-                  <Button variant="ghost" icon={FaTrash} className="text-danger-700 hover:bg-danger-50" onClick={() => setPendingDelete(u)} disabled={busyId === u.id}>
-                    Delete
+                  <Button
+                    variant="ghost"
+                    icon={FaTrash}
+                    className="text-danger-700 hover:bg-danger-50"
+                    onClick={() => setPendingDelete(u)}
+                    disabled={busyId === u.id}
+                  >
+                    {t("common.delete")}
                   </Button>
                 )}
               </>
@@ -220,12 +240,12 @@ function UserManagement({ title, subtitle }) {
         isOpen={Boolean(pendingDelete)}
         onClose={() => setPendingDelete(null)}
         type="warning"
-        title={pendingDelete ? `Delete ${pendingDelete.name}?` : ""}
+        title={pendingDelete ? t("users.deleteTitle", { name: pendingDelete.name }) : ""}
         onConfirm={confirmDelete}
-        confirmText="Delete account"
+        confirmText={t("users.deleteConfirm")}
         confirmVariant="danger"
       >
-        This permanently removes the account and its data. This cannot be undone.
+        {t("users.deleteBody")}
       </Modal>
     </>
   );

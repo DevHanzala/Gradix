@@ -1,0 +1,19 @@
+{
+  "main": "الرئيسية",
+  "account": "الحساب",
+  "navigation": "التنقّل",
+  "openNavigation": "فتح التنقّل",
+  "closeNavigation": "إغلاق التنقّل",
+  "skipToContent": "الانتقال إلى المحتوى",
+  "dashboard": "لوحة التحكم",
+  "myDashboard": "لوحة التحكم الخاصة بي",
+  "results": "النتائج والمراجعة",
+  "assessments": "التقييمات",
+  "newAssessment": "تقييم جديد",
+  "resources": "الموارد",
+  "registerStudent": "تسجيل طالب",
+  "users": "المستخدمون",
+  "profile": "ملفي الشخصي",
+  "logout": "تسجيل الخروج",
+  "goToMyDashboard": "الذهاب إلى لوحة التحكم"
+}

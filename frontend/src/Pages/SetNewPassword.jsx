@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import useAuthStore from "../store/authStore.js";
 import { setNewPasswordSchema } from "../schemas/passwordSchemas.js";
 import { validateWith, errorMessage } from "../utils/forms.js";
@@ -10,6 +11,7 @@ const EMPTY = { newPassword: "", confirmPassword: "" };
 
 /** Landing page of the emailed reset link: choose a new password. */
 function SetNewPassword() {
+  const { t } = useTranslation();
   const { resetId } = useParams();
   const resetPassword = useAuthStore((state) => state.resetPassword);
   const [form, setForm] = useState(EMPTY);
@@ -37,21 +39,21 @@ function SetNewPassword() {
       setDone(true);
       setForm(EMPTY);
     } catch (error) {
-      setFormError(errorMessage(error, "This reset link is invalid or has expired. Please request a new one."));
+      setFormError(errorMessage(error, t("auth.resetLinkInvalid")));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <AuthLayout title="Choose a new password" subtitle="Your new password will replace the old one immediately.">
+    <AuthLayout title={t("auth.newPasswordTitle")} subtitle={t("auth.newPasswordSubtitle")}>
       {done ? (
         <div className="space-y-4">
-          <Alert tone="success" title="Password updated">
-            You can now log in with your new password. We also sent you a confirmation email.
+          <Alert tone="success" title={t("auth.passwordUpdated")}>
+            {t("auth.passwordUpdatedBody")}
           </Alert>
           <Button to="/login" fullWidth>
-            Go to login
+            {t("auth.goToLogin")}
           </Button>
         </div>
       ) : (
@@ -61,7 +63,7 @@ function SetNewPassword() {
               tone="danger"
               action={
                 <Link to="/forgot-password" className="font-semibold underline">
-                  Request a new link
+                  {t("auth.requestNewLink")}
                 </Link>
               }
             >
@@ -69,18 +71,18 @@ function SetNewPassword() {
             </Alert>
           )}
           <Input
-            label="New password"
+            label={t("auth.newPassword")}
             name="newPassword"
             type="password"
             autoComplete="new-password"
             value={form.newPassword}
             onChange={onChange}
             error={errors.newPassword}
-            hint="At least 8 characters with an uppercase letter, a lowercase letter and a number."
+            hint={t("auth.passwordHint")}
             required
           />
           <Input
-            label="Confirm new password"
+            label={t("auth.confirmNewPassword")}
             name="confirmPassword"
             type="password"
             autoComplete="new-password"
@@ -90,7 +92,7 @@ function SetNewPassword() {
             required
           />
           <Button type="submit" fullWidth loading={loading}>
-            Update password
+            {t("auth.updatePassword")}
           </Button>
         </form>
       )}

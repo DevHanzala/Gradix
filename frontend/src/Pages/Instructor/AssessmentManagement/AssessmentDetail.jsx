@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { FaBinoculars, FaChartBar, FaDatabase, FaEdit, FaLink, FaListOl, FaPrint, FaUserPlus } from "react-icons/fa";
 import AssessmentStatus, { StatusSteps } from "../../../components/assessment/AssessmentStatus.jsx";
 import useAssessmentStore from "../../../store/assessmentStore.js";
 import PhysicalPaperModal from "../../../components/PhysicalPaperModal.jsx";
 import { Alert, Button, Card, CardBody, CardHeader, PageHeader, PageSpinner, ResponsiveTable } from "../../../components/ui";
 import { errorMessage } from "../../../utils/forms.js";
-
-const TYPE_LABEL = { multiple_choice: "Multiple choice", true_false: "True / False", short_answer: "Short answer" };
+import { formatDateTime, formatDuration, formatNumber } from "../../../utils/format.js";
+import { textDirection } from "../../../utils/text.js";
 
 function AssessmentDetail() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const { getAssessmentById } = useAssessmentStore();
   const [assessment, setAssessment] = useState(null);
@@ -22,17 +24,17 @@ function AssessmentDetail() {
     setAssessment(null);
     getAssessmentById(id)
       .then((data) => active && setAssessment(data))
-      .catch((error) => active && setLoadError(errorMessage(error, "Could not load this assessment.")));
+      .catch((error) => active && setLoadError(errorMessage(error, t("assessments.loadOneFailed"))));
     return () => {
       active = false;
     };
-  }, [id, getAssessmentById]);
+  }, [id, getAssessmentById, t]);
 
   if (loadError) {
     return (
       <>
-        <PageHeader title="Assessment" backTo="/instructor/assessments" backLabel="All assessments" />
-        <Alert tone="danger" title="Could not load the assessment">
+        <PageHeader title={t("assessments.assessment")} backTo="/instructor/assessments" backLabel={t("assessments.all")} />
+        <Alert tone="danger" title={t("assessments.loadOneFailedTitle")}>
           {loadError}
         </Alert>
       </>
@@ -45,40 +47,41 @@ function AssessmentDetail() {
   const totalSeconds = blocks.reduce((s, b) => s + Number(b.question_count || 0) * Number(b.duration_per_question || 0), 0);
   const totalMarks = blocks.reduce((s, b) => s + Number(b.question_count || 0) * Number(b.positive_marks || 0), 0);
   const links = assessment.external_links || [];
+  const editable = !assessment.is_executed && ["draft", "objectives_ready"].includes(assessment.status || "draft");
 
   return (
     <>
       <PageHeader
         title={assessment.title}
-        description={assessment.is_executed ? "Students have started this assessment, so its settings are locked." : "Not started yet: you can still edit it."}
+        description={editable ? t("detail.editableDescription") : t("detail.lockedDescription")}
         backTo="/instructor/assessments"
-        backLabel="All assessments"
+        backLabel={t("assessments.all")}
         actions={
           <>
-            {!assessment.is_executed && ["draft", "objectives_ready"].includes(assessment.status || "draft") && (
+            {editable && (
               <Button to={`/instructor/assessments/${id}/edit`} icon={FaEdit}>
-                Edit
+                {t("common.edit")}
               </Button>
             )}
             <Button to={`/instructor/assessments/${id}/objectives`} variant="secondary" icon={FaListOl}>
-              Objectives & publishing
+              {t("detail.objectivesAndPublishing")}
             </Button>
             {["publishing", "published"].includes(assessment.status) && (
               <Button to={`/instructor/assessments/${id}/questions`} variant="secondary" icon={FaDatabase}>
-                Question bank
+                {t("bank.title")}
               </Button>
             )}
             <Button to={`/instructor/assessments/${id}/enroll`} variant="secondary" icon={FaUserPlus}>
-              Enroll students
+              {t("enroll.title")}
             </Button>
             <Button variant="secondary" icon={FaPrint} onClick={() => setPaperOpen(true)}>
-              Print paper
+              {t("detail.printPaper")}
             </Button>
             <Button to={`/instructor/assessments/${id}/preview`} variant="secondary" icon={FaBinoculars}>
-              Preview
+              {t("preview.title")}
             </Button>
             <Button to={`/instructor/assessments/${id}/analytics`} variant="secondary" icon={FaChartBar}>
-              Results
+              {t("assessments.results")}
             </Button>
           </>
         }
@@ -87,31 +90,40 @@ function AssessmentDetail() {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <Card>
-            <CardHeader title="Prompt" />
+            <CardHeader title={t("form.prompt")} />
             <CardBody>
               {assessment.prompt ? (
-                <p className="whitespace-pre-wrap text-ink">{assessment.prompt}</p>
+                <p className="whitespace-pre-wrap text-ink" dir={textDirection(assessment.prompt)}>
+                  {assessment.prompt}
+                </p>
               ) : (
-                <p className="text-ink-subtle">No prompt. Questions are generated from the selected material.</p>
+                <p className="text-ink-subtle">{t("detail.noPrompt")}</p>
               )}
             </CardBody>
           </Card>
 
           <Card>
-            <CardHeader title="Question blocks" description={`${totalQuestions} questions · ${Math.round(totalSeconds / 60)} min · ${totalMarks} marks`} />
+            <CardHeader
+              title={t("detail.blocks")}
+              description={t("detail.blocksSummary", {
+                questions: formatNumber(totalQuestions),
+                duration: formatDuration(totalSeconds),
+                marks: formatNumber(totalMarks),
+              })}
+            />
             <ResponsiveTable
-              caption="Question blocks"
+              caption={t("detail.blocks")}
               rowKey={(b) => `${b.question_type}-${b.question_count}-${b.duration_per_question}-${blocks.indexOf(b)}`}
               rows={blocks}
               columns={[
-                { key: "question_type", header: "Type", primary: true, render: (b) => TYPE_LABEL[b.question_type] || b.question_type },
-                { key: "question_count", header: "Questions" },
-                { key: "duration_per_question", header: "Seconds each" },
-                { key: "positive_marks", header: "Correct", render: (b) => `+${Number(b.positive_marks)}` },
+                { key: "question_type", header: t("resources.type"), primary: true, render: (b) => t(`questionTypes.${b.question_type}`) },
+                { key: "question_count", header: t("assessments.questions"), render: (b) => formatNumber(b.question_count) },
+                { key: "duration_per_question", header: t("detail.secondsEach"), render: (b) => formatNumber(b.duration_per_question) },
+                { key: "positive_marks", header: t("detail.correctMarks"), render: (b) => <span dir="ltr">+{Number(b.positive_marks)}</span> },
                 {
                   key: "negative_marks",
-                  header: "Wrong",
-                  render: (b) => (Number(b.negative_marks) > 0 ? `−${Number(b.negative_marks)}` : "0"),
+                  header: t("detail.wrongMarks"),
+                  render: (b) => <span dir="ltr">{Number(b.negative_marks) > 0 ? `−${Number(b.negative_marks)}` : "0"}</span>,
                 },
               ]}
             />
@@ -120,31 +132,35 @@ function AssessmentDetail() {
 
         <div className="space-y-6">
           <Card>
-            <CardHeader title="Status" />
+            <CardHeader title={t("users.status")} />
             <CardBody className="space-y-3 text-sm">
               <div className="flex items-center justify-between gap-2">
-                <span className="text-ink-muted">State</span>
+                <span className="text-ink-muted">{t("detail.state")}</span>
                 <AssessmentStatus assessment={assessment} />
               </div>
               <StatusSteps assessment={assessment} />
               <div className="flex items-center justify-between gap-2">
-                <span className="text-ink-muted">Created</span>
-                <span>{assessment.created_at ? new Date(assessment.created_at).toLocaleString() : "–"}</span>
+                <span className="text-ink-muted">{t("detail.mode")}</span>
+                <span>{assessment.adaptive ? t("form.adaptive") : t("detail.fixedDifficulty")}</span>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-ink-muted">{t("assessments.created")}</span>
+                <span>{formatDateTime(assessment.created_at)}</span>
               </div>
             </CardBody>
           </Card>
 
           <Card>
-            <CardHeader title="Source material" />
+            <CardHeader title={t("form.sourceMaterial")} />
             <CardBody className="space-y-4 text-sm">
               {(assessment.resources || []).length === 0 && links.length === 0 ? (
-                <p className="text-ink-subtle">No resources or links.</p>
+                <p className="text-ink-subtle">{t("detail.noSources")}</p>
               ) : (
                 <>
                   {(assessment.resources || []).length > 0 && (
                     <ul className="space-y-1">
                       {assessment.resources.map((r) => (
-                        <li key={r.id} className="break-words text-ink">
+                        <li key={r.id} className="break-words text-ink" dir="auto">
                           {r.name}
                         </li>
                       ))}
@@ -155,7 +171,7 @@ function AssessmentDetail() {
                       {links.map((l) => (
                         <li key={l} className="flex items-start gap-2 break-all">
                           <FaLink className="mt-1 shrink-0 text-ink-subtle" aria-hidden="true" />
-                          <a href={l} target="_blank" rel="noreferrer" className="text-primary-700 hover:underline">
+                          <a href={l} target="_blank" rel="noreferrer" dir="ltr" className="text-primary-700 hover:underline">
                             {l}
                           </a>
                         </li>

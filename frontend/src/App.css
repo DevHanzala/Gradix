@@ -46,6 +46,34 @@
   --shadow-raised: 0 10px 25px -5px rgb(0 0 0 / 0.1), 0 4px 10px -6px rgb(0 0 0 / 0.08);
 }
 
+/*
+ * Script fonts (self-hosted, SIL OFL): Urdu is set in Nastaliq, Arabic and
+ * Persian in Naskh. The <html lang> attribute (set by i18n) selects them, and
+ * any element with its own lang (e.g. a question in Urdu) gets the right one.
+ */
+@font-face {
+  font-family: "Noto Nastaliq Urdu";
+  src: url("/fonts/NotoNastaliqUrdu.ttf") format("truetype");
+  font-weight: 400 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Naskh Arabic";
+  src: url("/fonts/NotoNaskhArabic.ttf") format("truetype");
+  font-weight: 400 700;
+  font-display: swap;
+}
+:lang(ur) {
+  font-family: "Noto Nastaliq Urdu", "Noto Naskh Arabic", Tahoma, serif;
+  /* Nastaliq has tall ascenders/descenders; give lines room. */
+  line-height: 2.1;
+}
+:lang(ar),
+:lang(fa) {
+  font-family: "Noto Naskh Arabic", Tahoma, serif;
+  line-height: 1.8;
+}
+
 /* reCAPTCHA v3 badge is hidden; the required notice is shown on the auth forms. */
 .grecaptcha-badge { visibility: hidden !important; }
 

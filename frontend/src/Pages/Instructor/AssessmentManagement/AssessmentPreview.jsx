@@ -1,22 +1,18 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { FaMagic, FaRedo } from "react-icons/fa";
 import useAssessmentStore from "../../../store/assessmentStore.js";
 import { Alert, Badge, Button, Card, CardBody, CardHeader, EmptyState, PageHeader, PageSpinner } from "../../../components/ui";
 import { textDirection } from "../../../utils/text.js";
 import { errorMessage } from "../../../utils/forms.js";
 
-const answerText = (q) => {
-  if (q.question_type === "true_false") return q.correct_answer ? "True" : "False";
-  if (q.correct_answer && typeof q.correct_answer === "object") return q.correct_answer.answer || "";
-  return String(q.correct_answer ?? "");
-};
-
 /**
  * Instructor preview: generates ONE sample question set exactly as a student
  * would receive it (each real student gets a different set).
  */
 function AssessmentPreview() {
+  const { t } = useTranslation();
   const { id } = useParams();
   const { getAssessmentById, fetchPreviewQuestions } = useAssessmentStore();
   const [assessment, setAssessment] = useState(null);
@@ -25,15 +21,21 @@ function AssessmentPreview() {
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState(null);
 
+  const answerText = (q) => {
+    if (q.question_type === "true_false") return q.correct_answer ? t("common.true") : t("common.false");
+    if (q.correct_answer && typeof q.correct_answer === "object") return q.correct_answer.answer || "";
+    return String(q.correct_answer ?? "");
+  };
+
   useEffect(() => {
     let active = true;
     getAssessmentById(id)
       .then((data) => active && setAssessment(data))
-      .catch((error) => active && setLoadError(errorMessage(error, "Could not load this assessment.")));
+      .catch((error) => active && setLoadError(errorMessage(error, t("assessments.loadOneFailed"))));
     return () => {
       active = false;
     };
-  }, [id, getAssessmentById]);
+  }, [id, getAssessmentById, t]);
 
   const generate = async () => {
     setGenerating(true);
@@ -41,7 +43,7 @@ function AssessmentPreview() {
     try {
       setQuestions(await fetchPreviewQuestions(id));
     } catch (error) {
-      setGenerateError(errorMessage(error, "Could not generate sample questions."));
+      setGenerateError(errorMessage(error, t("preview.failed")));
     } finally {
       setGenerating(false);
     }
@@ -50,7 +52,7 @@ function AssessmentPreview() {
   if (loadError) {
     return (
       <>
-        <PageHeader title="Preview" backTo="/instructor/assessments" backLabel="All assessments" />
+        <PageHeader title={t("preview.title")} backTo="/instructor/assessments" backLabel={t("assessments.all")} />
         <Alert tone="danger">{loadError}</Alert>
       </>
     );
@@ -60,13 +62,13 @@ function AssessmentPreview() {
   return (
     <>
       <PageHeader
-        title={`Preview: ${assessment.title}`}
-        description="Generate a sample question set in English to check the topic and difficulty. Each student gets their own set."
+        title={t("preview.titleFor", { title: assessment.title })}
+        description={t("preview.description")}
         backTo={`/instructor/assessments/${id}`}
-        backLabel="Back to assessment"
+        backLabel={t("assessments.backToAssessment")}
         actions={
           <Button icon={questions ? FaRedo : FaMagic} loading={generating} onClick={generate}>
-            {questions ? "Generate another sample" : "Generate sample questions"}
+            {questions ? t("preview.again") : t("preview.generate")}
           </Button>
         }
       />
@@ -78,11 +80,11 @@ function AssessmentPreview() {
       )}
 
       <Card>
-        <CardHeader title="Sample questions" description="Correct answers are highlighted. Students never see this view." />
+        <CardHeader title={t("preview.sample")} description={t("preview.sampleDescription")} />
         {generating ? (
-          <PageSpinner label="Generating questions with AI. This can take up to a minute…" />
+          <PageSpinner label={t("preview.generating")} />
         ) : !questions ? (
-          <EmptyState icon={FaMagic} title="No sample yet" description="Generating a sample uses the AI, so it runs only when you ask." />
+          <EmptyState icon={FaMagic} title={t("preview.none")} description={t("preview.noneDescription")} />
         ) : (
           <CardBody>
             <ol className="space-y-4">
@@ -92,10 +94,14 @@ function AssessmentPreview() {
                 return (
                   <li key={`${i}-${q.question_text}`} className="rounded-card border border-line p-4">
                     <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                      <span className="text-sm font-semibold text-ink-muted">Question {i + 1}</span>
+                      <span className="text-sm font-semibold text-ink-muted">{t("preview.questionNumber", { number: i + 1 })}</span>
                       <Badge>
-                        +{q.positive_marks}
-                        {Number(q.negative_marks) > 0 ? ` / −${q.negative_marks}` : ""} · {q.duration_per_question}s
+                        <span dir="ltr">
+                          +{q.positive_marks}
+                          {Number(q.negative_marks) > 0 ? ` / −${q.negative_marks}` : ""}
+                        </span>{" "}
+                        · {t("common.seconds", { count: q.duration_per_question })}
+                        {q.difficulty ? ` · ${t("bank.difficulty", { value: q.difficulty })}` : ""}
                       </Badge>
                     </div>
                     <p dir={dir} className="font-medium text-ink">
@@ -110,14 +116,14 @@ function AssessmentPreview() {
                           >
                             <span className="font-semibold">{String.fromCharCode(65 + oi)}.</span>
                             <span>{opt}</span>
-                            {opt === answer && <span className="sr-only">(correct answer)</span>}
+                            {opt === answer && <span className="sr-only">{t("preview.correctMarker")}</span>}
                           </li>
                         ))}
                       </ul>
                     )}
                     {!Array.isArray(q.options) && (
                       <p className="mt-3 text-sm text-ink-muted">
-                        Correct answer: <span className="font-semibold text-ink">{answer}</span>
+                        {t("preview.correctAnswer")} <span className="font-semibold text-ink">{answer}</span>
                       </p>
                     )}
                   </li>

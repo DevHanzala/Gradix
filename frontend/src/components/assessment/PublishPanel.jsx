@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { FaDatabase, FaPaperPlane, FaRedo } from "react-icons/fa";
 import { fetchPoolStatusApi, publishAssessmentApi, retryPublishApi } from "../../api/assessment.api.js";
 import { Alert, Badge, Button, Card, CardBody, CardHeader, Checkbox, Modal, Skeleton } from "../ui";
@@ -13,6 +14,7 @@ const DEFAULT_LANGUAGES = ["en", "ur", "ar"];
  * per language. Shown on the objectives page once objectives are ready.
  */
 function PublishPanel({ assessmentId, status, canPublish, onStatusChange }) {
+  const { t } = useTranslation();
   const [languages, setLanguages] = useState(DEFAULT_LANGUAGES);
   const [pool, setPool] = useState(null);
   const [error, setError] = useState(null);
@@ -27,9 +29,9 @@ function PublishPanel({ assessmentId, status, canPublish, onStatusChange }) {
       setError(null);
       if (res.data.data.status !== status) onStatusChange?.(res.data.data.status);
     } catch (e) {
-      setError(errorMessage(e, "Could not load publishing progress."));
+      setError(errorMessage(e, t("publish.loadFailed")));
     }
-  }, [assessmentId, status, onStatusChange]);
+  }, [assessmentId, status, onStatusChange, t]);
 
   useEffect(() => {
     if (publishing) load();
@@ -54,7 +56,7 @@ function PublishPanel({ assessmentId, status, canPublish, onStatusChange }) {
       setPool(res.data.data);
       onStatusChange?.(res.data.data.status);
     } catch (e) {
-      setError(errorMessage(e, "Could not start publishing."));
+      setError(errorMessage(e, t("publish.startFailed")));
     } finally {
       setBusy(false);
     }
@@ -66,7 +68,7 @@ function PublishPanel({ assessmentId, status, canPublish, onStatusChange }) {
       const res = await retryPublishApi(assessmentId);
       setPool(res.data.data);
     } catch (e) {
-      setError(errorMessage(e, "Could not retry."));
+      setError(errorMessage(e, t("publish.retryFailed")));
     } finally {
       setBusy(false);
     }
@@ -75,16 +77,12 @@ function PublishPanel({ assessmentId, status, canPublish, onStatusChange }) {
   return (
     <Card className="mt-6">
       <CardHeader
-        title={publishing ? "Publishing" : "Publish"}
-        description={
-          publishing
-            ? "Questions are prepared and checked in advance for every language, so students never wait for the AI."
-            : "Prepare a checked pool of questions in each language. Objectives and settings are locked after publishing."
-        }
+        title={publishing ? t("publish.titlePublishing") : t("publish.title")}
+        description={publishing ? t("publish.descriptionPublishing") : t("publish.description")}
         actions={
           publishing && (
             <Button variant="secondary" icon={FaDatabase} to={`/instructor/assessments/${assessmentId}/questions`}>
-              Question bank
+              {t("bank.title")}
             </Button>
           )
         }
@@ -95,13 +93,13 @@ function PublishPanel({ assessmentId, status, canPublish, onStatusChange }) {
         {!publishing && (
           <>
             <fieldset>
-              <legend className="mb-2 text-sm font-semibold text-ink">Languages students can choose</legend>
+              <legend className="mb-2 text-sm font-semibold text-ink">{t("publish.languages")}</legend>
               <div className="grid gap-1 sm:grid-cols-2">
                 {Object.entries(LANGUAGE_NAMES).map(([code, name]) => (
                   <Checkbox
                     key={code}
                     label={name}
-                    description={code === "fa" ? "Optional" : undefined}
+                    description={code === "fa" ? t("common.optional") : undefined}
                     checked={languages.includes(code)}
                     onChange={() => toggle(code)}
                     disabled={!canPublish}
@@ -109,15 +107,15 @@ function PublishPanel({ assessmentId, status, canPublish, onStatusChange }) {
                 ))}
               </div>
             </fieldset>
-            {!canPublish && <p className="text-sm text-ink-muted">Save at least one objective first.</p>}
+            {!canPublish && <p className="text-sm text-ink-muted">{t("publish.saveFirst")}</p>}
             <Button icon={FaPaperPlane} onClick={() => setConfirming(true)} disabled={!canPublish || languages.length === 0} loading={busy}>
-              Publish
+              {t("publish.publish")}
             </Button>
           </>
         )}
 
         {publishing && !pool && (
-          <div className="space-y-3" role="status" aria-label="Loading">
+          <div className="space-y-3" role="status" aria-label={t("common.loading")}>
             <Skeleton className="h-4 w-1/2" />
             <Skeleton className="h-3 w-full" />
           </div>
@@ -131,14 +129,14 @@ function PublishPanel({ assessmentId, status, canPublish, onStatusChange }) {
                   <span className="font-semibold text-ink">{LANGUAGE_NAMES[l.language] || l.language}</span>
                   <span className="flex items-center gap-2">
                     <span className="text-ink-muted">
-                      {l.questions} / {l.target} questions
+                      {t("publish.questionsOf", { have: l.questions, target: l.target })}
                     </span>
                     {l.state === "failed" ? (
-                      <Badge tone="danger">Failed</Badge>
+                      <Badge tone="danger">{t("publish.failed")}</Badge>
                     ) : l.ready ? (
-                      <Badge tone="success">Students can start</Badge>
+                      <Badge tone="success">{t("publish.ready")}</Badge>
                     ) : (
-                      <Badge tone="primary">Preparing…</Badge>
+                      <Badge tone="primary">{t("publish.preparing")}</Badge>
                     )}
                   </span>
                 </div>
@@ -148,25 +146,31 @@ function PublishPanel({ assessmentId, status, canPublish, onStatusChange }) {
                   aria-valuemin={0}
                   aria-valuemax={100}
                   aria-valuenow={l.percent}
-                  aria-label={`${LANGUAGE_NAMES[l.language] || l.language} progress`}
+                  aria-label={t("publish.progressFor", { language: LANGUAGE_NAMES[l.language] || l.language })}
                 >
                   <div className={`h-full rounded-full ${l.state === "failed" ? "bg-danger-600" : "bg-primary-600"}`} style={{ width: `${l.percent}%` }} />
                 </div>
-                {l.error && <p className="mt-1 text-sm text-danger-700">{l.error}</p>}
+                {l.state === "failed" && <p className="mt-1 text-sm text-danger-700">{t("publish.failedBody")}</p>}
               </li>
             ))}
           </ul>
         )}
         {pool?.languages?.some((l) => l.state === "failed") && (
           <Button variant="secondary" icon={FaRedo} onClick={retry} loading={busy}>
-            Retry failed languages
+            {t("publish.retry")}
           </Button>
         )}
       </CardBody>
 
-      <Modal isOpen={confirming} onClose={() => setConfirming(false)} title="Publish this assessment?" type="warning" onConfirm={publish} confirmText="Publish">
-        Objectives, question settings and source material will be locked. Questions are then prepared in {languages.length} language
-        {languages.length === 1 ? "" : "s"}; students can start as soon as their language is ready.
+      <Modal
+        isOpen={confirming}
+        onClose={() => setConfirming(false)}
+        title={t("publish.confirmTitle")}
+        type="warning"
+        onConfirm={publish}
+        confirmText={t("publish.publish")}
+      >
+        {t("publish.confirmBody", { count: languages.length })}
       </Modal>
     </Card>
   );
