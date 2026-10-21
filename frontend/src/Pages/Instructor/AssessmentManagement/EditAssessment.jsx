@@ -29,8 +29,9 @@ function EditAssessment() {
   }, [id, getAssessmentById, t]);
 
   const handleSubmit = async (formData) => {
-    await updateAssessment(Number(id), formData);
+    const updated = await updateAssessment(Number(id), formData);
     toast.success(t("assessments.updatedToast"));
+    if (updated?.skippedLinks?.length) toast.error(t("form.linksSkipped", { links: updated.skippedLinks.map((l) => l.url).join(", ") }));
     navigate(`/instructor/assessments/${id}`);
   };
 

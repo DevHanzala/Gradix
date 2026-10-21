@@ -20,3 +20,15 @@ export const uploadResourcesAPI = (files, { visibility = "private" } = {}) => {
 
 export const deleteResourceAPI = (resourceId) =>
   apiClient.delete(`/resources/${resourceId}`);
+
+/** Library search with filters and pagination (no full text returned). */
+export const searchResourcesAPI = (params) => apiClient.get("/resources/search", { params });
+
+/** Add a web page or YouTube video as a resource (the server reads it). */
+export const addLinkResourceAPI = (url, { visibility = "private", name } = {}) => {
+  const formData = new FormData();
+  formData.append("url", url);
+  formData.append("visibility", visibility);
+  if (name) formData.append("name", name);
+  return apiClient.post("/resources", formData, { headers: { "Content-Type": "multipart/form-data" } });
+};

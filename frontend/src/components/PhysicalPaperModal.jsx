@@ -19,6 +19,9 @@ const INITIAL_FORM = {
   headerFontSize: 18,
   questionFontSize: 10,
   optionFontSize: 9,
+  mode: "same",
+  copies: 2,
+  format: "pdf",
 };
 
 const PAGE_SIZES = ["A4", "A5", "Letter"].map((v) => ({ value: v, label: v })); // paper size names, not translated
@@ -56,7 +59,7 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
 
   const onChange = (e) => {
     const { name, value } = e.target;
-    setForm((f) => ({ ...f, [name]: name.endsWith("FontSize") ? Number(value) : value }));
+    setForm((f) => ({ ...f, [name]: name.endsWith("FontSize") || name === "copies" ? Number(value) : value }));
   };
 
   const handleSubmit = async () => {
@@ -67,7 +70,7 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
     setLoading(true);
     try {
       const blob = await generatePhysicalPaper(assessmentId, { language, ...form });
-      saveAs(blob, `${sanitizeFileName(assessmentTitle)}_Paper_${language.toUpperCase()}.pdf`);
+      saveAs(blob, `${sanitizeFileName(assessmentTitle)}_Paper_${language.toUpperCase()}.${form.format}`);
       toast.success(tp("paperGenerated"));
       reset();
       onClose();
@@ -138,7 +141,37 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
             <Input label={tp("paperDate")} name="paperDate" type="date" value={form.paperDate} onChange={onChange} />
             <Input label={tp("paperTime")} name="paperTime" type="time" value={form.paperTime} onChange={onChange} />
             <Textarea label={tp("notes")} name="notes" rows={3} placeholder={tp("notesPlaceholder")} value={form.notes} onChange={onChange} className="sm:col-span-2" />
+            <p className="text-sm text-ink-subtle sm:col-span-2">{tp("headerNote")}</p>
           </div>
+
+          <fieldset>
+            <legend className="mb-3 text-sm font-semibold text-ink">{tp("outputTitle")}</legend>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Select
+                label={tp("mode")}
+                name="mode"
+                value={form.mode}
+                onChange={onChange}
+                options={[
+                  { value: "same", label: tp("modeSame") },
+                  { value: "unique", label: tp("modeUnique") },
+                ]}
+              />
+              {form.mode === "unique" && (
+                <Input label={tp("copies")} name="copies" type="number" min={2} max={40} value={form.copies} onChange={onChange} hint={tp("copiesHint")} />
+              )}
+              <Select
+                label={tp("format")}
+                name="format"
+                value={form.format}
+                onChange={onChange}
+                options={[
+                  { value: "pdf", label: "PDF" },
+                  { value: "docx", label: "Word (DOCX)" }, // i18n-ignore: file format name
+                ]}
+              />
+            </div>
+          </fieldset>
 
           <fieldset>
             <legend className="mb-3 text-sm font-semibold text-ink">{tp("formattingTitle")}</legend>

@@ -578,7 +578,9 @@ export const startAssessmentForStudentService = async (studentId, assessmentId, 
 
   await assertAvailable(assessment, language);
   const pooled = Boolean(assessment.blueprint?.slots?.length);
-  const plan = pooled ? planFromBlueprint(assessment.blueprint) : null;
+  // With negative marking switched off, wrong answers never lose marks.
+  const marking = (items) => (assessment.negative_marking === false ? items.map((x) => ({ ...x, negative_marks: 0 })) : items);
+  const plan = pooled ? marking(planFromBlueprint(assessment.blueprint)) : null;
   const adaptive = pooled && Boolean(assessment.adaptive);
 
   // Questions to store now: the first one (pool), or the whole Phase 1 set.
@@ -587,7 +589,7 @@ export const startAssessmentForStudentService = async (studentId, assessmentId, 
     const draft = { attempt: { id: 0, adaptive, language }, plan, questions: [], saved: new Map() };
     initial = [await chooseForSlot(assessment, draft, 0)];
   } else {
-    initial = await generateLegacySet(assessment, language);
+    initial = marking(await generateLegacySet(assessment, language));
   }
 
   let attempt;

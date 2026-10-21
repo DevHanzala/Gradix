@@ -1,11 +1,12 @@
 import { getAssessmentsByInstructor, getAssessmentById, getEnrolledStudents, generateAssessmentQuestions } from "../models/assessmentModel.js";
-import { generateContent } from "./ai/generateContent.js";
 import { findUserByEmail, getUserById } from "../models/userModel.js";
 import { sendAssessmentEnrollmentEmail } from "../helper/emailService.js";
-import { prepareUploadedFiles, insertPreparedResource } from "../helper/resourceIngest.js";
+import { prepareUploadedFiles, insertPreparedResource, prepareLink } from "../helper/resourceIngest.js";
 import db, { withTransaction } from "../DB/db.js";
 import { notify } from "./notification.service.js";
 import { groupStudentsForEnrollment } from "./group.service.js";
+import { buildPaperSets } from "./paper/paperSets.js";
+import { renderPaperDocx, renderPaperPdf } from "./paper/paperRender.js";
 import * as assessmentRepo from "../repositories/assessmentRepository.js";
 import { findAssessmentLifecycleQuery } from "../repositories/objectiveRepository.js";
 import { requireAssessmentAccess } from "./assessmentAccess.js";
@@ -25,6 +26,24 @@ const parseFlag = (value) => {
   if (value === undefined || value === null || value === "") return undefined;
   if (typeof value === "boolean") return value;
   return ["true", "1", "on", "yes"].includes(String(value).toLowerCase());
+};
+
+/**
+ * Read every link (web page or YouTube transcript). A link that cannot be
+ * read does not block saving; it is reported back to the instructor.
+ */
+const prepareLinks = async (links) => {
+  const prepared = [];
+  const skipped = [];
+  for (const url of links) {
+    try {
+      prepared.push(await prepareLink(url));
+    } catch (error) {
+      if (!(error instanceof AppError)) throw error;
+      skipped.push({ url, reason: error.message });
+    }
+  }
+  return { prepared, skipped };
 };
 
 // ==================== CREATE ====================
@@ -49,6 +68,7 @@ export const createAssessmentService = async (body, user, files = []) => {
 
   await assertResourcesUsable(resourceIds, user);
   const prepared = await prepareUploadedFiles(files);
+  const linkSources = await prepareLinks(links);
 
   const created = await withTransaction(async (client) => {
     const assessment = await assessmentRepo.createAssessmentQuery(
@@ -60,6 +80,7 @@ export const createAssessmentService = async (body, user, files = []) => {
         is_executed: false,
         adaptive: parseFlag(body.adaptive) ?? false,
         show_live_score: parseFlag(body.show_live_score) ?? false,
+        negative_marking: parseFlag(body.negative_marking) ?? true,
       },
       client
     );
@@ -70,8 +91,8 @@ export const createAssessmentService = async (body, user, files = []) => {
     for (const resourceId of resourceIds) {
       await assessmentRepo.linkResourceToAssessmentQuery(assessment.id, resourceId, client);
     }
-    for (const file of prepared) {
-      const resource = await insertPreparedResource(client, file, { userId: user.id });
+    for (const source of [...prepared, ...linkSources.prepared]) {
+      const resource = await insertPreparedResource(client, source, { userId: user.id });
       await assessmentRepo.linkResourceToAssessmentQuery(assessment.id, resource.id, client);
     }
 
@@ -81,7 +102,7 @@ export const createAssessmentService = async (body, user, files = []) => {
   // After commit: objectives are extracted in the background.
   await requestObjectiveExtraction(created.id);
   const lifecycle = await findAssessmentLifecycleQuery(created.id);
-  return { ...created, status: lifecycle.status, objectives_state: lifecycle.objectives_state };
+  return { ...created, status: lifecycle.status, objectives_state: lifecycle.objectives_state, skippedLinks: linkSources.skipped };
 };
 
 // ==================== READ ====================
@@ -136,6 +157,7 @@ export const updateAssessmentService = async (assessmentId, body, user, files = 
 
   await assertResourcesUsable(resourceIds, user);
   const prepared = await prepareUploadedFiles(files);
+  const linkSources = await prepareLinks(links);
 
   const lifecycle = await findAssessmentLifecycleQuery(existing.id);
   if (!["draft", "objectives_ready"].includes(lifecycle.status)) {
@@ -157,7 +179,14 @@ export const updateAssessmentService = async (assessmentId, body, user, files = 
   const result = await withTransaction(async (client) => {
     const updated = await assessmentRepo.updateAssessmentQuery(
       existing.id,
-      { title, prompt, external_links: links, adaptive: adaptiveFlag, show_live_score: parseFlag(body.show_live_score) },
+      {
+        title,
+        prompt,
+        external_links: links,
+        adaptive: adaptiveFlag,
+        show_live_score: parseFlag(body.show_live_score),
+        negative_marking: parseFlag(body.negative_marking),
+      },
       client
     );
 
@@ -172,8 +201,8 @@ export const updateAssessmentService = async (assessmentId, body, user, files = 
     for (const resourceId of resourceIds) {
       await assessmentRepo.linkResourceToAssessmentQuery(existing.id, resourceId, client);
     }
-    for (const file of prepared) {
-      const resource = await insertPreparedResource(client, file, { userId: user.id });
+    for (const source of [...prepared, ...linkSources.prepared]) {
+      const resource = await insertPreparedResource(client, source, { userId: user.id });
       await assessmentRepo.linkResourceToAssessmentQuery(existing.id, resource.id, client);
     }
 
@@ -184,7 +213,7 @@ export const updateAssessmentService = async (assessmentId, body, user, files = 
 
   // New material means new objectives (instructor edits to the old ones no longer apply).
   if (sourcesChanged) await requestObjectiveExtraction(existing.id);
-  return result;
+  return { ...result, skippedLinks: linkSources.skipped };
 };
 
 // ==================== DELETE ====================
@@ -269,91 +298,33 @@ export const previewQuestionsService = async (assessmentId, user) => {
   return questions;
 };
 
-const PAPER_LANGUAGES = { en: "English", ar: "Arabic", ur: "Urdu", fa: "Persian" };
-const PAPER_LABELS = {
-  en: { institute: "Institute Name", teacher: "Teacher Name", subject: "Subject Name", date: "Paper Date", time: "Paper Time", notes: "Notes" },
-  ar: { institute: "اسم المعهد", teacher: "اسم المعلم", subject: "اسم المادة", date: "تاريخ الامتحان", time: "وقت الامتحان", notes: "ملاحظات" },
-  ur: { institute: "ادارے کا نام", teacher: "استاد کا نام", subject: "مضمون کا نام", date: "امتحان کی تاریخ", time: "امتحان کا وقت", notes: "نوٹس" },
-  fa: { institute: "نام موسسه", teacher: "نام معلم", subject: "نام درس", date: "تاریخ امتحان", time: "زمان امتحان", notes: "یادداشت ها" },
-};
-
-const extractValue = (lines, label) => {
-  const line = lines.find((l) => l.includes(label));
-  if (!line) return null;
-  const parts = line.split(":");
-  return parts.length < 2 ? null : parts.slice(1).join(":").trim();
-};
-
-const extractNotes = (lines, notesLabel) => {
-  const index = lines.findIndex((l) => l.includes(notesLabel));
-  return index === -1 ? null : lines.slice(index + 1).join("\n").trim();
-};
+const PAPER_LANGUAGES = ["en", "ur", "ar", "fa"];
+const PAPER_FORMATS = ["pdf", "docx"];
 
 /**
- * Generate a fresh question set in `language` for a printed paper. Nothing is
- * written to the database (no fake attempts).
+ * Printed paper(s) in `language`: mode "same" (one paper) or "unique" (one
+ * different paper per student, coded A, B, C... with a combined answer key),
+ * as PDF or DOCX. Header values are printed exactly as typed (proper nouns are
+ * never translated). Nothing is written as an attempt.
  */
 export const generatePhysicalPaperService = async (assessmentId, user, paperData) => {
-  const {
-    language = "en",
-    instituteName = "",
-    teacherName = "",
-    subjectName = "",
-    paperDate = "",
-    paperTime = "",
-    notes = "",
-  } = paperData;
+  const { language = "en", mode = "same", copies = 1, format = "pdf", form = {}, ...headerInput } = paperData;
+  if (!PAPER_LANGUAGES.includes(language)) throw new AppError("UNSUPPORTED_LANGUAGE", 400, "Unsupported language.");
+  if (!["same", "unique"].includes(mode)) throw new AppError("INVALID_PAPER", 400, "Unknown paper mode.");
+  if (!PAPER_FORMATS.includes(format)) throw new AppError("INVALID_PAPER", 400, "Unknown file format.");
 
-  if (!PAPER_LANGUAGES[language]) throw new AppError("UNSUPPORTED_LANGUAGE", 400, "Unsupported language.");
-
-  const assessment = await requireAssessmentAccess(assessmentId, user);
-  const { questions } = await generateAssessmentQuestions(assessment.id, language, assessment);
-  if (!questions || questions.length === 0) {
-    throw new AppError("GENERATION_FAILED", 503, "Could not generate questions for the paper. Please try again.");
-  }
-
-  const labels = PAPER_LABELS[language];
-  let headers = { instituteName, teacherName, subjectName, paperDate, paperTime, notes };
-
-  if (language !== "en") {
-    const langName = PAPER_LANGUAGES[language];
-    const headerText = [
-      `${labels.institute}: ${instituteName || "Not provided"}`,
-      `${labels.teacher}: ${teacherName || "Not provided"}`,
-      `${labels.subject}: ${subjectName || "Not provided"}`,
-      `${labels.date}: ${paperDate || "Not provided"}`,
-      `${labels.time}: ${paperTime || "Not provided"}`,
-      `${labels.notes}:`,
-      notes || "No additional notes",
-    ].join("\n");
-
-    const translationPrompt = `You are a professional translator. Translate the following exam paper header into natural, fluent ${langName}.
-Rules: keep the labels before each colon exactly as given; translate only the values after the colons;
-keep the same lines and format; output only the translated text.
-
-${headerText}`;
-
-    try {
-      const translated = await generateContent(translationPrompt, {
-        purpose: "paper_header_translation",
-        assessmentId: assessment.id,
-        userId: user.id,
-        maxOutputTokens: 1000,
-        temperature: 0.3,
-      });
-      const lines = translated.split("\n").map((l) => l.trim()).filter(Boolean);
-      headers = {
-        instituteName: extractValue(lines, labels.institute) || instituteName,
-        teacherName: extractValue(lines, labels.teacher) || teacherName,
-        subjectName: extractValue(lines, labels.subject) || subjectName,
-        paperDate: extractValue(lines, labels.date) || paperDate,
-        paperTime: extractValue(lines, labels.time) || paperTime,
-        notes: extractNotes(lines, labels.notes) || notes,
-      };
-    } catch (error) {
-      console.error(`[PAPER] Header translation failed, using original text: ${error.message}`);
-    }
-  }
-
-  return { questions, headers, isRTL: ["ar", "ur", "fa"].includes(language) };
+  const owned = await requireAssessmentAccess(assessmentId, user);
+  const { rows } = await db.query(`SELECT id, title, prompt, status, blueprint, languages FROM assessments WHERE id = $1`, [owned.id]);
+  const sets = await buildPaperSets(rows[0], language, { mode, copies });
+  const headers = {
+    instituteName: headerInput.instituteName || "",
+    teacherName: headerInput.teacherName || "",
+    subjectName: headerInput.subjectName || "",
+    paperDate: headerInput.paperDate || "",
+    paperTime: headerInput.paperTime || "",
+    notes: headerInput.notes || "",
+  };
+  const buffer =
+    format === "docx" ? await renderPaperDocx({ sets, headers, language }) : await renderPaperPdf({ sets, headers, form, language });
+  return { buffer, format, copies: sets.length };
 };

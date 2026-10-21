@@ -11,7 +11,6 @@ import {
   generatePhysicalPaperService,
   enrollGroupService,
 } from "../services/assessment.service.js";
-import { generatePhysicalPaperPDF } from "../helper/Pdfkitgenerator.js";
 
 // Errors (AppError with code/status, or unexpected ones) go to the error middleware.
 
@@ -113,6 +112,9 @@ export const generatePhysicalPaper = async (req, res, next) => {
       paperDate: String(body.paperDate || "").slice(0, 50),
       paperTime: String(body.paperTime || "").slice(0, 50),
       notes: String(body.notes || "").slice(0, 2000),
+      mode: body.mode === "unique" ? "unique" : "same",
+      copies: body.copies,
+      format: body.format === "docx" ? "docx" : "pdf",
     };
     const formOptions = {
       pageSize: PAGE_SIZES.includes(body.pageSize) ? body.pageSize : "A4",
@@ -121,13 +123,15 @@ export const generatePhysicalPaper = async (req, res, next) => {
       optionFontSize: clampFont(body.optionFontSize, 9, 7, 18),
     };
 
-    const { questions, headers, isRTL } = await generatePhysicalPaperService(req.params.id, req.user, paperData);
-    const pdfBuffer = await generatePhysicalPaperPDF(questions, headers, formOptions, isRTL, paperData.language);
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="Paper_${paperData.language.toUpperCase()}.pdf"`);
-    res.setHeader("Content-Length", pdfBuffer.length);
-    res.end(pdfBuffer);
+    const { buffer, format } = await generatePhysicalPaperService(req.params.id, req.user, { ...paperData, form: formOptions });
+    const docx = format === "docx";
+    res.setHeader(
+      "Content-Type",
+      docx ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document" : "application/pdf"
+    );
+    res.setHeader("Content-Disposition", `attachment; filename="Paper_${paperData.language.toUpperCase()}.${format}"`);
+    res.setHeader("Content-Length", buffer.length);
+    res.end(buffer);
   } catch (error) {
     next(error);
   }

@@ -7,6 +7,7 @@ import resourceRoutes from "./routes/resourceRoutes.js";
 import studentAnalyticsRoutes from "./routes/studentAnalyticsRoutes.js";
 import groupRoutes from "./routes/groupRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 import studentAssessmentRoutes from "./routes/studentAssessmentRoutes.js";
 import instructorAssessmentAnalyticsRoutes from "./routes/instructorAssessmentAnalyticsRoutes.js";
 import { errorHandler, notFound } from "./middleware/errorMiddleware.js";
@@ -49,6 +50,7 @@ app.use("/api/resources", resourceRoutes);
 app.use("/api/student-analytics", studentAnalyticsRoutes);
 app.use("/api/groups", groupRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/admin", adminRoutes);
 app.use("/api/taking", studentAssessmentRoutes);
 app.use("/api/instructor-analytics", instructorAssessmentAnalyticsRoutes);
 

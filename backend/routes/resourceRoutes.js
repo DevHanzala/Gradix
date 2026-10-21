@@ -13,6 +13,7 @@ import {
 } from "../controllers/resourceController.js";
 import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
 import { uploadFiles } from "../middleware/uploadMiddleware.js";
+import { searchResourcesService } from "../services/resource.service.js";
 
 const router = express.Router();
 
@@ -29,6 +30,19 @@ router.get(
   protect,
   authorizeRoles(["instructor", "admin", "super_admin"]),
   getInstructorResources
+);
+
+router.get(
+  "/search",
+  protect,
+  authorizeRoles(["instructor", "admin", "super_admin"]),
+  async (req, res, next) => {
+    try {
+      res.status(200).json({ success: true, data: await searchResourcesService(req.user, req.query) });
+    } catch (error) {
+      next(error);
+    }
+  }
 );
 
 router.get(

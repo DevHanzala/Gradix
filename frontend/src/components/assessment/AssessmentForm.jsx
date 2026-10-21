@@ -34,11 +34,12 @@ const toFormData = (values, files) => {
   );
   data.append("adaptive", String(Boolean(values.adaptive)));
   data.append("show_live_score", String(Boolean(values.showLiveScore)));
+  data.append("negative_marking", String(values.negativeMarking !== false));
   files.forEach((file) => data.append("files", file));
   return data;
 };
 
-function QuestionBlockEditor({ index, block, errors, disabled, onChange, onRemove, canRemove }) {
+function QuestionBlockEditor({ index, block, errors, disabled, onChange, onRemove, canRemove, negativeMarking }) {
   const { t } = useTranslation();
   const err = (field) => errors[`blocks.${index}.${field}`];
   const numberField = (field) => ({
@@ -80,7 +81,15 @@ function QuestionBlockEditor({ index, block, errors, disabled, onChange, onRemov
           <Input label={t("form.optionsPerQuestion")} min={ASSESSMENT_LIMITS.minOptions} max={ASSESSMENT_LIMITS.maxOptions} {...numberField("num_options")} />
         )}
         <Input label={t("form.positiveMarks")} min={0} step="0.25" {...numberField("positive_marks")} inputMode="decimal" />
-        <Input label={t("form.negativeMarks")} min={0} step="0.25" hint={t("form.negativeHint")} {...numberField("negative_marks")} inputMode="decimal" />
+        <Input
+          label={t("form.negativeMarks")}
+          min={0}
+          step="0.25"
+          hint={negativeMarking ? t("form.negativeHint") : t("form.negativeOffHint")}
+          {...numberField("negative_marks")}
+          disabled={disabled || !negativeMarking}
+          inputMode="decimal"
+        />
       </div>
       {block.question_type === "short_answer" && <p className="mt-3 text-sm text-ink-subtle">{t("form.shortAnswerNote")}</p>}
     </fieldset>
@@ -300,6 +309,7 @@ function AssessmentForm({ initialValues, submitLabel, onSubmit, onCancel, disabl
               onChange={updateBlock}
               onRemove={(index) => set("blocks", values.blocks.filter((_, j) => j !== index))}
               canRemove={values.blocks.length > 1}
+              negativeMarking={values.negativeMarking !== false}
             />
           ))}
           <Button
@@ -321,6 +331,13 @@ function AssessmentForm({ initialValues, submitLabel, onSubmit, onCancel, disabl
             description={t("form.adaptiveDescription")}
             checked={Boolean(values.adaptive)}
             onChange={(e) => set("adaptive", e.target.checked)}
+            disabled={disabled}
+          />
+          <Checkbox
+            label={t("form.negativeMarking")}
+            description={t("form.negativeMarkingDescription")}
+            checked={values.negativeMarking !== false}
+            onChange={(e) => set("negativeMarking", e.target.checked)}
             disabled={disabled}
           />
           <Checkbox

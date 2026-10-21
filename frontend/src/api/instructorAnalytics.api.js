@@ -13,3 +13,9 @@ export const fetchStudentQuestionsAPI = (assessmentId, studentId) =>
   
 export const fetchInstructorOverviewAPI = () =>
   apiClient.get("/instructor-analytics");
+
+/* Insights: objective accuracy, hardest objectives, distribution, difficulty reached */
+export const fetchInsightsAPI = (assessmentId) => apiClient.get(`/instructor-analytics/assessment/${assessmentId}/insights`);
+
+export const exportResultsAPI = (assessmentId, format = "csv") =>
+  apiClient.get(`/instructor-analytics/assessment/${assessmentId}/export`, { params: { format }, responseType: "blob" });

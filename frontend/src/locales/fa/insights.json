@@ -1,0 +1,18 @@
+{
+  "loadFailed": "بارگذاری تحلیل ممکن نشد.",
+  "exportFailed": "خروجی گرفتن از نتایج ممکن نشد.",
+  "exportCsv": "خروجی CSV",
+  "exportXlsx": "خروجی Excel",
+  "distribution": "توزیع نمرات",
+  "distributionLabel": "تعداد دانش‌آموزان در هر بازه نمره",
+  "distributionAxis": "بازه نمره (٪) از ۰ تا ۱۰۰",
+  "bucket": "{{from}}–{{to}}٪: {{count}}",
+  "medianLine": "میانه نمرات: {{median}}",
+  "byObjective": "دقت بر اساس هدف آموزشی",
+  "byObjectiveHint": "همه دانش‌آموزان با هم؛ پرسش‌هایی که به آن‌ها نرسیدند نادرست حساب می‌شوند.",
+  "hardest": "دشوارترین اهداف",
+  "difficultyReached": "دشواری به‌دست‌آمده",
+  "difficultyReachedHint": "تعداد دانش‌آموزانی که آخرین و بالاترین پرسششان در هر سطح بود.",
+  "finalLevel": "آخرین پرسش",
+  "highestLevel": "بالاترین"
+}

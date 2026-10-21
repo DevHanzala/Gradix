@@ -7,7 +7,7 @@ import db from "../DB/db.js";
 
 export const findAssessmentForStartQuery = async (assessmentId, client = db) => {
   const { rows } = await client.query(
-    `SELECT id, title, prompt, external_links, is_executed, status, blueprint, languages, adaptive, instructor_id
+    `SELECT id, title, prompt, external_links, is_executed, status, blueprint, languages, adaptive, instructor_id, negative_marking
      FROM assessments WHERE id = $1`,
     [assessmentId]
   );

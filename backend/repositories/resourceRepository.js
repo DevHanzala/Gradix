@@ -70,8 +70,7 @@ export const findAllResourcesQuery = async (userId) => {
     SELECT r.*, u.name as uploader_name
     FROM resources r
     JOIN users u ON r.uploaded_by = u.id
-    WHERE r.content_type = 'file'
-      AND (r.visibility = 'public' OR r.uploaded_by = $1)
+    WHERE (r.visibility = 'public' OR r.uploaded_by = $1)
     ORDER BY r.created_at DESC
   `;
 

@@ -30,5 +30,13 @@
   "noAssessment": "No assessment selected",
   "noQuestions": "No questions received",
   "paperGenerated": "Paper generated successfully!",
-  "generationFailed": "Failed to generate paper"
+  "generationFailed": "Failed to generate paper",
+  "headerNote": "Names are printed exactly as you type them; they are never translated.",
+  "outputTitle": "Papers and file",
+  "mode": "Papers",
+  "modeSame": "Same paper for everyone",
+  "modeUnique": "A different paper per student",
+  "copies": "Number of different papers",
+  "copiesHint": "Each paper gets a code (A, B, C…). One combined answer key is added at the end.",
+  "format": "File format"
 }

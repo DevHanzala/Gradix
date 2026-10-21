@@ -1,0 +1,18 @@
+{
+  "loadFailed": "تجزیہ لوڈ نہیں ہو سکا۔",
+  "exportFailed": "نتائج برآمد نہیں ہو سکے۔",
+  "exportCsv": "CSV برآمد کریں",
+  "exportXlsx": "Excel برآمد کریں",
+  "distribution": "اسکور کی تقسیم",
+  "distributionLabel": "ہر اسکور حد میں طلبہ کی تعداد",
+  "distributionAxis": "اسکور (%) کی حد، 0 سے 100 تک",
+  "bucket": "{{from}}–{{to}}%: {{count}}",
+  "medianLine": "درمیانی اسکور: {{median}}",
+  "byObjective": "تعلیمی مقصد کے لحاظ سے درستگی",
+  "byObjectiveHint": "تمام طلبہ ملا کر؛ جن سوالات تک نہیں پہنچے وہ درست شمار نہیں ہوتے۔",
+  "hardest": "مشکل ترین مقاصد",
+  "difficultyReached": "حاصل کردہ مشکل",
+  "difficultyReachedHint": "ہر سطح پر آخری اور بلند ترین سوال والے طلبہ کی تعداد۔",
+  "finalLevel": "آخری سوال",
+  "highestLevel": "بلند ترین"
+}

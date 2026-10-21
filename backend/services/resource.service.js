@@ -1,5 +1,4 @@
 import {
-  createResource,
   findResourcesByUploader,
   findResourceById,
   updateResource,
@@ -11,8 +10,8 @@ import {
 } from "../models/resourceModel.js";
 import { requireAssessmentAccess } from "./assessmentAccess.js";
 import { AppError } from "../utils/AppError.js";
-import { prepareUploadedFile, insertPreparedResource, decodeFilename } from "../helper/resourceIngest.js";
-import { withTransaction } from "../DB/db.js";
+import { prepareUploadedFile, insertPreparedResource, decodeFilename, prepareLink } from "../helper/resourceIngest.js";
+import db, { withTransaction } from "../DB/db.js";
 
 // ==================== SERVICE FUNCTIONS ====================
 
@@ -53,22 +52,9 @@ export const uploadResourceService = async (data, userId, files) => {
   }
 
   if (url) {
-    let parsed;
-    try {
-      parsed = new URL(String(url).trim());
-    } catch {
-      throw new AppError("INVALID_URL", 400, "Please enter a valid link.");
-    }
-    if (!["http:", "https:"].includes(parsed.protocol)) {
-      throw new AppError("INVALID_URL", 400, "Links must start with http:// or https://.");
-    }
-    const resource = await createResource({
-      name: (name && String(name).trim()) || parsed.hostname,
-      url: parsed.toString(),
-      content_type: "link",
-      visibility,
-      uploaded_by: userId,
-    });
+    // The page or video transcript is read and indexed like a file.
+    const prepared = await prepareLink(url);
+    const resource = await withTransaction((client) => insertPreparedResource(client, prepared, { userId, visibility, name }));
     uploadedResources.push(resource);
   }
 
@@ -107,6 +93,38 @@ export const getInstructorResourcesService = async (
 export const getAllResourcesService = async (userId) => {
   const resources = await findAllResources(userId);
   return resources || [];
+};
+
+/**
+ * Library search: own resources (plus public ones with scope "all"), with
+ * text search, filters and pagination. Never returns the full text.
+ */
+export const searchResourcesService = async (user, query = {}) => {
+  const params = [user.id];
+  const where = [query.scope === "all" ? "(r.uploaded_by = $1 OR r.visibility = 'public')" : "r.uploaded_by = $1"];
+  const add = (sql, value) => {
+    params.push(value);
+    where.push(sql.replaceAll("?", `$${params.length}`));
+  };
+  if (query.search) add("(r.name ILIKE ? OR r.content_text ILIKE ?)", `%${String(query.search).slice(0, 200)}%`);
+  if (["file", "link"].includes(query.type)) add("r.content_type = ?", query.type);
+  if (["private", "public"].includes(query.visibility)) add("r.visibility = ?", query.visibility);
+  if (["en", "ur", "ar", "fa"].includes(query.language)) add("r.language = ?", query.language);
+  const pageSize = Math.min(100, Math.max(1, Number.parseInt(query.page_size, 10) || 20));
+  const page = Math.max(1, Number.parseInt(query.page, 10) || 1);
+  const sql = where.join(" AND ");
+  const total = (await db.query(`SELECT count(*)::int AS n FROM resources r WHERE ${sql}`, params)).rows[0].n;
+  const { rows } = await db.query(
+    `SELECT r.id, r.name, r.url, r.file_type, r.file_size, r.content_type, r.visibility, r.language, r.extraction_method,
+            r.created_at, r.uploaded_by, u.name AS uploader_name,
+            (SELECT count(*)::int FROM resource_chunks rc WHERE rc.resource_id = r.id) AS chunk_count
+     FROM resources r JOIN users u ON u.id = r.uploaded_by
+     WHERE ${sql}
+     ORDER BY r.created_at DESC, r.id DESC
+     LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`,
+    params
+  );
+  return { items: rows, total, page, pageSize, pages: Math.max(1, Math.ceil(total / pageSize)) };
 };
 
 // 4. GET RESOURCE BY ID SERVICE

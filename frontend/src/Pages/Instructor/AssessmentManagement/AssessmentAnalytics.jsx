@@ -1,11 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { FaChartBar, FaEye } from "react-icons/fa";
+import { FaChartBar, FaDownload, FaEye } from "react-icons/fa";
+import { exportResultsAPI, fetchInsightsAPI } from "../../../api/instructorAnalytics.api.js";
+import ObjectiveBars from "../../../components/results/ObjectiveBars.jsx";
+import ScoreDistribution from "../../../components/insights/ScoreDistribution.jsx";
+import { errorMessage } from "../../../utils/forms.js";
 import useInstructorAnalyticsStore from "../../../store/useInstructorAssessmentAnalyticsStore";
 import AnswerReview from "../../../components/assessment/AnswerReview.jsx";
 import { formatDuration, formatNumber, formatPercent } from "../../../utils/format.js";
-import { Badge, Button, Card, CardBody, CardHeader, EmptyState, PageHeader, PageSpinner, ResponsiveTable, SkeletonList, StatCard } from "../../../components/ui";
+import { Alert, Badge, Button, Card, CardBody, CardHeader, EmptyState, PageHeader, PageSpinner, ResponsiveTable, SkeletonList, StatCard } from "../../../components/ui";
 
 function AssessmentAnalytics() {
   const { t } = useTranslation();
@@ -13,7 +17,40 @@ function AssessmentAnalytics() {
   const { assessments, students, studentQuestions, selectedStudentId, loading, fetchAssessments, fetchAssessmentStudents, fetchStudentQuestions } =
     useInstructorAnalyticsStore();
   const [studentsLoaded, setStudentsLoaded] = useState(false);
+  const [insights, setInsights] = useState(null);
+  const [insightsError, setInsightsError] = useState(null);
+  const [exporting, setExporting] = useState(null);
   const reviewRef = useRef(null);
+
+  const loadInsights = useCallback(async () => {
+    setInsightsError(null);
+    try {
+      setInsights((await fetchInsightsAPI(assessmentId)).data.data);
+    } catch (e) {
+      setInsightsError(errorMessage(e, t("insights.loadFailed")));
+    }
+  }, [assessmentId, t]);
+
+  useEffect(() => {
+    loadInsights();
+  }, [loadInsights]);
+
+  const download = async (format) => {
+    setExporting(format);
+    try {
+      const res = await exportResultsAPI(assessmentId, format);
+      const url = URL.createObjectURL(res.data);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `gradix-results-${assessmentId}.${format}`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setInsightsError(errorMessage(e, t("insights.exportFailed")));
+    } finally {
+      setExporting(null);
+    }
+  };
 
   useEffect(() => {
     fetchAssessments();
@@ -48,7 +85,75 @@ function AssessmentAnalytics() {
         description={t("analytics.description")}
         backTo={`/instructor/assessments/${assessmentId}`}
         backLabel={t("assessments.backToAssessment")}
+        actions={
+          <>
+            <Button variant="secondary" icon={FaDownload} loading={exporting === "csv"} onClick={() => download("csv")}>
+              {t("insights.exportCsv")}
+            </Button>
+            <Button variant="secondary" icon={FaDownload} loading={exporting === "xlsx"} onClick={() => download("xlsx")}>
+              {t("insights.exportXlsx")}
+            </Button>
+          </>
+        }
       />
+
+      {insightsError && (
+        <Alert tone="danger" className="mb-6">
+          {insightsError}
+        </Alert>
+      )}
+
+      {insights && insights.summary.students > 0 && (
+        <div className="mb-6 grid gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader title={t("insights.distribution")} description={t("insights.medianLine", { median: formatPercent(insights.summary.medianRaw ?? 0) })} />
+            <CardBody>
+              <ScoreDistribution buckets={insights.distribution} />
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader title={t("insights.byObjective")} description={t("insights.byObjectiveHint")} />
+            <CardBody>
+              <ObjectiveBars
+                objectives={insights.objectives.filter((o) => o.accuracy !== null)}
+                weakIds={new Set(insights.hardestObjectives.filter((o) => o.accuracy < 60).map((o) => o.objectiveId))}
+              />
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader title={t("insights.hardest")} />
+            <CardBody>
+              {insights.hardestObjectives.length === 0 ? (
+                <p className="text-sm text-ink-muted">{t("learning.noObjectives")}</p>
+              ) : (
+                <ol className="space-y-2">
+                  {insights.hardestObjectives.map((o) => (
+                    <li key={o.objectiveId} className="flex flex-wrap items-baseline justify-between gap-2">
+                      <span className="text-ink" dir="auto">
+                        {t("learning.objectiveRow", { number: o.number, text: o.text })}
+                      </span>
+                      <span className="tabular-nums text-ink-muted">{formatPercent(o.accuracy)}</span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader title={t("insights.difficultyReached")} description={t("insights.difficultyReachedHint")} />
+            <ResponsiveTable
+              caption={t("insights.difficultyReached")}
+              rowKey={(r) => r.level}
+              rows={insights.difficultyReached}
+              columns={[
+                { key: "level", header: t("bank.difficultyLabel"), primary: true, render: (r) => t(`bank.levels.${r.level}`) },
+                { key: "final", header: t("insights.finalLevel"), render: (r) => formatNumber(r.final) },
+                { key: "highest", header: t("insights.highestLevel"), render: (r) => formatNumber(r.highest) },
+              ]}
+            />
+          </Card>
+        </div>
+      )}
 
       {summary && (
         <section aria-label={t("dashboard.summary")} className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">

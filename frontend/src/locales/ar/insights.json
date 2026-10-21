@@ -1,0 +1,18 @@
+{
+  "loadFailed": "تعذّر تحميل التحليل.",
+  "exportFailed": "تعذّر تصدير النتائج.",
+  "exportCsv": "تصدير CSV",
+  "exportXlsx": "تصدير Excel",
+  "distribution": "توزيع الدرجات",
+  "distributionLabel": "عدد الطلاب في كل نطاق درجات",
+  "distributionAxis": "نطاق الدرجة (%) من 0 إلى 100",
+  "bucket": "{{from}}–{{to}}%: {{count}}",
+  "medianLine": "الدرجة الوسيطة: {{median}}",
+  "byObjective": "الدقة حسب الهدف التعليمي",
+  "byObjectiveHint": "لجميع الطلاب معًا؛ الأسئلة التي لم يُوصل إليها تُحتسب غير صحيحة.",
+  "hardest": "أصعب الأهداف",
+  "difficultyReached": "الصعوبة المُحقّقة",
+  "difficultyReachedHint": "عدد الطلاب الذين كان آخر سؤال وأعلى سؤال لديهم في كل مستوى.",
+  "finalLevel": "آخر سؤال",
+  "highestLevel": "الأعلى"
+}

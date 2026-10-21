@@ -13,16 +13,13 @@ Resume rule: read this file, check `git log --oneline main..phase-2`, continue w
 | 3. Adaptive difficulty engine | done | e462b21 |
 | 4. Full multilingual app | done | f331066 |
 | 5. Learning pathways | done | 3298e7b |
-| 6. Institutions, roles, notifications | done | (this commit) |
-| 7. Remaining SRS features | todo | |
+| 6. Institutions, roles, notifications | done | 0256e4c |
+| 7. Remaining SRS features | done | (this commit) |
 | Final verification + PHASE2_REPORT.md | todo | |
 
 ## Next
-Section 7: remaining SRS (DOCX export; print modes same paper / unique per student + combined answer key;
-header proper nouns never translated; negative-marking toggle; 30-second minimum enforced; link ingestion with
-readability + YouTube transcripts; resource dedupe by content hash, search, filters, pagination; instructor
-analytics per objective, hardest objectives, distribution, difficulty reached, CSV/Excel export; super admin
-platform stats incl. LLM calls and cost). "Show live score" was already done in section 3.
+Final verification: lint + i18n:check + build + tests; Puppeteer screenshots of the new pages at 360/768/1280 in
+English and Urdu with automatic checks; live Gemini smoke test if keys exist; Gate 2 evidence; PHASE2_REPORT.md.
 
 ## Section 0 summary
 - npm audit: non-breaking fixes applied (lockfile only). Upgraded nodemailer 6 -> 10 and puppeteer 24 -> 25
@@ -186,6 +183,32 @@ platform stats incl. LLM calls and cost). "Show live score" was already done in 
 - Phase 1 RBAC test "admin can move users" migrated: the admin must now share a group with the student.
 - Tests: 243 (9 new institutions tests + migrated RBAC test).
 
+## Section 7 summary
+- Migration 1760000000800: assessments.negative_marking (default true), CHECK question_blocks.duration_per_question
+  >= 30 s (older rows below it are raised to 30 first), index for the library listing.
+- Printing: services/paper/paperSets.js + paperRender.js replace helper/Pdfkitgenerator.js. Modes: same paper for
+  everyone, or up to 40 different papers (A, B, C...; Phase 1 assessments without a pool: up to 5) drawn from the
+  pool with the same blueprint and no identical sets; one combined answer key at the end. PDF (Chromium, RTL
+  fonts) or DOCX (`docx`). Header values (institute, teacher, subject) are printed exactly as typed, never sent
+  to the LLM.
+- Negative-marking toggle per assessment: when off, every planned negative mark is 0 at start (snapshot), so it
+  cannot change mid-attempt.
+- Links: helper/linkIngest.js fetches web pages (Readability via jsdom) and YouTube captions. SSRF guard: http(s)
+  only, DNS-resolved address must be public (private, loopback, link-local, metadata ranges refused), checked
+  again on each redirect; max 3 redirects, 10 s, 3 MB, HTML/plain text only. Links that cannot be read are
+  reported back (`skippedLinks`) and never block saving.
+- Library: content-hash dedupe per owner (duplicate upload/link returns the existing resource, flagged
+  `duplicate`); GET /api/resources/search (text, type, visibility, language, pagination); UI rewritten with
+  search, filters, pagination, "add link", duplicate notice.
+- Instructor insights: GET /api/instructor-analytics/assessment/:id/insights (per-objective accuracy, hardest
+  objectives, score distribution in 10% bands, median, difficulty reached final/highest) and /export?format=csv|xlsx
+  (UTF-8 BOM CSV; exceljs; cells starting with = + - @ are prefixed to block formula injection).
+- Super admin: GET /api/admin/stats?days=N (users, attempts, pool size, published assessments, LLM calls, failures,
+  tokens, latency, estimated cost by model and purpose). Prices from config/llmPricing.js, overridable with
+  LLM_PRICES_JSON; models without a price are listed as unpriced, never guessed.
+- "Show live score" was already done in section 3.
+- Tests: 257 (14 new in srs.test.js).
+
 ## Decisions
 - D0.1 npm audit majors NOT applied (risk noted): firebase (frontend; vulnerable firestore/grpc code is never
   imported, only firebase/auth), jest/nodemon (dev-only; npm suggests downgrades), office-text-extractor 4
@@ -239,6 +262,16 @@ platform stats incl. LLM calls and cost). "Show live score" was already done in 
 - D6.2 Group management (create, membership) is super-admin only; admins only see their groups. This keeps an
   admin from widening their own scope.
 - D6.3 Deleting an instructor keeps their assessments (shown as "Deleted user"); results must not vanish.
+
+- D7.1 Printed papers count their questions as served (served_count + no identical sets), so a question that
+  went home on paper is less likely to be served again online.
+- D7.2 Header proper nouns are never translated (no LLM call); the old header-translation purpose is legacy.
+- D7.3 The negative-marking switch is snapshotted at attempt start; changing it later never re-grades or alters
+  running attempts.
+- D7.4 Unreadable links are skipped with a visible report instead of failing the save; the instructor decides.
+- D7.5 Link fetching refuses non-public addresses even if the instructor typed them (SSRF protection beats
+  convenience for intranet pages).
+- D7.6 Cost figures are labelled estimates; unpriced models are excluded and named, not filled with a guess.
 
 ## Open issues
 - office-text-extractor major upgrade still pending (D0.1).

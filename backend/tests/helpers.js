@@ -6,6 +6,7 @@ import { mailer } from "../helper/emailService.js";
 import { captchaVerifier } from "../validator/verifyCaptcha.js";
 import { firebaseVerifier } from "../config/firebaseAdmin.js";
 import { embeddingAdapter } from "../helper/embeddingGenerator.js";
+import { linkFetcher } from "../helper/linkIngest.js";
 
 export { pool };
 
@@ -207,6 +208,21 @@ export const installFakes = () => {
     return decoded;
   };
   embeddingAdapter.embed = async (texts) => texts.map(fakeEmbedding);
+  // Web pages: fakes.pages[url] = { body, contentType } or a default article.
+  fakes.pages = {};
+  fakes.fetchedUrls = [];
+  linkFetcher.fetch = async (url) => {
+    fakes.fetchedUrls.push(String(url));
+    const page = fakes.pages[String(url)];
+    if (page instanceof Error) throw page;
+    return {
+      body:
+        page?.body ??
+        `<html><head><title>Lesson page</title></head><body><nav>Menu Home About</nav><article><h1>Photosynthesis</h1>${"<p>Plants use sunlight, water and carbon dioxide to make sugar in their green leaves every single day.</p>".repeat(20)}</article></body></html>`,
+      contentType: page?.contentType || "text/html; charset=utf-8",
+      finalUrl: String(url),
+    };
+  };
   embeddingAdapter.countTokens = async (text) => fakeTokenCount(text);
   return fakes;
 };

@@ -4,11 +4,11 @@ import { toPgVector } from "../helper/embeddingGenerator.js";
 // ==================== ASSESSMENT CRUD ====================
 
 export const createAssessmentQuery = async (assessmentData, client = db) => {
-  const { title, prompt, external_links, instructor_id, is_executed = false, adaptive = false, show_live_score = false } = assessmentData;
+  const { title, prompt, external_links, instructor_id, is_executed = false, adaptive = false, show_live_score = false, negative_marking = true } = assessmentData;
   
   const query = `
-    INSERT INTO assessments (title, prompt, external_links, instructor_id, is_executed, adaptive, show_live_score)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    INSERT INTO assessments (title, prompt, external_links, instructor_id, is_executed, adaptive, show_live_score, negative_marking)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     RETURNING *
   `;
   
@@ -24,6 +24,7 @@ export const createAssessmentQuery = async (assessmentData, client = db) => {
     is_executed,
     adaptive,
     show_live_score,
+    negative_marking,
   ]);
   
   return rows[0];
@@ -171,7 +172,7 @@ export const findAssessmentByIdForStudentQuery = async (assessmentId, studentId)
 };
 
 export const updateAssessmentQuery = async (assessmentId, updateData, client = db) => {
-  const { title, prompt, external_links, adaptive, show_live_score } = updateData;
+  const { title, prompt, external_links, adaptive, show_live_score, negative_marking } = updateData;
   
   const validExternalLinks = Array.isArray(external_links) 
     ? external_links.filter(link => link && typeof link === "string" && link.trim() !== "") 
@@ -180,7 +181,8 @@ export const updateAssessmentQuery = async (assessmentId, updateData, client = d
   const query = `
     UPDATE assessments
     SET title = $1, prompt = $2, external_links = $3,
-        adaptive = COALESCE($5, adaptive), show_live_score = COALESCE($6, show_live_score), updated_at = NOW()
+        adaptive = COALESCE($5, adaptive), show_live_score = COALESCE($6, show_live_score),
+        negative_marking = COALESCE($7, negative_marking), updated_at = NOW()
     WHERE id = $4
     RETURNING *
   `;
@@ -192,6 +194,7 @@ export const updateAssessmentQuery = async (assessmentId, updateData, client = d
     assessmentId,
     adaptive ?? null,
     show_live_score ?? null,
+    negative_marking ?? null,
   ]);
   
   return rows[0] || null;

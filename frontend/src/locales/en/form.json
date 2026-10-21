@@ -39,5 +39,9 @@
   "adaptiveDescription": "Each student starts at medium difficulty; it goes up after strong answers and down after weak ones. Every student still covers the same objectives.",
   "liveScore": "Show live score",
   "liveScoreDescription": "Students see whether each answer was correct and their running score during the exam. Off by default.",
-  "processingFiles": "Processing files…"
+  "processingFiles": "Processing files…",
+  "negativeMarking": "Negative marking",
+  "negativeMarkingDescription": "Wrong answers lose the deduction set in each question block. Turn off to never deduct marks.",
+  "negativeOffHint": "Negative marking is off for this assessment",
+  "linksSkipped": "These links could not be read and were not used: {{links}}"
 }

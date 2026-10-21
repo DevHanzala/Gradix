@@ -6,6 +6,7 @@ import {
   getInstructorOverview,
 } from "../controllers/InstructorAssessmentAnalyticsController.js";
 import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
+import { getInsightsService, exportInsightsService } from "../services/insights.service.js";
 
 const router = express.Router();
 
@@ -35,6 +36,27 @@ router.get("/assessment/:id/student/:studentId/questions", protect, authorizeRol
  * @desc    Get instructor dashboard overview
  * @access  Private (Instructor, Admin, Super Admin)
  */
+
+/** Objective accuracy, hardest objectives, score distribution, difficulty reached. */
+router.get("/assessment/:id/insights", protect, authorizeRoles("instructor", "super_admin"), async (req, res, next) => {
+  try {
+    res.status(200).json({ success: true, data: await getInsightsService(req.params.id, req.user) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/** Per-student results as CSV (default) or Excel (?format=xlsx). */
+router.get("/assessment/:id/export", protect, authorizeRoles("instructor", "super_admin"), async (req, res, next) => {
+  try {
+    const { buffer, contentType, extension } = await exportInsightsService(req.params.id, req.user, req.query.format === "xlsx" ? "xlsx" : "csv");
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Content-Disposition", `attachment; filename="gradix-results-${req.params.id}.${extension}"`);
+    res.send(buffer);
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.get(
   "/",

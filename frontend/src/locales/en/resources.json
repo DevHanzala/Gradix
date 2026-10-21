@@ -29,9 +29,19 @@
     "word": "Word",
     "powerpoint": "PowerPoint",
     "image": "Image",
-    "text": "Text"
+    "text": "Text",
+    "youtube": "YouTube"
   },
   "deleteTitle": "Delete \"{{name}}\"?",
   "deleteConfirm": "Delete resource",
-  "deleteBody": "Assessments that use it will no longer generate questions from it."
+  "deleteBody": "Assessments that use it will no longer generate questions from it.",
+  "loadFailed": "Could not load resources.",
+  "duplicates": "Already in your library (same content): {{count}}.",
+  "linkFailed": "This link could not be read.",
+  "linkTitle": "Add a web page or YouTube video",
+  "linkDescription": "The page's article text, or the video's captions, are read and used as source material.",
+  "linkUrl": "Link",
+  "addLink": "Add link",
+  "total": "Resources: {{count}}",
+  "noMatch": "No resources match these filters"
 }

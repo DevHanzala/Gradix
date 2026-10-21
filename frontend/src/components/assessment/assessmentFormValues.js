@@ -17,6 +17,7 @@ export const formValuesFromAssessment = (assessment) => ({
   resourceIds: Array.isArray(assessment?.resources) ? assessment.resources.map((r) => r.id).filter(Number.isInteger) : [],
   adaptive: Boolean(assessment?.adaptive),
   showLiveScore: Boolean(assessment?.show_live_score),
+  negativeMarking: assessment?.negative_marking !== false,
   blocks:
     Array.isArray(assessment?.question_blocks) && assessment.question_blocks.length
       ? assessment.question_blocks.map((b) => ({

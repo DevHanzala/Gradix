@@ -3,6 +3,7 @@ import { extractTextWithMethod } from "./textProcessor.js";
 import { embedPassages, EMBEDDING_MODEL } from "./embeddingGenerator.js";
 import { chunkDocument, CHUNKING_VERSION } from "./chunker.js";
 import { detectLanguage } from "./language.js";
+import { extractLinkText } from "./linkIngest.js";
 import { createResourceQuery } from "../repositories/resourceRepository.js";
 import { createResourceChunkQuery } from "../repositories/assessmentRepository.js";
 import { AppError } from "../utils/AppError.js";
@@ -86,13 +87,30 @@ export const prepareUploadedFiles = async (files = []) => {
   return prepared;
 };
 
+/** Read a web page or YouTube transcript and chunk/embed it (writes nothing). */
+export const prepareLink = async (url, { language } = {}) => {
+  const { title, text, method } = await extractLinkText(url, { language });
+  return { name: String(title).slice(0, 250), url: String(url).trim(), contentType: "link", extractionMethod: method, ...(await prepareText(text)) };
+};
+
+/**
+ * Insert a prepared resource, or return the uploader's existing resource
+ * with the same content (dedupe by content hash): { ...resource, duplicate }.
+ */
 export const insertPreparedResource = async (client, prepared, { userId, visibility = "private", name } = {}) => {
+  const existing = await client.query(
+    `SELECT * FROM resources WHERE uploaded_by = $1 AND content_hash = $2 ORDER BY id LIMIT 1`,
+    [userId, prepared.hash]
+  );
+  if (existing.rows[0]) return { ...existing.rows[0], duplicate: true };
+
   const resource = await createResourceQuery(
     {
       name: (name && String(name).trim()) || prepared.name,
-      file_type: prepared.mimetype,
-      file_size: prepared.size,
-      content_type: "file",
+      url: prepared.url || null,
+      file_type: prepared.mimetype || null,
+      file_size: prepared.size || null,
+      content_type: prepared.contentType || "file",
       visibility,
       uploaded_by: userId,
       content_text: prepared.text,

@@ -1,0 +1,18 @@
+{
+  "loadFailed": "Could not load the analysis.",
+  "exportFailed": "Could not export the results.",
+  "exportCsv": "Export CSV",
+  "exportXlsx": "Export Excel",
+  "distribution": "Score distribution",
+  "distributionLabel": "Number of students per score band",
+  "distributionAxis": "Score (%) band, from 0 to 100",
+  "bucket": "{{from}}–{{to}}%: {{count}}",
+  "medianLine": "Median score: {{median}}",
+  "byObjective": "Accuracy by learning objective",
+  "byObjectiveHint": "All students together; questions not reached count as not correct.",
+  "hardest": "Hardest objectives",
+  "difficultyReached": "Difficulty reached",
+  "difficultyReachedHint": "Number of students whose last and highest question was at each level.",
+  "finalLevel": "Last question",
+  "highestLevel": "Highest"
+}
