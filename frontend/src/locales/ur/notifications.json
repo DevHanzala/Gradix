@@ -1,0 +1,15 @@
+{
+  "label": "اطلاعات",
+  "labelUnread": "اطلاعات، {{count}} ناپڑھی",
+  "markAll": "سب کو پڑھا ہوا نشان زد کریں",
+  "none": "ابھی کوئی اطلاع نہیں۔",
+  "loadFailed": "اطلاعات لوڈ نہیں ہو سکیں۔",
+  "unread": "ناپڑھی",
+  "types": {
+    "role_changed": "آپ کا کردار {{oldRole}} سے {{newRole}} میں تبدیل ہو گیا۔",
+    "password_changed": "آپ کا پاس ورڈ تبدیل کر دیا گیا۔",
+    "enrolled": "آپ کو {{title}} میں شامل کیا گیا۔",
+    "published": "{{title}} اب دستیاب ہے۔",
+    "results_ready": "{{title}} کے لیے آپ کے نتائج تیار ہیں: {{percentage}}۔"
+  }
+}

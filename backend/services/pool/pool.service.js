@@ -6,6 +6,7 @@ import { embedPassages, toPgVector } from "../../helper/embeddingGenerator.js";
 import { generateObjectiveQuestions, objectiveContext } from "../questions/generator.js";
 import { computeTargets, bucketKey } from "./targets.js";
 import { AppError } from "../../utils/AppError.js";
+import { notifyPublished } from "../lifecycleNotifications.js";
 
 /**
  * Question pool: pre-generated, validated questions per
@@ -164,8 +165,6 @@ const maybePublish = async (assessmentId, client = db) => {
   return rowCount > 0;
 };
 
-/** Hook for side effects of publishing (notifications are attached in section 6). */
-export const publishHooks = { onPublished: async () => {} };
 
 /**
  * Job: fill one language's pool up to its targets. Idempotent (only the
@@ -203,7 +202,7 @@ export const fillPoolJob = async ({ assessmentId, language }, { attempt = 1, max
   const after = await languageBuckets(assessment, language);
   if (isLanguageReady(after)) {
     await poolRepo.setLanguageStateQuery(assessmentId, language, "ready");
-    if (await maybePublish(assessmentId)) await publishHooks.onPublished(assessmentId);
+    if (await maybePublish(assessmentId)) await notifyPublished(assessmentId);
     return { inserted, ready: true };
   }
   if (attempt >= maxAttempts) {

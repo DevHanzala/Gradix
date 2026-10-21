@@ -142,7 +142,7 @@ export const changePassword = async (req, res, next) => {
 
 export const getUsers = async (req, res, next) => {
   try {
-    const users = await getUsersService(req.user.role);
+    const users = await getUsersService(req.user);
     res.status(200).json({ success: true, message: "Users retrieved successfully", users });
   } catch (error) {
     handleError(error, res, next);

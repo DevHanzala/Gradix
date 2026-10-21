@@ -77,7 +77,11 @@ describe("role changes", () => {
     expect(await roleOf(student)).toBe("student");
   });
 
-  test("an admin can move users between student and instructor", async () => {
+  test("an admin can move users of their own groups between student and instructor", async () => {
+    // Phase 2: admins are scoped to their groups.
+    expect((await changeRole(admin, student, "instructor")).status).toBe(403);
+    const { rows } = await pool.query("INSERT INTO groups (name) VALUES ('Class A') RETURNING id");
+    await pool.query("INSERT INTO group_memberships (group_id, user_id) VALUES ($1, $2), ($1, $3)", [rows[0].id, admin.id, student.id]);
     expect((await changeRole(admin, student, "instructor")).status).toBe(200);
     expect(await roleOf(student)).toBe("instructor");
   });

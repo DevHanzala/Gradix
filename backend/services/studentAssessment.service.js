@@ -3,6 +3,7 @@ import { generateAssessmentQuestions } from "../models/assessmentModel.js";
 import * as attemptRepo from "../repositories/attemptRepository.js";
 import { AppError } from "../utils/AppError.js";
 import { availableLanguages } from "./assessmentAvailability.js";
+import { notifyResultsReady } from "./lifecycleNotifications.js";
 import { findLanguageStatesQuery, incrementServedQuery } from "../repositories/poolRepository.js";
 import { selectPoolQuestion, otherStudentSets, topUpIfLow, languageBuckets, isLanguageReady } from "./pool/pool.service.js";
 import { replayDifficulty, computeScores, ADAPTIVE_CONFIG } from "./engine/adaptiveConfig.js";
@@ -353,12 +354,19 @@ const syncAttempt = async (attemptId) => {
  * never reached count as unanswered (their marks still count in the total,
  * so submitting early never raises a percentage). Idempotent.
  */
-export const finalizeAttempt = async (attemptId, { expired = false } = {}) =>
+export const finalizeAttempt = async (attemptId, options = {}) => {
+  const { result, completed } = await completeAttempt(attemptId, options);
+  // Only the call that actually completed the attempt notifies (after commit).
+  if (completed) await notifyResultsReady(completed);
+  return result;
+};
+
+const completeAttempt = async (attemptId, { expired = false } = {}) =>
   withTransaction(async (client) => {
     const ctx = await loadContext(attemptId, client);
     const { attempt, plan, questions } = ctx;
     if (!attempt) throw new AppError("ATTEMPT_NOT_FOUND", 404, "Attempt not found");
-    if (attempt.status === "completed") return buildAttemptResult(attempt, client);
+    if (attempt.status === "completed") return { result: await buildAttemptResult(attempt, client), completed: null };
 
     const now = Date.now();
     const currentStart = new Date(attempt.current_question_started_at || attempt.started_at).getTime();
@@ -384,7 +392,7 @@ export const finalizeAttempt = async (attemptId, { expired = false } = {}) =>
       { ...scores, difficultyPath: attempt.adaptive ? path : null },
       client
     );
-    return buildAttemptResult(completed, client);
+    return { result: await buildAttemptResult(completed, client), completed };
   });
 
 /** Full result of a completed attempt, including correct answers (owner/instructor only). */

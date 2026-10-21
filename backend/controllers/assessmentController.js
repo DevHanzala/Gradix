@@ -9,6 +9,7 @@ import {
   getEnrolledStudentsService,
   previewQuestionsService,
   generatePhysicalPaperService,
+  enrollGroupService,
 } from "../services/assessment.service.js";
 import { generatePhysicalPaperPDF } from "../helper/Pdfkitgenerator.js";
 
@@ -127,6 +128,15 @@ export const generatePhysicalPaper = async (req, res, next) => {
     res.setHeader("Content-Disposition", `attachment; filename="Paper_${paperData.language.toUpperCase()}.pdf"`);
     res.setHeader("Content-Length", pdfBuffer.length);
     res.end(pdfBuffer);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const enrollGroupController = async (req, res, next) => {
+  try {
+    const data = await enrollGroupService(req.params.id, req.body?.groupId, req.user);
+    res.status(200).json({ success: true, data });
   } catch (error) {
     next(error);
   }

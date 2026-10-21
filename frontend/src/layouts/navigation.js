@@ -4,6 +4,7 @@ import {
   FaClipboardList,
   FaFolderOpen,
   FaHome,
+  FaLayerGroup,
   FaPlusCircle,
   FaUserCog,
   FaUserPlus,
@@ -23,8 +24,14 @@ export const NAVIGATION = {
     { to: "/instructor/resources", labelKey: "nav.resources", icon: FaFolderOpen },
     { to: "/instructor/students", labelKey: "nav.registerStudent", icon: FaUserPlus },
   ],
-  admin: [{ to: "/admin/dashboard", labelKey: "nav.users", icon: FaUsers }],
-  super_admin: [{ to: "/super-admin/dashboard", labelKey: "nav.users", icon: FaUsers }],
+  admin: [
+    { to: "/admin/dashboard", labelKey: "nav.users", icon: FaUsers },
+    { to: "/admin/groups", labelKey: "nav.groups", icon: FaLayerGroup },
+  ],
+  super_admin: [
+    { to: "/super-admin/dashboard", labelKey: "nav.users", icon: FaUsers },
+    { to: "/super-admin/groups", labelKey: "nav.groups", icon: FaLayerGroup },
+  ],
 };
 
 export const ACCOUNT_LINKS = [{ to: "/profile", labelKey: "nav.profile", icon: FaUserCog }];

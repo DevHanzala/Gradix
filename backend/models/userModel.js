@@ -2,7 +2,6 @@ import * as userRepo from "../repositories/userRepository.js";
 import {
   validateUserData,
   validateRoleChange,
-  validateUserDeletion,
   validatePasswordUpdate,
   validateResetTokenUpdate,
 } from "../validator/user.validator.js";
@@ -176,20 +175,6 @@ export const updateUserRole = async (userId, newRole, requestingUserRole, target
   }
 };
 
-export const deleteUser = async (userId, requestingUserRole) => {
-  try {
-    const validationErrors = validateUserDeletion(requestingUserRole);
-    if (validationErrors.length > 0) {
-      throw new Error(`Validation failed: ${validationErrors.join(', ')}`);
-    }
-
-    const user = await userRepo.deleteUserQuery(userId);
-    return user;
-  } catch (error) {
-    console.error("❌ Error deleting user:", error.message);
-    throw error;
-  }
-};
 
 // ==================== USER SEARCH & FILTERING ====================
 

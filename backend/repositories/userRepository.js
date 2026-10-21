@@ -52,7 +52,7 @@ export const findUserByEmailQuery = async (email) => {
 };
 
 export const findUserByIdQuery = async (id) => {
-  const query = "SELECT id, name, email, role, verified, provider, uid, created_at, language_preference FROM users WHERE id = $1";
+  const query = "SELECT id, name, email, role, verified, provider, uid, created_at, language_preference, deleted_at FROM users WHERE id = $1";
   const result = await pool.query(query, [id]);
   return result.rows[0] || null;
 };
@@ -122,6 +122,7 @@ export const findAllUsersQuery = async () => {
   const query = `
     SELECT id, name, email, role, verified, created_at, language_preference 
     FROM users 
+    WHERE deleted_at IS NULL
     ORDER BY created_at DESC
   `;
   const result = await pool.query(query);
@@ -139,11 +140,6 @@ export const updateUserRoleQuery = async (userId, newRole) => {
   return result.rows[0] || null;
 };
 
-export const deleteUserQuery = async (userId) => {
-  const query = "DELETE FROM users WHERE id = $1 RETURNING id, name, email";
-  const result = await pool.query(query, [userId]);
-  return result.rows[0] || null;
-};
 
 // ==================== USER SEARCH & FILTERING ====================
 
@@ -164,4 +160,38 @@ export const setLanguagePreferenceQuery = async (userId, language) => {
     [userId, language]
   );
   return rows[0] || null;
+};
+
+/**
+ * Anonymise a deleted account: personal data and sign-in methods are removed,
+ * the row (and therefore the user's results) stays as an anonymous record.
+ * Enrollments, group memberships, notifications and practice sessions go.
+ */
+export const anonymizeUserQuery = async (userId) => {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows } = await client.query(
+      `UPDATE users
+       SET name = 'Deleted user', email = 'deleted-' || id || '@deleted.invalid', password = NULL, uid = NULL,
+           provider = 'manual', verified = FALSE, verification_token = NULL, reset_token = NULL,
+           reset_token_expires = NULL, deleted_at = NOW(), updated_at = NOW()
+       WHERE id = $1 AND deleted_at IS NULL
+       RETURNING id`,
+      [userId]
+    );
+    if (rows[0]) {
+      const owned = { enrollments: "student_id", group_memberships: "user_id", notifications: "user_id", practice_sessions: "student_id" };
+      for (const [table, column] of Object.entries(owned)) {
+        await client.query(`DELETE FROM ${table} WHERE ${column} = $1`, [userId]);
+      }
+    }
+    await client.query("COMMIT");
+    return rows[0] || null;
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
 };

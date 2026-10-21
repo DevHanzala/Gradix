@@ -1,0 +1,15 @@
+{
+  "label": "Notifications",
+  "labelUnread": "Notifications, {{count}} unread",
+  "markAll": "Mark all as read",
+  "none": "No notifications yet.",
+  "loadFailed": "Could not load notifications.",
+  "unread": "Unread",
+  "types": {
+    "role_changed": "Your role changed from {{oldRole}} to {{newRole}}.",
+    "password_changed": "Your password was changed.",
+    "enrolled": "You were enrolled in {{title}}.",
+    "published": "{{title}} is now available.",
+    "results_ready": "Your results for {{title}} are ready: {{percentage}}."
+  }
+}

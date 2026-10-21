@@ -81,6 +81,7 @@ const TakeAssessment = lazy(() =>
   import("./Pages/Student/AssessmentManagement/TakeAssessment")
 );
 const Results = lazy(() => import("./Pages/Student/Results"));
+const Groups = lazy(() => import("./Pages/Groups"));
 const StudentAnalytics = lazy(() =>
   import("./Pages/Student/StudentAnalytics")
 );
@@ -184,6 +185,24 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          {/* GROUPS */}
+          {[
+            ["/super-admin/groups", "super_admin"],
+            ["/admin/groups", "admin"],
+          ].map(([path, role]) => (
+            <Route
+              key={path}
+              path={path}
+              element={
+                <ProtectedRoute allowedRoles={[role]}>
+                  <MainLayout>
+                    <Groups />
+                  </MainLayout>
+                </ProtectedRoute>
+              }
+            />
+          ))}
 
           {/* ADMIN */}
           <Route

@@ -17,5 +17,11 @@
   "noneDescription": "Add students by email or enroll a whole group.",
   "removeTitle": "Remove {{name}}?",
   "removeConfirm": "Remove student",
-  "removeBody": "The student will no longer see this assessment. Results of an attempt they already made are kept."
+  "removeBody": "The student will no longer see this assessment. Results of an attempt they already made are kept.",
+  "groupTitle": "Enroll a whole group",
+  "group": "Group",
+  "groupOption": "{{name}} (students: {{count}})",
+  "enrollGroup": "Enroll group",
+  "groupEnrolled": "Students enrolled from {{group}}: {{count}}.",
+  "noGroups": "You are not in any group. The Super Admin can add you to groups."
 }

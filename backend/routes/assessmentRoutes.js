@@ -13,6 +13,7 @@ import {
   getEnrolledStudentsController,
   previewQuestions,
   generatePhysicalPaper,
+  enrollGroupController,
 } from '../controllers/assessmentController.js';
 import { getObjectives, replaceObjectives, regenerateObjectives } from '../controllers/objectivesController.js';
 import {
@@ -62,6 +63,7 @@ router.delete(
 );
 
 router.post('/:id/enroll', protect, authorizeRoles('instructor', 'admin', 'super_admin'), enrollStudentController);
+router.post('/:id/enroll-group', protect, authorizeRoles('instructor', 'admin', 'super_admin'), enrollGroupController);
 router.delete('/:id/enroll/:studentId', protect, authorizeRoles('instructor', 'admin', 'super_admin'), unenrollStudentController);
 router.get('/:id/enrolled-students', protect, authorizeRoles('instructor', 'admin', 'super_admin'), getEnrolledStudentsController);
 

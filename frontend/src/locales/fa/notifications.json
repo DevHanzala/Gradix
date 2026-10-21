@@ -1,0 +1,15 @@
+{
+  "label": "اعلان‌ها",
+  "labelUnread": "اعلان‌ها، خوانده‌نشده: {{count}}",
+  "markAll": "علامت‌گذاری همه به‌عنوان خوانده‌شده",
+  "none": "هنوز اعلانی وجود ندارد.",
+  "loadFailed": "بارگذاری اعلان‌ها ممکن نشد.",
+  "unread": "خوانده‌نشده",
+  "types": {
+    "role_changed": "نقش شما از {{oldRole}} به {{newRole}} تغییر کرد.",
+    "password_changed": "رمز عبور شما تغییر کرد.",
+    "enrolled": "شما در {{title}} ثبت‌نام شدید.",
+    "published": "{{title}} اکنون در دسترس است.",
+    "results_ready": "نتایج شما در {{title}} آماده است: {{percentage}}."
+  }
+}

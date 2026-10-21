@@ -3,7 +3,9 @@ import { generateContent } from "./ai/generateContent.js";
 import { findUserByEmail, getUserById } from "../models/userModel.js";
 import { sendAssessmentEnrollmentEmail } from "../helper/emailService.js";
 import { prepareUploadedFiles, insertPreparedResource } from "../helper/resourceIngest.js";
-import { withTransaction } from "../DB/db.js";
+import db, { withTransaction } from "../DB/db.js";
+import { notify } from "./notification.service.js";
+import { groupStudentsForEnrollment } from "./group.service.js";
 import * as assessmentRepo from "../repositories/assessmentRepository.js";
 import { findAssessmentLifecycleQuery } from "../repositories/objectiveRepository.js";
 import { requireAssessmentAccess } from "./assessmentAccess.js";
@@ -216,8 +218,32 @@ export const enrollStudentService = async (assessmentId, email, user) => {
   // After the insert has committed; failures are logged, never thrown.
   const instructor = await getUserById(user.id);
   sendAssessmentEnrollmentEmail(student, assessment.title, instructor?.name);
+  await notify(student.id, "enrolled", { assessmentId: assessment.id, title: assessment.title });
 
   return { enrollment, student: { id: student.id, name: student.name, email: student.email } };
+};
+
+/**
+ * Enroll every student of a group the requester belongs to (super admin: any
+ * group). Students already enrolled are skipped; new ones are emailed and notified.
+ */
+export const enrollGroupService = async (assessmentId, groupId, user) => {
+  const assessment = await requireAssessmentAccess(assessmentId, user);
+  const { group, students } = await groupStudentsForEnrollment(user, groupId);
+  const instructor = await getUserById(user.id);
+  const added = [];
+  for (const student of students) {
+    const { rows } = await db.query(
+      `INSERT INTO enrollments (assessment_id, student_id) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING student_id`,
+      [assessment.id, student.id]
+    );
+    if (rows[0]) added.push(student);
+  }
+  for (const student of added) {
+    sendAssessmentEnrollmentEmail(student, assessment.title, instructor?.name);
+    await notify(student.id, "enrolled", { assessmentId: assessment.id, title: assessment.title });
+  }
+  return { groupId: group.id, groupName: group.name, enrolled: added.length, alreadyEnrolled: students.length - added.length };
 };
 
 export const unenrollStudentService = async (assessmentId, studentId, user) => {

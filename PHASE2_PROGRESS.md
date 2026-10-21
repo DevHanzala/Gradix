@@ -12,16 +12,17 @@ Resume rule: read this file, check `git log --oneline main..phase-2`, continue w
 | 2. Question pool + pre-generation | done | 3e2fadb |
 | 3. Adaptive difficulty engine | done | e462b21 |
 | 4. Full multilingual app | done | f331066 |
-| 5. Learning pathways | done | (this commit) |
-| 6. Institutions, roles, notifications | todo | |
+| 5. Learning pathways | done | 3298e7b |
+| 6. Institutions, roles, notifications | done | (this commit) |
 | 7. Remaining SRS features | todo | |
 | Final verification + PHASE2_REPORT.md | todo | |
 
 ## Next
-Section 6: institutions (groups + group_memberships; admins scoped to their groups, promote/demote only
-student<->instructor; enroll a whole group; super admin manages groups and any role; notifications table + bell;
-notify on role change, deletion (email only), password change, enrollment, published, results ready; account
-deletion anonymizes results; scope tests).
+Section 7: remaining SRS (DOCX export; print modes same paper / unique per student + combined answer key;
+header proper nouns never translated; negative-marking toggle; 30-second minimum enforced; link ingestion with
+readability + YouTube transcripts; resource dedupe by content hash, search, filters, pagination; instructor
+analytics per objective, hardest objectives, distribution, difficulty reached, CSV/Excel export; super admin
+platform stats incl. LLM calls and cost). "Show live score" was already done in section 3.
 
 ## Section 0 summary
 - npm audit: non-breaking fixes applied (lockfile only). Upgraded nodemailer 6 -> 10 and puppeteer 24 -> 25
@@ -165,6 +166,26 @@ deletion anonymizes results; scope tests).
   passages, practice quiz with instant feedback, report language picker + PDF download, full review.
 - Tests: 234 (14 new) incl. a real Chromium render of an Urdu report.
 
+## Section 6 summary
+- Migration 1760000000700: groups (unique case-insensitive name), group_memberships, notifications (type + data,
+  rendered by the client in the reader's language), users.deleted_at.
+- Scope: admins list and manage only users who share a group with them (403 OUT_OF_SCOPE otherwise) and still
+  only between student and instructor; the super admin manages all groups/members and can set any role.
+  /api/groups: list (own groups unless super admin), members, create/rename/delete, add members by email
+  (unknown emails reported), remove member.
+- POST /api/assessments/:id/enroll-group: enrolls every student of a group the requester belongs to; already
+  enrolled students skipped; each new one is emailed and notified.
+- Notifications (in-app + email in the recipient's language): role change, password change, enrollment (single
+  and group), published (all enrolled students, when the pool is ready), results ready (exactly once, when the
+  attempt actually completes). Account deletion: email only.
+- Deletion anonymises instead of deleting: name/email/password/sign-in removed, enrollments, memberships,
+  notifications and practice sessions removed, attempts and results kept as anonymous records; old tokens stop
+  working and the user disappears from lists.
+- UI: notification bell in the top bar (unread badge, panel, mark read / all, links), Groups page (super admin
+  manages; admins read-only), "Enroll a whole group" on the enroll page, Groups in admin/super admin navigation.
+- Phase 1 RBAC test "admin can move users" migrated: the admin must now share a group with the student.
+- Tests: 243 (9 new institutions tests + migrated RBAC test).
+
 ## Decisions
 - D0.1 npm audit majors NOT applied (risk noted): firebase (frontend; vulnerable firestore/grpc code is never
   imported, only firebase/auth), jest/nodemon (dev-only; npm suggests downgrades), office-text-extractor 4
@@ -213,6 +234,11 @@ deletion anonymizes results; scope tests).
   practice can never expose exam questions (to this or any other student).
 - D5.2 Weak area = objective accuracy below 60% (WEAK_THRESHOLD); questions never reached count as not correct.
 - D5.3 Study plan and report default to the student's account language, selectable per request.
+
+- D6.1 An admin with no group manages nobody (scope fails closed).
+- D6.2 Group management (create, membership) is super-admin only; admins only see their groups. This keeps an
+  admin from widening their own scope.
+- D6.3 Deleting an instructor keeps their assessments (shown as "Deleted user"); results must not vanish.
 
 ## Open issues
 - office-text-extractor major upgrade still pending (D0.1).

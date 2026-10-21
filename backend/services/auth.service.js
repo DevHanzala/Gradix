@@ -13,13 +13,16 @@ import {
   getAllUsers,
   getUserById,
   updateUserRole,
-  deleteUser,
   findUserByResetToken,
   linkGoogleAccount,
   setVerificationToken,
   setLanguagePreference,
 } from "../models/userModel.js";
 import { normalizeLanguage, LANGUAGES } from "../helper/i18n.js";
+import { notify } from "./notification.service.js";
+import { sharesGroupQuery, findScopedUsersQuery } from "./group.service.js";
+import { anonymizeUserQuery } from "../repositories/userRepository.js";
+import { sendAccountDeletedEmail } from "../helper/emailService.js";
 import { firebaseVerifier } from "../config/firebaseAdmin.js";
 import {
   sendVerificationEmail,
@@ -196,6 +199,7 @@ export const resetPasswordService = async ({ resetId, newPassword }) => {
   await updateResetToken(user.email, null, null);
 
   sendPasswordChangedEmail(user);
+  await notify(user.id, "password_changed");
   return { success: true };
 };
 
@@ -222,11 +226,14 @@ export const changePasswordService = async ({ currentPassword, newPassword }, au
   if (!updated) throw new Error("PASSWORD_UPDATE_FAILED");
 
   sendPasswordChangedEmail(user);
+  await notify(user.id, "password_changed");
   return { success: true };
 };
 
 // 7. GET USERS
-export const getUsersService = async (userRole) => getAllUsers(userRole);
+// Admins only see users who share a group with them; the super admin sees everyone.
+export const getUsersService = async (requester) =>
+  requester.role === "admin" ? findScopedUsersQuery(requester.id) : getAllUsers(requester.role);
 
 // 8. CHANGE USER ROLE
 // The check uses the TARGET's current role from the database.
@@ -243,6 +250,9 @@ export const changeUserRoleService = async ({ userId, newRole }, requestingUser)
 
   const errors = validateRoleChange(requestingUser.role, target.role, newRole);
   if (errors.length > 0) throw new AppError("ROLE_CHANGE_FORBIDDEN", 403, errors[0]);
+  if (requestingUser.role === "admin" && !(await sharesGroupQuery(requestingUser.id, targetId))) {
+    throw new AppError("OUT_OF_SCOPE", 403, "You can only manage users in your own groups.");
+  }
 
   if (target.role === newRole) return target;
 
@@ -250,6 +260,7 @@ export const changeUserRoleService = async ({ userId, newRole }, requestingUser)
   if (!updatedUser) throw new Error("USER_NOT_FOUND");
 
   sendRoleChangeEmail({ ...updatedUser, language: target.language_preference }, target.role, newRole);
+  await notify(targetId, "role_changed", { oldRole: target.role, newRole });
   return updatedUser;
 };
 
@@ -261,9 +272,15 @@ export const removeUserService = async (userId, requestingUser) => {
     throw new AppError("CANNOT_DELETE_SELF", 400, "You cannot delete your own account.");
   }
 
-  const deletedUser = await deleteUser(targetId, requestingUser.role);
-  if (!deletedUser) throw new Error("USER_NOT_FOUND");
-  return deletedUser;
+  if (requestingUser.role !== "super_admin") throw new AppError("DELETE_FORBIDDEN", 403, "Only super admins can delete users.");
+  const target = await getUserById(targetId);
+  if (!target || target.deleted_at) throw new Error("USER_NOT_FOUND");
+
+  // Tell the person first (email only: they will not be able to sign in again),
+  // then anonymise: personal data goes, results stay as anonymous records.
+  sendAccountDeletedEmail(target);
+  const anonymised = await anonymizeUserQuery(targetId);
+  return { id: anonymised.id, name: target.name, email: target.email };
 };
 
 // 10. REGISTER STUDENT (by admin / instructor / super_admin)

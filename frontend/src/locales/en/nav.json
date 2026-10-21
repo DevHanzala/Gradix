@@ -15,5 +15,6 @@
   "users": "Users",
   "profile": "My profile",
   "logout": "Log out",
-  "goToMyDashboard": "Go to my dashboard"
+  "goToMyDashboard": "Go to my dashboard",
+  "groups": "Groups"
 }

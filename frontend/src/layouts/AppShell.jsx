@@ -5,6 +5,7 @@ import { FaBars, FaSignOutAlt, FaTimes } from "react-icons/fa";
 import useAuthStore from "../store/authStore.js";
 import { dashboardPathForRole } from "../utils/redirectByRole.js";
 import LanguageSwitcher from "../components/LanguageSwitcher.jsx";
+import NotificationBell from "../components/NotificationBell.jsx";
 import { ACCOUNT_LINKS, BRAND, NAVIGATION } from "./navigation.js";
 
 function Brand({ to }) {
@@ -179,6 +180,7 @@ function AppShell({ children, topBarExtras = null }) {
           </div>
           <div className="ms-auto flex items-center gap-2 sm:gap-3">
             <LanguageSwitcher compact />
+            <NotificationBell />
             {topBarExtras}
             <div className="hidden text-end md:block">
               <p className="text-sm font-semibold text-ink">{user?.name}</p>

@@ -1,0 +1,15 @@
+{
+  "label": "الإشعارات",
+  "labelUnread": "الإشعارات، غير المقروءة: {{count}}",
+  "markAll": "تعليم الكل كمقروء",
+  "none": "لا توجد إشعارات بعد.",
+  "loadFailed": "تعذّر تحميل الإشعارات.",
+  "unread": "غير مقروء",
+  "types": {
+    "role_changed": "تغيّر دورك من {{oldRole}} إلى {{newRole}}.",
+    "password_changed": "تم تغيير كلمة المرور الخاصة بك.",
+    "enrolled": "تم تسجيلك في {{title}}.",
+    "published": "أصبح {{title}} متاحًا الآن.",
+    "results_ready": "نتائجك في {{title}} جاهزة: {{percentage}}."
+  }
+}

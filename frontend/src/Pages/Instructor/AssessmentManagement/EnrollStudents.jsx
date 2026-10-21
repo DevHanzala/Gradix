@@ -8,7 +8,8 @@ import { enrollStudentSchema } from "../../../schemas/studentSchemas.js";
 import { validateWith, errorMessage } from "../../../utils/forms.js";
 import { formatNumber } from "../../../utils/format.js";
 import { RegisterStudentForm } from "../AddStudent.jsx";
-import { Alert, Button, Card, CardBody, CardHeader, EmptyState, Input, Modal, PageHeader, ResponsiveTable, SkeletonList } from "../../../components/ui";
+import { enrollGroupApi, fetchGroupsApi } from "../../../api/groups.api.js";
+import { Alert, Button, Card, CardBody, CardHeader, EmptyState, Input, Modal, PageHeader, ResponsiveTable, Select, SkeletonList } from "../../../components/ui";
 
 function EnrollByEmail({ assessmentId, onEnrolled }) {
   const { t } = useTranslation();
@@ -54,6 +55,55 @@ function EnrollByEmail({ assessmentId, onEnrolled }) {
       />
       <Button type="submit" loading={saving} className="w-full sm:w-auto">
         {t("enroll.enrollButton")}
+      </Button>
+    </form>
+  );
+}
+
+/** Enroll every student of one of the instructor's groups. */
+function EnrollGroup({ assessmentId, onEnrolled }) {
+  const { t } = useTranslation();
+  const [groups, setGroups] = useState(null);
+  const [groupId, setGroupId] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    fetchGroupsApi()
+      .then((res) => setGroups(res.data.data))
+      .catch((e) => setError(errorMessage(e, t("groups.loadFailed"))));
+  }, [t]);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await enrollGroupApi(assessmentId, Number(groupId));
+      toast.success(t("enroll.groupEnrolled", { count: formatNumber(res.data.data.enrolled), group: res.data.data.groupName }));
+      onEnrolled();
+    } catch (err) {
+      setError(errorMessage(err, t("enroll.enrollFailed")));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (error) return <Alert tone="danger">{error}</Alert>;
+  if (!groups) return <SkeletonList rows={1} />;
+  if (!groups.length) return <p className="text-sm text-ink-muted">{t("enroll.noGroups")}</p>;
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <Select
+        label={t("enroll.group")}
+        value={groupId}
+        onChange={(e) => setGroupId(e.target.value)}
+        options={[
+          { value: "", label: t("common.choose") },
+          ...groups.map((g) => ({ value: g.id, label: t("enroll.groupOption", { name: g.name, count: formatNumber(g.studentCount) }) })),
+        ]}
+      />
+      <Button type="submit" loading={saving} disabled={!groupId} className="w-full sm:w-auto">
+        {t("enroll.enrollGroup")}
       </Button>
     </form>
   );
@@ -110,6 +160,12 @@ function EnrollStudents() {
             <CardHeader title={t("enroll.addStudent")} />
             <CardBody>
               <EnrollByEmail assessmentId={assessmentId} onEnrolled={load} />
+            </CardBody>
+          </Card>
+          <Card>
+            <CardHeader title={t("enroll.groupTitle")} />
+            <CardBody>
+              <EnrollGroup assessmentId={assessmentId} onEnrolled={load} />
             </CardBody>
           </Card>
           <Card>

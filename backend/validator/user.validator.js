@@ -60,15 +60,6 @@ export const validateRoleChange = (requestingUserRole, targetCurrentRole, newRol
   return errors;
 };
 
-export const validateUserDeletion = (requestingUserRole) => {
-  const errors = [];
-
-  if (requestingUserRole !== 'super_admin') {
-    errors.push('Only super admins can delete users');
-  }
-
-  return errors;
-};
 
 export const validatePasswordUpdate = (data) => {
   const errors = [];
