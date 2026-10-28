@@ -1,0 +1,9 @@
+$ npm run lint
+i18n check passed: 834 keys, 98 files scanned.
+$ npm run i18n:check
+i18n check passed: 834 keys, 98 files scanned.
+$ npm run build
+✓ built in 5.13s
+$ npm test
+Test Suites: 13 passed, 13 total
+Tests:       258 passed, 258 total
