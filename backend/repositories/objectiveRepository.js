@@ -40,7 +40,7 @@ export const deleteAllObjectivesQuery = async (assessmentId, client = db) => {
 
 export const findAssessmentLifecycleQuery = async (assessmentId, client = db, { forUpdate = false } = {}) => {
   const { rows } = await client.query(
-    `SELECT id, title, prompt, instructor_id, is_executed, status, objectives_state, objectives_error, blueprint
+    `SELECT id, title, prompt, instructor_id, is_executed, status, objectives_state, objectives_error, blueprint, updated_at
      FROM assessments WHERE id = $1 ${forUpdate ? "FOR UPDATE" : ""}`,
     [assessmentId]
   );

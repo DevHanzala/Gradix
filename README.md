@@ -17,7 +17,7 @@ This is a monorepo using npm workspaces:
 - **Node.js 22.13 or newer** (required by `pdf-to-img`; check with `node -v`)
 - **PostgreSQL 14+ with the [pgvector](https://github.com/pgvector/pgvector) extension.** The easiest way is Docker: `docker compose -f backend/docker-compose.yml up -d db` starts Postgres 16 + pgvector on port 5433. A hosted Postgres such as Neon also works; enable the `vector` extension there.
 - Accounts and keys for the external services:
-  - **Google Gemini** API key(s) for question generation; Groq is optional as a fallback
+  - **Google Gemini** API key(s) for question generation; Groq is optional. Add as many keys as you have (`GEMINI_CREATION_API_KEY_1`, `_2`, … and `GROQ_API_KEY`, `GROQ_API_KEY_2`, …): calls are spread over the keys that still have free quota today, and the Super Admin dashboard shows each key's daily usage against its free-plan limit
   - **Firebase** project with Google sign-in enabled, plus a **service account key** for the backend
   - **Google reCAPTCHA v3** site key and secret
   - **Gmail** account with an **app password** for sending email
@@ -69,12 +69,14 @@ For production, create only the super admin: `npm run create-super-admin --works
 ## 5. Run the apps
 
 ```bash
-npm run dev            # backend (http://localhost:5000) and frontend (http://localhost:5173) together
+npm run dev            # backend (http://localhost:5001) and frontend (http://localhost:5173) together
 npm run dev:backend    # only the API   (health check: /api/health)
 npm run dev:frontend   # only the SPA
 ```
 
-Point `VITE_API_URL` at the backend (e.g. `http://localhost:5000/api`) and `FRONTEND_URL` at the frontend.
+Point `VITE_API_URL` at the backend (e.g. `http://localhost:5001/api`) and `FRONTEND_URL` at the frontend.
+
+**Background jobs** (objective extraction, question pools, re-chunking) run inside the backend process, so the backend alone is a complete server: in production `npm start --workspace backend` is enough. Work interrupted by a restart is picked up again automatically. To run jobs on a separate machine instead, start `npm run worker` there and set `JOBS_IN_API=false` on the API.
 
 ## 6. Tests and checks
 

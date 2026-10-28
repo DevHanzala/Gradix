@@ -1,5 +1,6 @@
 import db from "../../DB/db.js";
-import { getRandomCreationProvider, getCheckingModel } from "./aiProviders.js";
+import { getCheckingModel, clientFor, GEMINI_MODEL, GROQ_MODEL } from "./aiProviders.js";
+import { pickKeys, noteRequest, noteFailure } from "./keyPool.js";
 
 /**
  * THE single entry point for every LLM call in Gradix.
@@ -7,8 +8,9 @@ import { getRandomCreationProvider, getCheckingModel } from "./aiProviders.js";
  * purpose, provider, model, tokens, latency and success.
  */
 
-export const GEMINI_MODEL = "gemini-2.5-flash";
-export const GROQ_MODEL = "openai/gpt-oss-20b";
+export { GEMINI_MODEL, GROQ_MODEL };
+/** At most this many keys are tried for one call. */
+export const MAX_KEY_ATTEMPTS = 3;
 
 /** Rough token estimate when a provider does not report usage. */
 export const estimateTokens = (text) => Math.max(1, Math.ceil(String(text || "").length / 4));
@@ -62,8 +64,8 @@ const callGroq = async (client, prompt, options) => {
   };
 };
 
-const callProvider = (provider, prompt, options) =>
-  provider.type === "gemini" ? callGemini(provider.client, prompt, options) : callGroq(provider.client, prompt, options);
+const callKey = (key, prompt, options) =>
+  key.type === "gemini" ? callGemini(clientFor(key), prompt, options) : callGroq(clientFor(key), prompt, options);
 
 const timed = async (fn) => {
   const started = Date.now();
@@ -76,36 +78,40 @@ const timed = async (fn) => {
 
 /**
  * Real implementation: returns { text, attempts: [...] }.
- * `purpose === "checking"`-style calls use the checking key; everything else
- * uses the creation pool with one fallback attempt on another provider.
+ * Calls use the key pool (keyPool.js): keys with free quota left today are
+ * shuffled so usage spreads over every account; on failure the next key is
+ * tried (up to MAX_KEY_ATTEMPTS), and a key the provider rate-limits is parked
+ * until its limit resets. Each attempt is logged with its key label.
  */
-const generateWithProviders = async (prompt, options = {}) => {
+export const generateWithProviders = async (prompt, options = {}) => {
   const attempts = [];
-  const run = async (providerLabel, fn) => {
+  const run = async (providerLabel, fn, { keyLabel = null, model = null } = {}) => {
     const r = await timed(fn);
     attempts.push(
       r.ok
-        ? { ...r.value, latencyMs: r.latencyMs, success: true }
-        : { provider: providerLabel, model: null, latencyMs: r.latencyMs, success: false, error: r.error.message }
+        ? { ...r.value, keyLabel, latencyMs: r.latencyMs, success: true }
+        : { provider: providerLabel, model, keyLabel, latencyMs: r.latencyMs, success: false, error: r.error.message }
     );
     return r;
   };
 
   if (options.useCheckingKey) {
-    const r = await run("gemini", async () => callGemini(await getCheckingModel(), prompt, options));
+    const r = await run("gemini", async () => callGemini(await getCheckingModel(), prompt, options), { keyLabel: "gemini-checking", model: GEMINI_MODEL });
     if (r.ok) return { text: r.value.text, attempts };
     throw Object.assign(r.error, { attempts });
   }
 
-  const primary = getRandomCreationProvider();
-  const first = await run(primary.type, () => callProvider(primary, prompt, options));
-  if (first.ok) return { text: first.value.text, attempts };
-  console.warn(`[AI] Primary provider (${primary.type}) failed: ${first.error.message}`);
-
-  const secondary = options.images?.length ? primary : getRandomCreationProvider();
-  const second = await run(secondary.type, () => callProvider(secondary, prompt, options));
-  if (second.ok) return { text: second.value.text, attempts };
-  throw Object.assign(second.error, { attempts });
+  const keys = (await pickKeys({ needsImages: Boolean(options.images?.length) })).slice(0, MAX_KEY_ATTEMPTS);
+  let lastError;
+  for (const key of keys) {
+    noteRequest(key.label);
+    const r = await run(key.type, () => callKey(key, prompt, options), { keyLabel: key.label, model: key.model });
+    if (r.ok) return { text: r.value.text, attempts };
+    lastError = r.error;
+    await noteFailure(key, r.error);
+    console.warn(`[AI] ${key.label} failed: ${String(r.error.message).slice(0, 200)}`);
+  }
+  throw Object.assign(lastError, { attempts });
 };
 
 /** Replaceable in tests. May return a string or { text, attempts }. */
@@ -117,8 +123,8 @@ const writeUsageLog = async (context, prompt, attempt, outputText) => {
     await db.query(
       `INSERT INTO llm_usage_log
          (assessment_id, user_id, purpose, provider, model, input_tokens, output_tokens,
-          tokens_estimated, latency_ms, success, error)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+          tokens_estimated, latency_ms, success, error, key_label)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
       [
         context.assessmentId ?? null,
         context.userId ?? null,
@@ -131,6 +137,7 @@ const writeUsageLog = async (context, prompt, attempt, outputText) => {
         Math.max(0, Math.round(attempt.latencyMs || 0)),
         Boolean(attempt.success),
         attempt.error ? String(attempt.error).slice(0, 500) : null,
+        attempt.keyLabel || null,
       ]
     );
   } catch (error) {

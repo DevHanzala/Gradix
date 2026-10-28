@@ -13,7 +13,7 @@
   "scripts": {
     "dev:backend": "npm run dev --workspace backend",
     "dev:frontend": "npm run dev --workspace frontend",
-    "dev": "concurrently --names backend,worker,frontend --prefix-colors blue,yellow,magenta \"npm:dev:backend\" \"npm:dev:worker\" \"npm:dev:frontend\"",
+    "dev": "concurrently --names backend,frontend --prefix-colors blue,magenta \"npm:dev:backend\" \"npm:dev:frontend\"",
     "build": "npm run build --workspace frontend",
     "lint": "npm run lint --workspace backend && npm run lint --workspace frontend",
     "test": "npm test --workspace backend",

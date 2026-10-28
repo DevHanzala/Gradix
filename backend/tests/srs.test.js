@@ -236,7 +236,7 @@ describe("instructor analytics", () => {
 });
 
 describe("platform stats", () => {
-  test("super admin sees counts, LLM calls and an estimated cost; others cannot", async () => {
+  test("super admin sees counts and LLM calls, with no cost; others cannot", async () => {
     await pool.query(
       `INSERT INTO llm_usage_log (purpose, provider, model, input_tokens, output_tokens, latency_ms, success)
        VALUES ('question_generation', 'gemini', 'gemini-2.5-flash', 1000000, 100000, 900, TRUE),
@@ -248,8 +248,9 @@ describe("platform stats", () => {
     const { llm, users } = res.body.data;
     expect(llm.calls).toBe(2);
     expect(llm.failed).toBe(1);
-    expect(llm.estimatedCostUsd).toBeCloseTo(0.3 + 0.25, 4);
-    expect(llm.unpricedModels).toEqual(["mystery-model"]);
+    expect(llm.estimatedCostUsd).toBeUndefined();
+    expect(JSON.stringify(res.body.data)).not.toMatch(/cost|price/i);
+    expect(llm.inputTokens).toBe(1000010);
     expect(users.instructor).toBe(1);
     expect((await request(app).get("/api/admin/stats").set("Authorization", auth(instructor))).status).toBe(403);
   });

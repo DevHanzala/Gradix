@@ -12,11 +12,13 @@ Branch `phase-2` (from `main` at `d8ba9b9`), one commit per section:
 | 3298e7b | 5. Learning pathways |
 | 0256e4c | 6. Institutions, scoped admins, notifications |
 | dda3445 | 7. Remaining SRS features |
-| 5478973 + final commit | Final verification: fixes, report, evidence |
+| 5478973 + bdf4b60 | Final verification: fixes, report, evidence |
+| (this commit) | Post-release fixes: stuck "finding objectives", per-key free-plan AI usage (section 11) |
 
 **Result:** every Phase 2 item is done, except three that are partial and explained below: 4.8 (native
 review of translations), 7.6 (YouTube transcripts not tested live) and final-verification item 3 (the live
-smoke test did not cover every LLM purpose). Gate 2 passes 6/6. lint, i18n:check, build and 259 tests pass.
+smoke test did not cover every LLM purpose; the real-stack run in section 11 then covered them). Gate 2 passes
+6/6. lint, i18n:check, build and 270 tests pass.
 Overall completion went from about 65% after Phase 1 to about **89%** (scoring in section 9). Phase 1
 behaviour is intact: all Phase 1 tests still pass, with the exam tests moved to the new one-question API
 and all 21 rules kept.
@@ -123,7 +125,7 @@ Status: **Done**, **Partial** (works, with a stated gap) or **Not done**. File l
 | 7.6 | Web page ingestion (Readability) and YouTube transcripts through the same pipeline | **Partial** | helper/linkIngest.js, helper/resourceIngest.js. Both work and are tested with a fake fetcher. The YouTube path reads caption tracks from the watch page (no official API) and was not tested against live YouTube. |
 | 7.7 | Library: content-hash dedupe, search (title/content/type/language), filters, pagination | Done | services/resource.service.js, Pages/…/ResourceManagement.jsx |
 | 7.8 | Instructor analytics: per objective, hardest, distribution, difficulty reached, CSV/Excel | Done | services/insights.service.js, Pages/…/AssessmentAnalytics.jsx, components/insights/ScoreDistribution.jsx |
-| 7.9 | Super Admin platform stats incl. LLM calls and estimated cost | Done | services/platformStats.service.js, config/llmPricing.js, components/PlatformStats.jsx |
+| 7.9 | Super Admin platform stats incl. LLM calls; AI usage per key and per day (no cost: free plans, section 11) | Done | services/platformStats.service.js, services/ai/keyPool.js, components/PlatformStats.jsx |
 
 ### Final verification
 
@@ -240,7 +242,9 @@ All are in `backend/.env.example` with placeholders, and all are optional (defau
 | `EMBEDDING_CACHE_DIR` | 1 | Where model files are cached |
 | `POOL_ON_DEMAND_TIMEOUT_MS` | 2 | Max wait for an on-demand question when a pool bucket is empty (20000) |
 | `OCR_GEMINI_FALLBACK` | 4 | `true` sends low-quality OCR pages to Gemini (off: documents go to a third party) |
-| `LLM_PRICES_JSON` | 7 | Your own per-model prices for the cost estimate |
+| `JOBS_IN_API` | 11 | `true` (default): the API runs the background jobs itself. Set `false` only when `npm run worker` runs separately |
+| `LLM_FREE_LIMITS_JSON` | 11 | Your free-plan limits per model (defaults: Gemini 2.5 Flash 250 requests/day; Groq gpt-oss-20b 1,000 requests and 200,000 tokens/day) |
+| `GEMINI_CREATION_API_KEY_3…`, `GROQ_API_KEY_2…` | 11 | Any number of extra keys; calls are spread over all keys with quota left |
 
 There are no new frontend variables.
 
@@ -278,9 +282,8 @@ integrity and fairness:
    - `office-text-extractor` → `file-type` (moderate, a DoS in the ASF media parser); v4 is a breaking upgrade.
    - `exceljs` → `uuid` (moderate): npm's suggested fix is a downgrade.
    - `mammoth` → `argparse` → `sprintf-js` (moderate, CLI argument parsing the app doesn't use).
-2. **Objectives can outnumber questions.** In the live smoke test, 9 objectives for 3 questions left 6 with
-   no question. The instructor can merge or delete objectives, but the UI doesn't warn. Suggested fix: warn
-   on the objectives page, or cap extraction at the question count.
+2. ~~Objectives can outnumber questions.~~ Fixed in section 11: extraction never produces more objectives
+   than questions, and the objectives page warns when manual edits leave objectives without a question.
 3. **YouTube transcripts** depend on the caption tracks embedded in the watch page. A YouTube page change
    produces a clear "no captions" message, not a crash. Not tested live.
 4. **Translations** need a native speaker's review (`TRANSLATION_REVIEW.md`). Non-English UIs show
@@ -288,7 +291,8 @@ integrity and fairness:
 5. **No frontend unit tests.** Frontend behaviour is verified by the Puppeteer pass, lint and the i18n
    check.
 6. **Build size:** Vite warns about chunks over 500 kB; no code splitting yet.
-7. **LLM cost** figures are list-price estimates. Set `LLM_PRICES_JSON` for contract prices.
+7. **Free-plan limits** are the published values at the time of writing and change often; they count per
+   Google project / Groq account. Set `LLM_FREE_LIMITS_JSON` if your plan differs.
 8. **Secrets** that were in the old repos' git history must be rotated (from the monorepo merge).
 9. **Adaptive thresholds** (`adaptiveConfig.js`) are reasoned defaults, not yet tuned on real student data.
 
@@ -303,11 +307,11 @@ None of the following were built. They are noted as temptations in `PHASE2_PROGR
 - Offline/PWA exam caching (today there is only a retry of unsaved answers).
 - A live class view.
 - Polls and exit tickets on top of the practice-quiz component.
-- Per-institution plans or limits based on the LLM cost log.
+- Per-institution plans or limits based on the LLM usage log.
 - Deployment (Docker compose for app + worker).
 
 Useful groundwork for Phase 3 already exists: the per-question timing data, the notification system, the
-LLM cost log and the pg-boss worker.
+LLM usage log and the pg-boss worker.
 
 ---
 
@@ -327,3 +331,48 @@ LLM cost log and the pg-boss worker.
 | F10 Resource library | 30% | 45% | **85%** | Dedupe is exact-content only; search is text, not semantic |
 | F11 Analytics | 45% | 50% | **80%** | No per-question item analysis (difficulty/discrimination per pool question) |
 | **Overall (unweighted)** | **≈ 50%** | **≈ 65%** | **≈ 89%** | Weighted toward F1, F2, F3, F6: ≈ 89% |
+
+---
+
+## 11. Post-release fixes (after merging to main)
+
+**Reported problem:** a created assessment stayed on "finding objectives" and could not be started.
+
+**Cause:** background jobs (objective extraction, question pools) were put in the database queue, but only the
+separate `npm run worker` process executed them. With just the backend running, nothing ever processed the
+queue. The Regenerate button was also disabled while extraction was "running", so there was no way out in the UI.
+
+**Fixes:**
+- The backend runs the background jobs itself (`backend/jobs/runner.js`, started from `index.js`); `npm run worker`
+  is optional (`JOBS_IN_API=false`). The root `npm run dev` no longer starts a second worker.
+- On startup and every 5 minutes, assessments still extracting objectives and languages still filling their pool
+  are re-queued (de-duplicated per assessment). Assessments that were already stuck recover on the first start.
+- After 3 minutes the objectives page shows "This is taking longer than usual" with a working **Try again**.
+- Objectives never outnumber questions (the 9-objectives-for-4-questions case), with a warning for manual edits.
+
+**AI usage on free plans (no cost):**
+- Any number of keys: `GEMINI_CREATION_API_KEY_1..N`, `GROQ_API_KEY`, `GROQ_API_KEY_2..N`. Each call shuffles over
+  the keys that still have free quota today, falls back to another key on failure (up to 3), and a key the
+  provider rate-limits is parked: for a minute, or until its daily reset for a daily limit.
+- Every call is logged with its key label (migration `1760000000900_llm-key-usage.sql`; the key itself is never
+  stored or shown).
+- The Super Admin dashboard shows: AI requests and tokens today, keys available, per key "requests used / limit",
+  "tokens used / limit", what is left, status (Available / Almost used up / Paused / Limit reached) and reset
+  time, plus a tokens-per-day chart and usage by model and purpose. All cost figures were removed.
+
+**Verification:**
+- 270 backend tests (11 new: key rotation, daily-limit parking, usage accounting, stats without cost, stuck-work
+  recovery, stalled flag, objective cap), lint + i18n check (862 keys), build.
+- Migrations 100–900 up → down → up on a fresh database.
+- **Real-stack run, 13/13 pass in 112 s** (`docs/phase2-evidence/e2e/`): one `node index.js` process (no worker),
+  real pg-boss queue, your real AI keys, a browser clicking through the production build:
+  - instructor creates an assessment with an uploaded file;
+  - 4 objectives for 4 questions appear in 11 s;
+  - publishing builds 12 English and 12 Urdu questions in 68 s;
+  - an English and an Urdu student take the exam one question at a time and get different questions;
+  - results, AI study plan, practice and PDF reports work (en + ur);
+  - analytics, PDF and DOCX printing, and the super admin usage view work;
+  - an admin without a group sees nobody.
+
+  The 19 AI calls were spread over gemini-1, gemini-2 and groq-1, with no failures.
+- Layout and translation checks on the changed pages in English, Urdu and Arabic at 360/768/1280: 45/45 clean.

@@ -1,11 +1,25 @@
 import db from "../DB/db.js";
-import { estimateCost } from "../config/llmPricing.js";
+import { keyStatus } from "./ai/keyPool.js";
 
 /**
  * Super Admin platform statistics: accounts, assessments, attempts, the
- * question pool, and LLM usage with an estimated cost (config/llmPricing.js).
+ * question pool, and AI usage in tokens and requests: per day, and today per
+ * API key against its free-plan limits (services/ai/keyPool.js). No cost: the
+ * keys are on free plans.
  */
 const DEFAULT_DAYS = 30;
+
+/** One row per UTC day of the window (days without calls included as zero). */
+const fillDays = (rows, window) => {
+  const byDay = new Map(rows.map((r) => [r.day, r]));
+  const days = [];
+  for (let i = Math.min(window, 90) - 1; i >= 0; i--) {
+    const day = new Date(Date.now() - i * 86400000).toISOString().slice(0, 10);
+    const r = byDay.get(day);
+    days.push({ day, calls: r?.calls || 0, failed: r?.failed || 0, tokens: Number(r?.tokens || 0) });
+  }
+  return days;
+};
 
 export const getPlatformStatsService = async ({ days } = {}) => {
   const window = Math.min(365, Math.max(1, Number.parseInt(days, 10) || DEFAULT_DAYS));
@@ -39,26 +53,25 @@ export const getPlatformStatsService = async ({ days } = {}) => {
       [window]
     ),
     count(
-      `SELECT to_char(date_trunc('day', created_at), 'YYYY-MM-DD') AS day, count(*)::int AS calls
+      `SELECT to_char(date_trunc('day', created_at AT TIME ZONE 'UTC'), 'YYYY-MM-DD') AS day, count(*)::int AS calls,
+              count(*) FILTER (WHERE NOT success)::int AS failed,
+              COALESCE(sum(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0)::bigint AS tokens
        FROM llm_usage_log WHERE created_at > NOW() - make_interval(days => $1)
        GROUP BY 1 ORDER BY 1`,
       [window]
     ),
   ]);
 
-  const models = llmByModel.map((m) => {
-    const cost = estimateCost(m.model, m.input_tokens, m.output_tokens);
-    return {
-      provider: m.provider,
-      model: m.model,
-      calls: m.calls,
-      succeeded: m.succeeded,
-      inputTokens: Number(m.input_tokens),
-      outputTokens: Number(m.output_tokens),
-      avgLatencyMs: m.avg_latency_ms,
-      estimatedCostUsd: cost === null ? null : Math.round(cost * 10000) / 10000,
-    };
-  });
+  const models = llmByModel.map((m) => ({
+    provider: m.provider,
+    model: m.model,
+    calls: m.calls,
+    succeeded: m.succeeded,
+    inputTokens: Number(m.input_tokens),
+    outputTokens: Number(m.output_tokens),
+    avgLatencyMs: m.avg_latency_ms,
+  }));
+  const keys = await keyStatus({ fresh: true });
   const toMap = (rows, key) => Object.fromEntries(rows.map((r) => [r[key], r.n]));
   return {
     windowDays: window,
@@ -72,11 +85,16 @@ export const getPlatformStatsService = async ({ days } = {}) => {
       failed: models.reduce((s, m) => s + (m.calls - m.succeeded), 0),
       inputTokens: models.reduce((s, m) => s + m.inputTokens, 0),
       outputTokens: models.reduce((s, m) => s + m.outputTokens, 0),
-      estimatedCostUsd: Math.round(models.reduce((s, m) => s + (m.estimatedCostUsd || 0), 0) * 10000) / 10000,
-      unpricedModels: models.filter((m) => m.estimatedCostUsd === null).map((m) => m.model),
       byModel: models,
       byPurpose: llmByPurpose.map((p) => ({ ...p, input_tokens: Number(p.input_tokens), output_tokens: Number(p.output_tokens) })),
-      daily: llmDaily,
+      daily: fillDays(llmDaily, window),
+      keys,
+      today: {
+        requests: keys.reduce((s, k) => s + k.today.requests, 0),
+        tokens: keys.reduce((s, k) => s + k.today.tokens, 0),
+        requestsLeft: keys.some((k) => k.left.requests === null) ? null : keys.reduce((s, k) => s + k.left.requests, 0),
+        keysAvailable: keys.filter((k) => k.status === "ok" || k.status === "low").length,
+      },
     },
   };
 };

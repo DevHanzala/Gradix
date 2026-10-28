@@ -37,5 +37,9 @@
   "order": "Question order",
   "slot": "Q{{q}} · O{{o}} · {{type}}",
   "regenerateTitle": "Regenerate objectives?",
-  "regenerateBody": "The current objectives, including your edits, will be replaced by a new AI-generated list."
+  "regenerateBody": "The current objectives, including your edits, will be replaced by a new AI-generated list.",
+  "stalledTitle": "This is taking longer than usual",
+  "stalledBody": "Reading the material has not finished yet. Try again to restart it, or add objectives yourself.",
+  "untestedTitle": "Objectives without a question: {{count}}",
+  "untestedBody": "Each student answers {{questions}} questions, but there are {{objectives}} objectives, so some are never tested. Remove or merge objectives, or add more questions to the assessment."
 }

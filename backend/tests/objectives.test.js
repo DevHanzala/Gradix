@@ -174,6 +174,18 @@ describe("question validation", () => {
 // ------------------------------------------------------- extraction pipeline
 
 describe("objective extraction", () => {
+  test("never more objectives than questions, so every objective is tested", async () => {
+    // The model is asked for at most 4 but returns 6: the 4 most important are kept, in order.
+    fakes.aiObjectives = (chunkIds) =>
+      [1, 5, 2, 4, 3, 1].map((weight, i) => ({ text: `Objective number ${i + 1}`, source_chunk_ids: chunkIds.slice(0, 1), weight }));
+    const blocks = [{ question_type: "multiple_choice", question_count: 4, duration_per_question: 60, num_options: 4, positive_marks: 1, negative_marks: 0 }];
+    const res = await create({ blocks });
+    const { objectives, blueprint } = (await getObjectives(res.body.data.id)).body.data;
+    expect(objectives.map((o) => o.text)).toEqual(["Objective number 2", "Objective number 3", "Objective number 4", "Objective number 5"]);
+    expect(new Set(blueprint.slots.map((s) => s.objective_id)).size).toBe(4);
+    expect(fakes.prompts.find((p) => p.purpose === "objective_extraction").prompt).toMatch(/between 3 and 4 distinct/);
+  });
+
   test("creating an assessment extracts objectives from retrieved chunks and builds the blueprint", async () => {
     const res = await create();
     expect(res.status).toBe(201);

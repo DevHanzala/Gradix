@@ -18,7 +18,7 @@ Resume rule: read this file, check `git log --oneline main..phase-2`, continue w
 | Final verification + PHASE2_REPORT.md | done | 5478973 + final commit |
 
 ## Next
-Phase 2 is complete. See PHASE2_REPORT.md for the full report and docs/phase2-evidence/ for the evidence.
+Phase 2 is complete, plus the post-release fixes (PHASE2_REPORT.md section 11). See PHASE2_REPORT.md for the full report and docs/phase2-evidence/ for the evidence.
 Nothing from Phase 2 is left in progress; known issues are listed below and in the report.
 
 ## Section 0 summary
@@ -298,12 +298,17 @@ Nothing from Phase 2 is left in progress; known issues are listed below and in t
 - D8.4 Vulnerable pinned dependencies of office-text-extractor are patched with scoped npm overrides (same
   majors, DOCX regression test) instead of the breaking v4 upgrade.
 
+- D9.1 Background jobs run inside the API process by default (JOBS_IN_API), so a single process is a complete
+  server; a separate worker stays optional. Stuck work is re-queued on start and every 5 minutes.
+- D9.2 Objectives are capped at the number of questions per student, so every objective is tested; when the
+  model returns more, the highest-weighted are kept.
+- D9.3 AI keys are chosen by remaining free quota (shuffled), never by cost; keys are identified by label only.
+  Limits are configurable because free plans change and count per project/account.
+
 ## Open issues
 - office-text-extractor 4 (major) still pending; file-type (moderate, ASF media parser) remains through it.
 - firebase -> firestore/grpc advisories (high): firestore is never imported (only firebase/auth); npm's fix is
   a firebase downgrade, not applied. exceljs -> uuid (moderate): npm's fix is an exceljs downgrade, not applied.
-- An assessment can have more objectives than questions (live smoke: 9 objectives, 3 questions). The UI does
-  not warn; the instructor has to merge or delete objectives.
 - YouTube ingestion reads the caption tracks embedded in the watch page (there is no official transcript API).
   It is tested with a fake fetcher, not live.
 - Urdu/Arabic/Persian strings need a native speaker's review (TRANSLATION_REVIEW.md).

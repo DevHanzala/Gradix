@@ -21,6 +21,7 @@ export const OBJECTIVE_LIMITS = { min: 3, max: 15, textMax: 300, descriptionMax:
 const CANDIDATE_CHUNKS = 40;
 const CONTEXT_CHUNKS = 12;
 export const EDITABLE_STATUSES = ["draft", "objectives_ready"];
+export const EXTRACTION_STALLED_MS = 3 * 60 * 1000;
 
 // ------------------------------------------------------------ blueprint
 
@@ -50,7 +51,7 @@ export const requestObjectiveExtraction = async (assessmentId) => {
   }
 };
 
-const buildExtractionPrompt = (assessment, chunks) => {
+const buildExtractionPrompt = (assessment, chunks, { min, max }) => {
   const material = chunks.length
     ? chunks.map((c) => `[chunk ${c.id}] (${c.resource_name})\n${c.chunk_text}`).join("\n\n")
     : "(no uploaded material)";
@@ -62,7 +63,7 @@ SOURCE MATERIAL (representative passages)
 ${material}
 
 TASK
-List between ${OBJECTIVE_LIMITS.min} and ${OBJECTIVE_LIMITS.max} distinct learning objectives this material teaches and an exam should test.
+List between ${min} and ${max} distinct learning objectives this material teaches and an exam should test${max < OBJECTIVE_LIMITS.max ? ` (the exam has only ${max} questions, so choose the ${max} most important objectives)` : ""}.
 Each objective is one short sentence starting with a verb (e.g. "Explain ...", "Identify ...").
 Write the objectives in the main language of the source material (English if mixed or none).
 Give each a weight from 1 (minor) to 5 (central) reflecting how much of the material covers it.
@@ -73,7 +74,18 @@ Return ONLY a JSON array:
 [{"text": "...", "description": "one sentence on what exactly is assessed", "source_chunk_ids": [ids], "weight": 1-5}]`;
 };
 
-const parseObjectives = (text, allowedChunkIds) => {
+/**
+ * How many objectives to extract: 3 to 15, but never more than the questions one
+ * student answers, so every objective is actually tested (fewer than 3 only for
+ * a 1- or 2-question assessment).
+ */
+export const objectiveRange = (blocks) => {
+  const questions = (blocks || []).reduce((sum, b) => sum + (Number(b.question_count) || 0), 0);
+  const max = questions > 0 ? Math.min(OBJECTIVE_LIMITS.max, questions) : OBJECTIVE_LIMITS.max;
+  return { min: Math.min(OBJECTIVE_LIMITS.min, max), max };
+};
+
+const parseObjectives = (text, allowedChunkIds, { min = OBJECTIVE_LIMITS.min, max = OBJECTIVE_LIMITS.max } = {}) => {
   const cleaned = String(text || "")
     .trim()
     .replace(/^```(?:json)?\s*/i, "")
@@ -101,12 +113,20 @@ const parseObjectives = (text, allowedChunkIds) => {
         .filter((id) => allowedChunkIds.has(id)),
       weight,
     });
-    if (objectives.length === OBJECTIVE_LIMITS.max) break;
   }
-  if (objectives.length < OBJECTIVE_LIMITS.min) {
+  if (objectives.length < min) {
     throw new Error(`Only ${objectives.length} usable objectives were produced`);
   }
-  return objectives;
+  if (objectives.length <= max) return objectives;
+  // More than the exam can test: keep the most important ones, in their original order.
+  const keep = new Set(
+    objectives
+      .map((o, i) => ({ i, weight: o.weight }))
+      .sort((a, b) => b.weight - a.weight || a.i - b.i)
+      .slice(0, max)
+      .map((o) => o.i)
+  );
+  return objectives.filter((_, i) => keep.has(i));
 };
 
 /** Representative passages: everything for short material, otherwise relevant AND diverse ones. */
@@ -130,7 +150,8 @@ export const extractObjectivesJob = async ({ assessmentId }, { attempt = 1, maxA
 
   try {
     const chunks = await selectExtractionChunks(assessment);
-    const text = await generateContent(buildExtractionPrompt(assessment, chunks), {
+    const range = objectiveRange(await findQuestionBlocksByAssessmentQuery(assessmentId));
+    const text = await generateContent(buildExtractionPrompt(assessment, chunks, range), {
       purpose: "objective_extraction",
       assessmentId,
       userId: assessment.instructor_id,
@@ -138,7 +159,7 @@ export const extractObjectivesJob = async ({ assessmentId }, { attempt = 1, maxA
       temperature: 0.3,
       responseMimeType: "application/json",
     });
-    const objectives = parseObjectives(text, new Set(chunks.map((c) => c.id)));
+    const objectives = parseObjectives(text, new Set(chunks.map((c) => c.id)), range);
 
     await withTransaction(async (client) => {
       const locked = await objectiveRepo.findAssessmentLifecycleQuery(assessmentId, client, { forUpdate: true });
@@ -173,6 +194,10 @@ const toView = async (assessmentId) => {
     isExecuted: assessment.is_executed,
     objectivesState: assessment.objectives_state,
     objectivesError: assessment.objectives_error,
+    // Extraction normally takes well under a minute; past this the UI offers a retry.
+    objectivesStalled:
+      assessment.objectives_state === "extracting" &&
+      Date.now() - new Date(assessment.updated_at).getTime() > EXTRACTION_STALLED_MS,
     editable: EDITABLE_STATUSES.includes(assessment.status) && !assessment.is_executed,
     objectives,
     blueprint: assessment.blueprint,

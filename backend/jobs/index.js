@@ -7,3 +7,4 @@ import "./definitions/pool.js";
 
 export { enqueue, queueAdapter, getBoss, stopBoss } from "./queue.js";
 export { defineJob, listJobDefinitions } from "./registry.js";
+export { startJobWorkers, stopJobWorkers, recoverStuckWork, jobsRunInApi } from "./runner.js";

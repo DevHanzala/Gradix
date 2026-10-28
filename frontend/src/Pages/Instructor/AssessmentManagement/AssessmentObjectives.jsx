@@ -26,6 +26,7 @@ function AssessmentObjectives() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const dirtyRef = useRef(false);
   dirtyRef.current = dirty;
 
@@ -57,6 +58,7 @@ function AssessmentObjectives() {
 
   // Poll while the background extraction runs.
   const extracting = view?.objectivesState === "extracting";
+  const stalled = extracting && Boolean(view?.objectivesStalled);
   useEffect(() => {
     if (!extracting) return undefined;
     const timer = setInterval(() => load(), POLL_MS);
@@ -109,11 +111,14 @@ function AssessmentObjectives() {
   const regenerate = async () => {
     setConfirmRegenerate(false);
     setSaveError(null);
+    setRegenerating(true);
     try {
       const res = await regenerateObjectivesApi(id);
       applyView(res.data.data, { force: true });
     } catch (error) {
       setSaveError(errorMessage(error, t("objectives.regenerateFailed")));
+    } finally {
+      setRegenerating(false);
     }
   };
 
@@ -158,6 +163,8 @@ function AssessmentObjectives() {
   const editable = view.editable;
   const blueprintByObjective = new Map((view.blueprint?.objectives || []).map((b) => [b.objective_id, b]));
   const invalid = drafts.some((d) => d.text.trim().length < 3) || drafts.length === 0;
+  // Saved objectives the question plan gives no question (more objectives than questions).
+  const untested = view.blueprint ? (view.objectives || []).filter((o) => !(blueprintByObjective.get(o.id)?.count > 0)).length : 0;
 
   return (
     <>
@@ -170,9 +177,25 @@ function AssessmentObjectives() {
         </CardBody>
       </Card>
 
-      {extracting && (
+      {extracting && !stalled && (
         <Alert tone="info" title={t("objectives.extractingTitle")} className="mb-6">
           {t("objectives.extractingBody")}
+        </Alert>
+      )}
+      {stalled && (
+        <Alert
+          tone="warning"
+          title={t("objectives.stalledTitle")}
+          className="mb-6"
+          action={
+            editable && (
+              <Button variant="secondary" icon={FaRedo} onClick={regenerate} loading={regenerating}>
+                {t("common.tryAgain")}
+              </Button>
+            )
+          }
+        >
+          {t("objectives.stalledBody")}
         </Alert>
       )}
       {view.objectivesState === "failed" && (
@@ -183,6 +206,11 @@ function AssessmentObjectives() {
       {!editable && (
         <Alert tone="info" title={t("objectives.lockedTitle")} className="mb-6">
           {t("objectives.lockedBody")}
+        </Alert>
+      )}
+      {untested > 0 && editable && (
+        <Alert tone="warning" title={t("objectives.untestedTitle", { count: untested })} className="mb-6">
+          {t("objectives.untestedBody", { questions: view.blueprint?.slots?.length || 0, objectives: view.objectives.length })}
         </Alert>
       )}
       {saveError && (
@@ -203,7 +231,7 @@ function AssessmentObjectives() {
           actions={
             editable && (
               <div className="flex flex-wrap gap-2">
-                <Button variant="secondary" icon={FaRedo} onClick={() => setConfirmRegenerate(true)} disabled={extracting}>
+                <Button variant="secondary" icon={FaRedo} onClick={() => setConfirmRegenerate(true)} disabled={extracting && !stalled}>
                   {t("objectives.regenerate")}
                 </Button>
                 <Button icon={FaSave} onClick={save} loading={saving} disabled={!dirty || invalid}>

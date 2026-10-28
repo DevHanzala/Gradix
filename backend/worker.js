@@ -1,34 +1,20 @@
 import { validateEnv } from "./config/env.js";
 
 /**
- * Background worker: `npm run worker`. Runs every job registered in
- * jobs/index.js from the pg-boss queue in Postgres.
+ * Standalone background worker: `npm run worker`. Optional: the API runs the
+ * jobs itself unless JOBS_IN_API=false (see jobs/runner.js). Use this to run
+ * jobs on a separate machine or process.
  */
 const start = async () => {
   try {
     validateEnv();
-    const { getBoss, stopBoss, listJobDefinitions } = await import("./jobs/index.js");
-    const boss = await getBoss();
-    const concurrency = Number(process.env.WORKER_CONCURRENCY) || 2;
-
-    for (const def of listJobDefinitions()) {
-      await boss.work(def.name, { batchSize: 1, localConcurrency: concurrency }, async ([job]) =>
-        def.handler(job.data, {
-          jobId: job.id,
-          attempt: (job.retryCount ?? 0) + 1,
-          maxAttempts: (def.options.retryLimit ?? 0) + 1,
-        })
-      );
-    }
-    await boss.schedule("maintenance.prune-llm-log", "30 3 * * *");
-    // Bring resources from older chunking/embedding versions up to date.
-    await boss.send("resources.rechunk-sweep", {}, { singletonKey: "sweep" });
-
-    console.log(`Gradix worker running ${listJobDefinitions().length} job type(s), concurrency ${concurrency}`);
+    const { startJobWorkers, stopJobWorkers } = await import("./jobs/index.js");
+    await startJobWorkers();
+    console.log("Gradix worker started");
 
     const shutdown = async (signal) => {
       console.log(`Worker received ${signal}; finishing current jobs…`);
-      await stopBoss();
+      await stopJobWorkers();
       process.exit(0);
     };
     process.on("SIGINT", () => shutdown("SIGINT"));
