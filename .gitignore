@@ -6,6 +6,9 @@ node_modules/
 .env.*
 !.env.example
 
+# Puppeteer's Chrome download on Render (see .puppeteerrc.cjs)
+.cache/
+
 # Build output and coverage
 dist/
 build/
