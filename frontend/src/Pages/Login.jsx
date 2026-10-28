@@ -5,7 +5,7 @@ import useAuthStore from "../store/authStore.js";
 import { getCaptchaToken } from "../config/captcha.js";
 import useRecaptchaInit from "../hooks/useRecaptchaInit.js";
 import { loginSchema } from "../schemas/authSchemas.js";
-import { redirectByRole } from "../utils/redirectByRole.js";
+import { canOpenPath, redirectByRole } from "../utils/redirectByRole.js";
 import { validateWith, errorMessage } from "../utils/forms.js";
 import AuthLayout from "../layouts/AuthLayout.jsx";
 import GoogleButton, { OrDivider } from "../components/GoogleButton.jsx";
@@ -26,8 +26,10 @@ function Login() {
   const [googleLoading, setGoogleLoading] = useState(false);
 
   const goToApp = (user) => {
+    // Return to the page that asked for login, unless it belongs to another role
+    // (e.g. the previous user's dashboard after logging out and in as someone else).
     const from = location.state?.from;
-    if (from && from !== "/login") navigate(from, { replace: true });
+    if (from && from !== "/login" && canOpenPath(from, user.role)) navigate(from, { replace: true });
     else redirectByRole(user.role, navigate);
   };
 
