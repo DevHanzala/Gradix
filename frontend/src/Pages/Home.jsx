@@ -22,7 +22,7 @@ function Home() {
   return (
     <>
       <section className="border-b border-line bg-surface">
-        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+        <div className="w-full px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
           <div className="max-w-3xl">
             <p className="text-sm font-semibold uppercase tracking-wide text-primary-700">{t("home.eyebrow")}</p>
             <h1 className="mt-3 text-3xl font-bold tracking-tight text-ink sm:text-5xl">{t("home.title")}</h1>
@@ -47,7 +47,7 @@ function Home() {
         </div>
       </section>
 
-      <section aria-labelledby="features-heading" className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+      <section aria-labelledby="features-heading" className="w-full px-4 py-14 sm:px-6 lg:px-8">
         <h2 id="features-heading" className="text-2xl font-bold text-ink">
           {t("home.featuresTitle")}
         </h2>

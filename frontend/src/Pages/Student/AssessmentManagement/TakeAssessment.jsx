@@ -237,7 +237,7 @@ function TakeAssessment() {
     <div dir={dir} lang={examLanguage} className="flex min-h-screen flex-col bg-canvas">
       {/* Top bar */}
       <header className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur">
-        <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2 px-4 py-3">
+        <div className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6 lg:px-8">
           <span className="text-sm font-semibold text-ink-muted">
             {t("exam.progress", { current: formatNumber(currentIndex + 1, undefined, examLanguage), total: formatNumber(totalQuestions, undefined, examLanguage) })}
           </span>
@@ -264,7 +264,7 @@ function TakeAssessment() {
       </header>
 
       {/* Question */}
-      <main className="mx-auto w-full max-w-4xl flex-1 px-4 pb-32 pt-6 sm:pb-12">
+      <main className="w-full flex-1 px-4 pb-32 pt-6 sm:px-6 sm:pb-12 lg:px-8">
         {liveScore && (
           <div className="mb-4 flex flex-wrap items-center gap-2 text-sm" role="status" aria-live="polite">
             {lastAnswer && (
@@ -365,7 +365,7 @@ function TakeAssessment() {
 
       {/* Navigation: sticky at the bottom on mobile */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface p-4 sm:static sm:border-0 sm:bg-transparent">
-        <div className="mx-auto flex max-w-4xl justify-end">
+        <div className="flex w-full justify-end sm:px-2 lg:px-4">
           {isLast ? (
             <button type="button" onClick={() => setConfirmSubmit(true)} disabled={submitting} className="btn-primary w-full sm:w-auto">
               {submitting ? t("exam.submitting") : t("exam.submit")}

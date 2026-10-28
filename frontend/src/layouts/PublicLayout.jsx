@@ -29,7 +29,7 @@ function PublicLayout({ children }) {
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
       <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex min-h-16 max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-2 sm:px-6 lg:px-8">
+        <div className="flex min-h-16 w-full flex-wrap items-center justify-between gap-3 px-4 py-2 sm:px-6 lg:px-8">
           <Link to="/" className="inline-flex min-h-11 items-center gap-2 font-bold text-ink">
             <span className="flex h-8 w-8 items-center justify-center rounded-control bg-primary-600 text-white">
               <Icon aria-hidden="true" />
@@ -59,7 +59,7 @@ function PublicLayout({ children }) {
       </main>
 
       <footer className="border-t border-line bg-surface">
-        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-6 text-sm text-ink-muted sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+        <div className="flex w-full flex-col gap-2 px-4 py-6 text-sm text-ink-muted sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
           <p>
             © {new Date().getFullYear()} <span lang="en">{BRAND.name}</span>
           </p>

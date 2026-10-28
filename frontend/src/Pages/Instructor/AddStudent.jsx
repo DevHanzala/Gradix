@@ -100,7 +100,7 @@ function AddStudent() {
   return (
     <>
       <PageHeader title={t("students.registerTitle")} description={t("students.registerDescription")} />
-      <Card className="max-w-2xl">
+      <Card>
         <CardHeader title={t("students.newAccount")} />
         <CardBody>
           <RegisterStudentForm />

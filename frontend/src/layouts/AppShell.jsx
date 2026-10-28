@@ -196,7 +196,7 @@ function AppShell({ children, topBarExtras = null }) {
           </div>
         </header>
 
-        <main id="main-content" tabIndex={-1} className="mx-auto w-full max-w-7xl px-4 py-6 focus:outline-none sm:px-6 sm:py-8 lg:px-8">
+        <main id="main-content" tabIndex={-1} className="w-full px-4 py-6 focus:outline-none sm:px-6 sm:py-8 lg:px-8">
           {children}
         </main>
       </div>
