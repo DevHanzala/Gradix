@@ -130,10 +130,27 @@ const youtubeTranscript = async (videoId, preferredLanguage) => {
     tracks.find((t) => t.languageCode === preferredLanguage) ||
     tracks[0];
   const title = (page.body.match(/<title>(.*?)<\/title>/) || [])[1]?.replace(/ - YouTube$/, "");
-  const xml = await linkFetcher.fetch(pick.baseUrl.replace(/\\u0026/g, "&"), { accept: "text/xml,application/xml" });
-  const text = [...xml.body.matchAll(/<text[^>]*>([\s\S]*?)<\/text>/g)].map((m) => decodeEntities(decodeEntities(m[1]))).join(" ");
+  let xml;
+  try {
+    xml = await linkFetcher.fetch(pick.baseUrl.replace(/\\u0026/g, "&"), { accept: "text/xml,application/xml" });
+  } catch {
+    xml = { body: "" };
+  }
+  const text = parseTimedText(xml.body);
+  // YouTube may refuse caption downloads outside its own player; say so instead of "no text".
+  if (!text) throw unreadable(TRANSCRIPT_BLOCKED);
   return { title: title ? decodeEntities(title) : `YouTube ${videoId}`, text, method: "youtube" };
 };
+
+export const TRANSCRIPT_BLOCKED =
+  "YouTube did not allow this video's transcript to be read. Open the video on YouTube, copy its transcript (More > Show transcript) and add it as a text file instead.";
+
+/** Caption text from either timedtext format: <text> (srv1) or <p> with optional <s> words (srv3). */
+export const parseTimedText = (xml) =>
+  [...String(xml || "").matchAll(/<(text|p)\b[^>]*>([\s\S]*?)<\/\1>/g)]
+    .map((m) => decodeEntities(decodeEntities(m[2].replace(/<[^>]+>/g, ""))).trim())
+    .filter(Boolean)
+    .join(" ");
 
 // --------------------------------------------------------------- pages
 

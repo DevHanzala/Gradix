@@ -2,7 +2,7 @@ import request from "supertest";
 import app from "../app.js";
 import { queueAdapter } from "../jobs/queue.js";
 import { pdfRenderer } from "../helper/pdfRenderer.js";
-import { isPrivateAddress, assertPublicUrl, youtubeId } from "../helper/linkIngest.js";
+import { isPrivateAddress, assertPublicUrl, youtubeId, parseTimedText, TRANSCRIPT_BLOCKED } from "../helper/linkIngest.js";
 import { safeCell } from "../services/insights.service.js";
 import { pool, resetDatabase, createUser, createAssessment, auth, installFakes, enroll, playThrough } from "./helpers.js";
 
@@ -143,6 +143,18 @@ describe("links and YouTube", () => {
     expect(r).toMatchObject({ extraction_method: "youtube", name: "Photosynthesis explained" });
     expect(r.content_text).toContain("Leaves capture light energy");
     expect(youtubeId("https://www.youtube.com/shorts/abcdef12")).toBe("abcdef12");
+  });
+
+  test("both caption formats are read; a refused caption download gets a clear message", async () => {
+    expect(parseTimedText('<timedtext><body><p t="1">Good <s>morning</s></p><p t="2">&amp;amp; more</p></body></timedtext>')).toBe("Good morning & more");
+    const watch = "https://www.youtube.com/watch?v=blocked123";
+    fakes.pages[watch] = {
+      body: `<title>Blocked - YouTube</title><script>{"captionTracks":[{"baseUrl":"https://www.youtube.com/api/timedtext?v=blocked123","languageCode":"en"}]}</script>`,
+    };
+    fakes.pages["https://www.youtube.com/api/timedtext?v=blocked123"] = { contentType: "text/html", body: "" };
+    const res = await request(app).post("/api/resources").set("Authorization", auth(instructor)).field("url", watch);
+    expect(res.status).toBe(422);
+    expect(res.body.message).toBe(TRANSCRIPT_BLOCKED);
   });
 
   test("an unreadable link does not block creating the assessment; it is reported", async () => {
