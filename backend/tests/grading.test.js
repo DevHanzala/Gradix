@@ -19,16 +19,16 @@ const mcq = (correct, options = ["Paris", "Rome", "Madrid", "Berlin"]) => ({
 
 describe("scoring: positive / negative / unanswered", () => {
   test("correct answer earns the positive marks", () => {
-    expect(gradeAnswer(mcq("Paris"), "Paris")).toEqual({ answered: true, correct: true, score: 2 });
+    expect(gradeAnswer(mcq("Paris"), "Paris")).toMatchObject({ answered: true, correct: true, score: 2 });
   });
 
   test("wrong answer deducts the negative marks", () => {
-    expect(gradeAnswer(mcq("Paris"), "Rome")).toEqual({ answered: true, correct: false, score: -0.5 });
+    expect(gradeAnswer(mcq("Paris"), "Rome")).toMatchObject({ answered: true, correct: false, score: -0.5 });
   });
 
   test("unanswered scores zero (null, empty, whitespace)", () => {
     for (const blank of [null, undefined, "", "   "]) {
-      expect(gradeAnswer(mcq("Paris"), blank)).toEqual({ answered: false, correct: false, score: 0 });
+      expect(gradeAnswer(mcq("Paris"), blank)).toMatchObject({ answered: false, correct: false, score: 0 });
     }
   });
 

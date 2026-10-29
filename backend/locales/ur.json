@@ -98,6 +98,7 @@
     "paperCode": "پرچہ {{code}}",
     "studentName": "طالب علم کا نام",
     "true": "درست",
-    "false": "غلط"
+    "false": "غلط",
+    "matchingHint": "ہر نمبر کے آگے متعلقہ حرف لکھیں۔"
   }
 }

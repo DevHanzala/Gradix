@@ -1,7 +1,7 @@
 import { generateAssessmentQuestions } from "../../models/assessmentModel.js";
 import { selectPoolQuestion, languageBuckets, isLanguageReady } from "../pool/pool.service.js";
 import { incrementServedQuery } from "../../repositories/poolRepository.js";
-import { normalizeOptions, decodeStoredValue } from "../../utils/grading.js";
+import { questionOptions, decodeStoredValue } from "../../utils/grading.js";
 import { AppError } from "../../utils/AppError.js";
 
 /**
@@ -38,7 +38,9 @@ const fromPool = async (assessment, language, copies) => {
       questions.push({
         question_type: row.question_type,
         question_text: row.question_text,
-        options: row.options ? normalizeOptions(row.options) : null,
+        options: row.options ? questionOptions(row) : null,
+        image: row.image ?? null,
+        option_images: row.option_images ?? null,
         correct_answer: decodeStoredValue(row.correct_answer),
         positive_marks: slot.positive_marks,
         negative_marks: slot.negative_marks,

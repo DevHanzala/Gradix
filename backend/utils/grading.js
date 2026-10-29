@@ -198,17 +198,95 @@ const evaluateShortAnswer = (studentAnswer, rule) => {
   return false;
 };
 
+// ------------------------------------------------------ Fill in the blank
+
+/** Blank markers in a fill-in-the-blank stem: [[1]], [[2]]... */
+export const BLANK_MARKER = /\[\[(\d+)\]\]/g;
+export const blankCount = (text) => new Set([...String(text || "").matchAll(BLANK_MARKER)].map((m) => m[1])).size;
+
+/** Accepted answers per blank: [["Paris"], ["Seine", "the Seine"]]. */
+export const parseBlankRule = (rule) => {
+  const decoded = decodeStoredValue(rule);
+  const blanks = Array.isArray(decoded?.blanks) ? decoded.blanks : Array.isArray(decoded) ? decoded : [];
+  return blanks.map((accepted) => [].concat(accepted ?? []).map(String).filter((a) => normalizeText(a)));
+};
+
+/** The student's blanks as a list of strings (an array, or { "0": "...", ... }). */
+const blankAnswers = (studentAnswer) => {
+  const decoded = decodeStoredValue(studentAnswer);
+  if (Array.isArray(decoded)) return decoded.map((v) => (v === null || v === undefined ? "" : String(v)));
+  if (decoded && typeof decoded === "object") {
+    return Object.keys(decoded)
+      .sort((a, b) => Number(a) - Number(b))
+      .map((k) => String(decoded[k] ?? ""));
+  }
+  return typeof decoded === "string" ? [decoded] : [];
+};
+
+/** How many blanks are right (Unicode-safe comparison through normalizeText). */
+const blankResult = (question, studentAnswer) => {
+  const rule = parseBlankRule(question.correct_answer);
+  const given = blankAnswers(studentAnswer);
+  const right = rule.filter((accepted, i) => normalizeText(given[i]) && accepted.some((a) => normalizeText(a) === normalizeText(given[i]))).length;
+  return { right, total: rule.length };
+};
+
+// ------------------------------------------------------------- Matching
+
+/** Matching options: { left: [...], right: [...] } (the right column is stored shuffled). */
+export const matchingOptions = (options) => {
+  const decoded = decodeStoredValue(options);
+  const list = (v) => (Array.isArray(v) ? v.map((x) => String(x ?? "")) : []);
+  return { left: list(decoded?.left), right: list(decoded?.right) };
+};
+
+/** Correct pairs { "<left index>": "<right text>" } and whether partial credit is given. */
+export const parseMatchingRule = (rule) => {
+  const decoded = decodeStoredValue(rule);
+  const pairs = decoded && typeof decoded.pairs === "object" && decoded.pairs ? decoded.pairs : {};
+  return { pairs, partialCredit: decoded?.partial_credit !== false };
+};
+
+const matchingResult = (question, studentAnswer) => {
+  const { left } = matchingOptions(question.options);
+  const { pairs } = parseMatchingRule(question.correct_answer);
+  const decoded = decodeStoredValue(studentAnswer);
+  const given = decoded && typeof decoded === "object" ? decoded : {};
+  const right = left.filter((_, i) => normalizeText(given[i]) && normalizeText(given[i]) === normalizeText(pairs[i])).length;
+  return { right, total: left.length };
+};
+
 // ------------------------------------------------------------- Grading
 
-/** True when the student actually gave an answer. */
+/** Question types and how many parts they have to answer. */
+export const QUESTION_TYPES = ["multiple_choice", "true_false", "short_answer", "fill_blank", "matching"];
+export const STRUCTURED_TYPES = ["fill_blank", "matching"];
+
+/** True when the student actually gave an answer (for structured answers: at least one part). */
 export const isAnswered = (studentAnswer) => {
   const decoded = decodeStoredValue(studentAnswer);
   if (decoded === null || decoded === undefined) return false;
   if (typeof decoded === "boolean" || typeof decoded === "number") return true;
+  if (Array.isArray(decoded)) return decoded.some((v) => normalizeText(v).length > 0);
+  if (typeof decoded === "object") return Object.values(decoded).some((v) => normalizeText(v).length > 0);
   return normalizeText(decoded).length > 0;
 };
 
-/** Is `studentAnswer` correct for `question` ({ question_type, options, correct_answer })? */
+/**
+ * Share of the question that is right, 0 to 1. Every type is all-or-nothing except
+ * matching with partial credit (right pairs / all pairs).
+ */
+export const answerFraction = (question, studentAnswer) => {
+  if (!isAnswered(studentAnswer)) return 0;
+  if (question.question_type === "matching") {
+    const { right, total } = matchingResult(question, studentAnswer);
+    if (!total) return 0;
+    return parseMatchingRule(question.correct_answer).partialCredit ? right / total : right === total ? 1 : 0;
+  }
+  return isAnswerCorrect(question, studentAnswer) ? 1 : 0;
+};
+
+/** Is `studentAnswer` fully correct for `question` ({ question_type, options, correct_answer })? */
 export const isAnswerCorrect = (question, studentAnswer) => {
   if (!isAnswered(studentAnswer)) return false;
 
@@ -225,26 +303,36 @@ export const isAnswerCorrect = (question, studentAnswer) => {
     }
     case "short_answer":
       return evaluateShortAnswer(studentAnswer, question.correct_answer);
+    case "fill_blank": {
+      const { right, total } = blankResult(question, studentAnswer);
+      return total > 0 && right === total;
+    }
+    case "matching": {
+      const { right, total } = matchingResult(question, studentAnswer);
+      return total > 0 && right === total;
+    }
     default:
       return false;
   }
 };
 
 /**
- * Score one question. Correct: +positive. Wrong: -|negative|. Unanswered: 0.
+ * Score one question. Fully correct: +positive. Partly correct (matching with partial
+ * credit): +positive x share right. Wrong: -|negative|. Unanswered: 0.
  */
 export const gradeAnswer = (question, studentAnswer) => {
   const answered = isAnswered(studentAnswer);
-  const correct = answered && isAnswerCorrect(question, studentAnswer);
+  const fraction = answered ? answerFraction(question, studentAnswer) : 0;
+  const correct = answered && fraction === 1;
   const positive = Number(question.positive_marks ?? 1) || 0;
   const negative = Math.abs(Number(question.negative_marks ?? 0) || 0);
-  const score = correct ? positive : answered ? -negative : 0;
-  return { answered, correct, score };
+  const score = fraction > 0 ? Math.round(positive * fraction * 100) / 100 : answered ? -negative : 0;
+  return { answered, correct, score, fraction };
 };
 
 /**
  * Canonical form to store for a student's answer, so the DB holds
- * "Paris" rather than "B" / "B. Paris" / "b".
+ * "Paris" rather than "B" / "B. Paris" / "b". Structured answers are stored as JSON.
  */
 export const canonicalStudentAnswer = (question, answer) => {
   if (!isAnswered(answer)) return null;
@@ -255,8 +343,48 @@ export const canonicalStudentAnswer = (question, answer) => {
       const parsed = parseBoolean(answer);
       return parsed === null ? String(answer).trim() : String(parsed);
     }
+    case "fill_blank":
+      return JSON.stringify(blankAnswers(answer).map((v) => v.trim().slice(0, 200)));
+    case "matching": {
+      const decoded = decodeStoredValue(answer);
+      const { left } = matchingOptions(question.options);
+      const clean = {};
+      for (let i = 0; i < left.length; i++) if (decoded?.[i] !== undefined && decoded[i] !== null) clean[i] = String(decoded[i]).slice(0, 200);
+      return JSON.stringify(clean);
+    }
     default:
       return String(answer).trim();
+  }
+};
+
+/** Options as shown to a student: MCQ texts, matching columns, or null. Never contains the answer. */
+export const questionOptions = (question) => {
+  if (question.question_type === "multiple_choice") return normalizeOptions(question.options);
+  if (question.question_type === "matching") return matchingOptions(question.options);
+  return null;
+};
+
+/** A readable correct answer for review screens, reports and answer keys. */
+export const correctAnswerText = (question) => {
+  const value = decodeStoredValue(question.correct_answer);
+  switch (question.question_type) {
+    case "multiple_choice":
+      return canonicalOption(value, question.options) ?? String(value ?? "");
+    case "true_false":
+      return String(parseBoolean(value));
+    case "short_answer":
+      return parseShortAnswerRule(value).answer || "";
+    case "fill_blank":
+      return parseBlankRule(value)
+        .map((accepted, i) => `(${i + 1}) ${accepted.join(" / ")}`)
+        .join("  ");
+    case "matching": {
+      const { left } = matchingOptions(question.options);
+      const { pairs } = parseMatchingRule(value);
+      return left.map((l, i) => `${l} → ${pairs[i] ?? ""}`).join("; ");
+    }
+    default:
+      return String(value ?? "");
   }
 };
 
@@ -268,17 +396,19 @@ export const canonicalStudentAnswer = (question, answer) => {
  * `row` needs question_type, options, correct_answer, student_answer and marks.
  */
 export const toReviewItem = (row) => {
-  const { answered, correct, score } = gradeAnswer(row, row.student_answer);
-  const options = row.question_type === "multiple_choice" ? normalizeOptions(row.options) : null;
+  const { answered, correct, score, fraction } = gradeAnswer(row, row.student_answer);
+  const structured = STRUCTURED_TYPES.includes(row.question_type);
   return {
     question_order: row.question_order,
     question_type: row.question_type,
     question_text: row.question_text,
-    options,
+    options: questionOptions(row),
     correct_answer: decodeStoredValue(row.correct_answer),
-    student_answer: row.student_answer ?? null,
+    correct_answer_text: correctAnswerText(row),
+    student_answer: structured ? decodeStoredValue(row.student_answer) ?? null : row.student_answer ?? null,
     answered,
     is_correct: correct,
+    fraction,
     score,
     positive_marks: Number(row.positive_marks),
     negative_marks: Number(row.negative_marks),

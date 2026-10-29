@@ -7,7 +7,8 @@ import { generateObjectiveQuestions } from "../questions/generator.js";
 import { embedPassages, toPgVector } from "../../helper/embeddingGenerator.js";
 import { POOL_LANGUAGES, publishAssessment, retryPublish, poolStatus, loadAssessment } from "./pool.service.js";
 import { AppError } from "../../utils/AppError.js";
-import { decodeStoredValue, normalizeOptions } from "../../utils/grading.js";
+import { decodeStoredValue, normalizeOptions, questionOptions, matchingOptions } from "../../utils/grading.js";
+import { normalizeImageRef, normalizeOptionImages } from "../questions/questionImages.js";
 
 /**
  * Instructor question bank: browse, preview, edit (versioned), retire,
@@ -26,8 +27,10 @@ const toItem = (row) => ({
   difficulty: row.difficulty,
   language: row.language,
   questionText: row.question_text,
-  options: row.question_type === "multiple_choice" ? normalizeOptions(row.options) : null,
+  options: questionOptions(row),
   correctAnswer: decodeStoredValue(row.correct_answer),
+  image: row.image ?? null,
+  optionImages: row.option_images ?? null,
   sourceChunkIds: row.source_chunk_ids || [],
   origin: row.origin,
   status: row.status,
@@ -112,15 +115,21 @@ const normalizeManual = async (assessment, body) => {
   const raw = {
     question_text: body?.question_text ?? body?.questionText,
     options: body?.options,
+    pairs: body?.pairs,
     correct_answer: body?.correct_answer ?? body?.correctAnswer,
   };
-  const numOptions = type === "multiple_choice" ? normalizeOptions(raw.options).length : null;
+  const numOptions =
+    type === "multiple_choice" ? normalizeOptions(raw.options).length : type === "matching" ? (raw.pairs?.length ?? matchingOptions(raw.options).left.length) : null;
   if (type === "multiple_choice" && (numOptions < 2 || numOptions > 6)) throw invalid("A multiple-choice question needs 2 to 6 options.");
   const result = validateQuestion(raw, { question_type: type, language, num_options: numOptions });
   if (!result.ok) throw invalid(VALIDATION_MESSAGES[result.reason] || "This question is not valid.");
+  const image = normalizeImageRef(body?.image, assessment.id);
+  const optionImages = type === "multiple_choice" ? normalizeOptionImages(body?.option_images ?? body?.optionImages, result.question.options.length, assessment.id) : null;
   const [vector] = await embedPassages([result.question.question_text]);
   return {
     ...result.question,
+    image,
+    option_images: optionImages,
     objective_id: objectiveId,
     question_type: type,
     difficulty,
@@ -141,6 +150,10 @@ export const VALIDATION_MESSAGES = {
   answer_in_stem: "The question text gives away the answer.",
   answer_not_boolean: "The answer must be True or False.",
   no_answer: "Give a model answer or at least one required concept.",
+  blank_count: "Use 1 to 5 blanks, written [[1]], [[2]]… in the question.",
+  blank_numbering: "Number the blanks in order: [[1]], [[2]]…, each once.",
+  blank_answers: "Give at least one accepted answer for every blank.",
+  pair_count: "A matching question needs 3 to 6 pairs.",
 };
 
 const duplicate = () => new AppError("DUPLICATE_QUESTION", 409, "An active question with the same text already exists.");
@@ -178,7 +191,10 @@ export const editQuestionService = async (assessmentId, questionId, user, body) 
     difficulty: body?.difficulty ?? current.difficulty,
     question_text: body?.question_text ?? body?.questionText,
     options: body?.options,
+    pairs: body?.pairs,
     correct_answer: body?.correct_answer ?? body?.correctAnswer,
+    image: body?.image === undefined ? current.image : body.image,
+    option_images: body?.option_images ?? body?.optionImages ?? (body?.options ? undefined : current.option_images),
   });
   const created = await withTransaction(async (client) => {
     const locked = await requireActiveQuestion(assessment, questionId, client);

@@ -2,7 +2,7 @@ import { randomInt } from "crypto";
 import jwt from "jsonwebtoken";
 import db, { withTransaction } from "../../DB/db.js";
 import { AppError } from "../../utils/AppError.js";
-import { normalizeOptions, canonicalOption, isAnswerCorrect, isAnswered, decodeStoredValue, normalizeText } from "../../utils/grading.js";
+import { canonicalOption, isAnswerCorrect, isAnswered, decodeStoredValue, normalizeText, questionOptions, correctAnswerText, canonicalStudentAnswer } from "../../utils/grading.js";
 import { requireAssessmentAccess } from "../assessmentAccess.js";
 import { generateContent } from "../ai/generateContent.js";
 import { validateQuestion, LANGUAGES } from "../questions/validation.js";
@@ -111,12 +111,12 @@ const spreadPick = (rows, count) => {
   return picked;
 };
 
-const POOL_TYPES = ["multiple_choice", "true_false", "short_answer"];
+const POOL_TYPES = ["multiple_choice", "true_false", "short_answer", "fill_blank", "matching"];
 
 const bankQuestions = async (assessmentId, language, client = db) =>
   (
     await client.query(
-      `SELECT id, objective_id, question_type, question_text, options, correct_answer
+      `SELECT id, objective_id, question_type, question_text, options, correct_answer, image, option_images
        FROM question_pool
        WHERE assessment_id = $1 AND language = $2 AND status = 'active' AND question_type = ANY($3)`,
       [assessmentId, language, POOL_TYPES]
@@ -125,8 +125,9 @@ const bankQuestions = async (assessmentId, language, client = db) =>
 
 const insertQuestion = (client, sessionId, participantId, idx, q) =>
   client.query(
-    `INSERT INTO live_questions (session_id, participant_id, idx, pool_question_id, question_type, question_text, options, correct_answer, objective_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    `INSERT INTO live_questions (session_id, participant_id, idx, pool_question_id, question_type, question_text, options, correct_answer, objective_id,
+                                 image, option_images)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
     [
       sessionId,
       participantId,
@@ -137,6 +138,8 @@ const insertQuestion = (client, sessionId, participantId, idx, q) =>
       q.options ? JSON.stringify(q.options) : null,
       JSON.stringify(decodeStoredValue(q.correct_answer)),
       q.objective_id ?? null,
+      q.image ? JSON.stringify(q.image) : null,
+      q.option_images ? JSON.stringify(q.option_images) : null,
     ]
   );
 
@@ -297,14 +300,16 @@ const questionPublic = (q) =>
     index: q.idx,
     type: q.question_type,
     text: q.question_text,
-    options: q.question_type === "multiple_choice" ? normalizeOptions(q.options) : null,
+    options: questionOptions(q),
+    image: q.image ?? null,
+    optionImages: q.option_images ?? null,
   };
 
 const correctAnswerOf = (q) => {
   const value = decodeStoredValue(q.correct_answer);
   if (q.question_type === "multiple_choice") return canonicalOption(value, q.options) ?? value;
-  if (q.question_type === "short_answer") return value?.answer ?? value;
-  return value;
+  if (q.question_type === "true_false") return value;
+  return correctAnswerText(q);
 };
 
 // ------------------------------------------------------------------ joining
@@ -535,7 +540,8 @@ export const answerService = async (token, { index, answer }) => {
     const responseMs = Math.max(0, Math.min(now() - startedAt, session.seconds_per_question * 1000));
     const streak = correct ? p.streak + 1 : 0;
     const points = computePoints({ correct, responseMs, durationMs: session.seconds_per_question * 1000, streak });
-    const stored = q.question_type === "multiple_choice" ? canonicalOption(answer, q.options) ?? String(answer) : answer;
+    const canonical = canonicalStudentAnswer(q, answer);
+    const stored = ["fill_blank", "matching"].includes(q.question_type) ? JSON.parse(canonical) : q.question_type === "multiple_choice" ? canonical : answer;
     await client.query(
       `INSERT INTO live_answers (session_id, participant_id, live_question_id, idx, answer, is_correct, response_ms, points)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,

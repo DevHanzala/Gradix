@@ -5,7 +5,7 @@ const TYPE_ALIASES = {
   trueFalse: "true_false",
   shortAnswer: "short_answer",
 };
-const QUESTION_TYPES = ["multiple_choice", "true_false", "short_answer"];
+const QUESTION_TYPES = ["multiple_choice", "true_false", "short_answer", "fill_blank", "matching"];
 
 export const LIMITS = {
   titleMax: 255,
@@ -60,6 +60,10 @@ export const normalizeQuestionBlocks = (rawBlocks) => {
     }
 
     let numOptions = null;
+    if (type === "matching") {
+      numOptions = Number(block.num_options ?? 4);
+      if (!isInt(numOptions) || numOptions < 3 || numOptions > 6) throw invalid(`${label}: matching needs 3-6 pairs.`);
+    }
     if (type === "multiple_choice") {
       numOptions = Number(block.num_options ?? 4);
       if (!isInt(numOptions) || numOptions < LIMITS.minOptions || numOptions > LIMITS.maxOptions) {

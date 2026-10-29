@@ -14,6 +14,10 @@ import { notifyPublished } from "../lifecycleNotifications.js";
  * starting an exam does not wait for the LLM and every question was
  * validated before anyone saw it.
  */
+/** Size of a question for its bucket: MCQ options or matching pairs (null for other types). */
+const optionCount = (q) =>
+  q.question_type === "multiple_choice" ? q.options?.length ?? null : q.question_type === "matching" ? q.options?.left?.length ?? null : null;
+
 export const POOL_LANGUAGES = ["en", "ur", "ar", "fa"];
 export const DEFAULT_LANGUAGES = ["en", "ur", "ar"];
 /** Two stems at least this similar (cosine, multilingual-e5) count as the same question. */
@@ -138,7 +142,7 @@ const generateIntoPool = async ({ assessment, objective, language, deficits, exi
       if (!row) continue;
       existing.push({ stem_hash: q.stem_hash, question_text: q.question_text, embedding: JSON.parse(q.embedding) });
       const d = queue.find(
-        (x) => x.question_type === q.question_type && x.difficulty === q.difficulty && (x.num_options ?? null) === (q.options ? q.options.length : null) && x.count > 0
+        (x) => x.question_type === q.question_type && x.difficulty === q.difficulty && (x.num_options ?? null) === optionCount(q) && x.count > 0
       );
       if (d) d.count -= 1;
       inserted += 1;

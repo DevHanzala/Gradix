@@ -3,7 +3,10 @@ import db from "../DB/db.js";
 const BUCKET_FILTER = `
   assessment_id = $1 AND language = $2 AND objective_id = $3 AND question_type = $4 AND difficulty = $5
   AND status = 'active'
-  AND ($6::int IS NULL OR question_type <> 'multiple_choice' OR jsonb_array_length(options) = $6)`;
+  AND ($6::int IS NULL
+       OR (question_type = 'multiple_choice' AND jsonb_array_length(options) = $6)
+       OR (question_type = 'matching' AND jsonb_array_length(options->'left') = $6)
+       OR question_type NOT IN ('multiple_choice', 'matching'))`;
 
 export const bucketParams = (assessmentId, language, b) => [
   assessmentId,
@@ -18,7 +21,8 @@ export const bucketParams = (assessmentId, language, b) => [
 export const countActiveByBucketQuery = async (assessmentId, language, client = db) => {
   const { rows } = await client.query(
     `SELECT objective_id, question_type, difficulty,
-            CASE WHEN question_type = 'multiple_choice' THEN jsonb_array_length(options) END AS num_options,
+            CASE WHEN question_type = 'multiple_choice' THEN jsonb_array_length(options)
+                 WHEN question_type = 'matching' THEN jsonb_array_length(options->'left') END AS num_options,
             count(*)::int AS n, COALESCE(sum(times_served), 0)::int AS served
      FROM question_pool
      WHERE assessment_id = $1 AND language = $2 AND status = 'active'
@@ -41,8 +45,9 @@ export const insertPoolQuestionQuery = async (assessmentId, q, client = db) => {
   const { rows } = await client.query(
     `INSERT INTO question_pool
        (assessment_id, objective_id, question_type, difficulty, language, question_text, options, correct_answer,
-        stem_hash, embedding, source_chunk_ids, origin, version, previous_version_id, approved_at, approved_by, created_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::vector, $11, $12, $13, $14, $15, $16, $17)
+        stem_hash, embedding, source_chunk_ids, origin, version, previous_version_id, approved_at, approved_by, created_by,
+        image, option_images)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::vector, $11, $12, $13, $14, $15, $16, $17, $18, $19)
      ON CONFLICT (assessment_id, language, stem_hash) WHERE status = 'active' DO NOTHING
      RETURNING id`,
     [
@@ -63,6 +68,8 @@ export const insertPoolQuestionQuery = async (assessmentId, q, client = db) => {
       q.approved_at || null,
       q.approved_by || null,
       q.created_by || null,
+      q.image ? JSON.stringify(q.image) : null,
+      q.option_images ? JSON.stringify(q.option_images) : null,
     ]
   );
   return rows[0] || null;
@@ -75,7 +82,7 @@ export const insertPoolQuestionQuery = async (assessmentId, q, client = db) => {
 export const findBucketCandidatesQuery = async (assessmentId, language, bucket, excludeIds, client = db) => {
   const { rows } = await client.query(
     `SELECT id, objective_id, question_type, difficulty, language, question_text, options, correct_answer,
-            stem_hash, source_chunk_ids, times_served
+            stem_hash, source_chunk_ids, times_served, image, option_images
      FROM question_pool
      WHERE ${BUCKET_FILTER} AND NOT (id = ANY($7::int[]))
      ORDER BY times_served ASC, random()

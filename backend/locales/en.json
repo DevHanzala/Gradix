@@ -98,6 +98,7 @@
     "paperCode": "Paper {{code}}",
     "studentName": "Student name",
     "true": "True",
-    "false": "False"
+    "false": "False",
+    "matchingHint": "Write the letter of the matching item next to each number."
   }
 }

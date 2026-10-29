@@ -1,7 +1,7 @@
 import db from "../../DB/db.js";
 import { findObjectivesQuery } from "../../repositories/objectiveRepository.js";
 import { generateObjectiveQuestions } from "../questions/generator.js";
-import { gradeAnswer, normalizeOptions, decodeStoredValue } from "../../utils/grading.js";
+import { gradeAnswer, questionOptions, decodeStoredValue, correctAnswerText } from "../../utils/grading.js";
 import { normalizeLanguage } from "../../helper/i18n.js";
 import { AppError } from "../../utils/AppError.js";
 import { getResultsService } from "./results.service.js";
@@ -14,12 +14,19 @@ import { getResultsService } from "./results.service.js";
  */
 export const PRACTICE_LIMITS = { min: 1, max: 10, default: 5 };
 const PRACTICE_TYPES = ["multiple_choice", "true_false"];
+// Practised too when the assessment itself uses them.
+const EXTRA_TYPES = ["fill_blank", "matching"];
+
+const practiceTypes = async (assessmentId) => {
+  const { rows } = await db.query(`SELECT DISTINCT question_type FROM question_blocks WHERE assessment_id = $1`, [assessmentId]);
+  return [...PRACTICE_TYPES, ...EXTRA_TYPES.filter((t) => rows.some((r) => r.question_type === t))];
+};
 
 const toPublic = (q, index) => ({
   index,
   question_type: q.question_type,
   question_text: q.question_text,
-  options: q.question_type === "multiple_choice" ? normalizeOptions(q.options) : null,
+  options: questionOptions(q),
   objectiveId: q.objective_id,
   difficulty: q.difficulty,
 });
@@ -41,11 +48,13 @@ export const createPracticeService = async (student, assessmentId, { language: r
     perObjective.set(o.objectiveId, (perObjective.get(o.objectiveId) || 0) + 1);
   }
 
+  const types = await practiceTypes(results.assessmentId);
   const questions = [];
   const seen = new Set();
+  let slot = 0;
   for (const [objectiveId, n] of perObjective) {
     const requests = Array.from({ length: n }, (_, i) => ({
-      question_type: PRACTICE_TYPES[i % PRACTICE_TYPES.length],
+      question_type: types[slot++ % types.length],
       difficulty: 2 + (i % 2),
       num_options: 4,
       count: 1,
@@ -90,5 +99,5 @@ export const checkPracticeAnswerService = async (student, sessionId, index, answ
   const q = session.questions[Number.parseInt(index, 10)];
   if (!q) throw new AppError("INVALID_QUESTION", 400, "Question does not belong to this practice session");
   const { correct, answered } = gradeAnswer({ ...q, positive_marks: 1, negative_marks: 0 }, answer);
-  return { index: Number(index), answered, correct, correctAnswer: decodeStoredValue(q.correct_answer) };
+  return { index: Number(index), answered, correct, correctAnswer: decodeStoredValue(q.correct_answer), correctAnswerText: correctAnswerText(q) };
 };

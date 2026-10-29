@@ -6,7 +6,7 @@ import { translate, normalizeLanguage, isRtl, formatDateTime } from "../../helpe
 import { getResultsService } from "./results.service.js";
 import { findReportQuery } from "./studyPlan.service.js";
 import { createPracticeService } from "./practice.service.js";
-import { normalizeOptions, decodeStoredValue } from "../../utils/grading.js";
+import { normalizeOptions, decodeStoredValue, correctAnswerText, matchingOptions, BLANK_MARKER } from "../../utils/grading.js";
 import { storage } from "../../helper/storage.js";
 
 /**
@@ -62,6 +62,7 @@ const reportHtml = ({ results, plan, practice = [], language }) => {
   const answerText = (q) => {
     const answer = decodeStoredValue(q.correct_answer);
     if (q.question_type === "true_false") return t(String(answer).toLowerCase() === "true" ? "paper.true" : "paper.false");
+    if (q.question_type !== "multiple_choice") return text(correctAnswerText(q));
     const options = normalizeOptions(q.options) || [];
     const at = options.findIndex((o) => String(o) === String(answer));
     return at >= 0 ? `${letter(at)}. ${text(options[at])}` : text(answer);
@@ -71,6 +72,15 @@ const reportHtml = ({ results, plan, practice = [], language }) => {
        <p class="muted">${t("report.practiceIntro")}</p>
        <ol class="practice">${practice
          .map((q) => {
+           if (q.question_type === "fill_blank") {
+             return `<li>${text(String(q.question_text).replace(BLANK_MARKER, (_, n) => `(${n}) ______`))}</li>`;
+           }
+           if (q.question_type === "matching") {
+             const { left, right } = matchingOptions(q.options);
+             return `<li>${text(q.question_text)}<ul class="options">${left
+               .map((l, i) => `<li>${i + 1}. ${text(l)} — ${letter(i)}. ${text(right[i] ?? "")}</li>`)
+               .join("")}</ul></li>`;
+           }
            const options =
              q.question_type === "true_false"
                ? [t("paper.true"), t("paper.false")]

@@ -84,6 +84,10 @@ const TYPE_INSTRUCTIONS = {
   short_answer: () =>
     `"options": null; "correct_answer": {"answer": "model answer", ` +
     `"required_keywords": ["2-4 essential keywords"], "min_required_match": 1}.`,
+  fill_blank: () =>
+    `"question_text" contains 1-3 blanks written [[1]], [[2]] in order; "options": null; ` +
+    `"correct_answer": {"blanks": [["accepted answer", "other accepted forms"], ...]}.`,
+  matching: (n) => `"options": null; "pairs": exactly ${n} pairs [["term", "its match"], ...]; "correct_answer": {"partial_credit": true}.`,
 };
 
 const buildQuestionPrompt = ({ assessment, blockRows, langName, resourcesContent }) => {

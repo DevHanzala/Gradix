@@ -71,8 +71,8 @@ export const insertGeneratedQuestionQuery = async (attemptId, order, q, client =
     `INSERT INTO generated_questions
        (attempt_id, question_order, question_type, question_text, options,
         correct_answer, positive_marks, negative_marks, duration_per_question,
-        objective_id, difficulty, language, source_chunk_ids, stem_hash, pool_question_id, served_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+        objective_id, difficulty, language, source_chunk_ids, stem_hash, pool_question_id, served_at, image, option_images)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
      ON CONFLICT (attempt_id, question_order) DO NOTHING
      RETURNING id`,
     [
@@ -92,6 +92,8 @@ export const insertGeneratedQuestionQuery = async (attemptId, order, q, client =
       q.stem_hash ?? null,
       q.pool_question_id ?? null,
       q.served_at ?? null,
+      q.image ? JSON.stringify(q.image) : null,
+      q.option_images ? JSON.stringify(q.option_images) : null,
     ]
   );
   return rows[0] || null;
@@ -111,7 +113,7 @@ export const findAttemptQuestionsQuery = async (attemptId, { includeAnswers = fa
   const { rows } = await client.query(
     `SELECT id, question_order, question_type, question_text, options,
             positive_marks, negative_marks, duration_per_question,
-            objective_id, difficulty, pool_question_id, served_at${answerColumn}
+            objective_id, difficulty, pool_question_id, served_at, image, option_images${answerColumn}
      FROM generated_questions
      WHERE attempt_id = $1
      ORDER BY question_order ASC, id ASC`,

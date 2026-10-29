@@ -3,13 +3,15 @@ import {
   BorderStyle,
   Document,
   HeadingLevel,
+  ImageRun,
   Packer,
   PageBreak,
   Paragraph,
   TextRun,
 } from "docx";
 import { escapeHtml, escapeHtmlMultiline } from "../../utils/escapeHtml.js";
-import { normalizeOptions, canonicalOptionIndex, parseBoolean, decodeStoredValue } from "../../utils/grading.js";
+import { normalizeOptions, canonicalOptionIndex, parseBoolean, decodeStoredValue, matchingOptions, parseMatchingRule, parseBlankRule, BLANK_MARKER } from "../../utils/grading.js";
+import { imageBytes } from "../questions/questionImages.js";
 import { translate, isRtl, normalizeLanguage } from "../../helper/i18n.js";
 import { pdfFontCss } from "../../helper/pdfFonts.js";
 import { pdfRenderer } from "../../helper/pdfRenderer.js";
@@ -33,6 +35,19 @@ export const answerText = (q, language) => {
     const value = parseBoolean(q.correct_answer);
     return value === null ? "" : `${letter(value ? 0 : 1)} – ${translate(language, value ? "paper.true" : "paper.false")}`;
   }
+  if (q.question_type === "fill_blank") {
+    return parseBlankRule(q.correct_answer)
+      .map((accepted, i) => `(${i + 1}) ${accepted.join(" / ")}`)
+      .join("   ");
+  }
+  if (q.question_type === "matching") {
+    const { right } = matchingOptions(q.options);
+    const { pairs } = parseMatchingRule(q.correct_answer);
+    return Object.keys(pairs)
+      .sort((a, b) => a - b)
+      .map((i) => `${Number(i) + 1}–${letter(right.findIndex((r) => r === pairs[i]))}`)
+      .join(", ");
+  }
   const rule = decodeStoredValue(q.correct_answer);
   if (rule && typeof rule === "object") return rule.answer || (rule.rubric || []).map((r) => r.concept).join(", ") || (rule.required_keywords || []).join(", ");
   return String(rule ?? "");
@@ -44,6 +59,37 @@ const choicesOf = (q, language) =>
     : q.question_type === "true_false"
       ? [translate(language, "paper.true"), translate(language, "paper.false")]
       : null;
+
+/** A fill-in-the-blank stem as printed: [[1]] becomes a numbered line. */
+const printedStem = (q) => (q.question_type === "fill_blank" ? String(q.question_text).replace(BLANK_MARKER, (_, n) => `(${n}) __________`) : q.question_text);
+
+/**
+ * Load each question's images once before rendering: data URIs for the PDF, PNG
+ * bytes (Word cannot show WebP) with a print size for the DOCX.
+ */
+const MAX_PRINT_WIDTH = 360;
+const loadImage = async (ref, { png }) => {
+  const bytes = await imageBytes(ref);
+  if (!bytes) return null;
+  const { loadImage: decode, createCanvas } = await import("@napi-rs/canvas");
+  const image = await decode(bytes);
+  const scale = Math.min(1, MAX_PRINT_WIDTH / image.width);
+  const width = Math.round(image.width * scale);
+  const height = Math.round(image.height * scale);
+  if (!png) return { alt: ref.alt, src: `data:image/webp;base64,${bytes.toString("base64")}`, width, height };
+  const canvas = createCanvas(image.width, image.height);
+  canvas.getContext("2d").drawImage(image, 0, 0);
+  return { alt: ref.alt, data: await canvas.encode("png"), width, height };
+};
+export const preloadImages = async (sets, { png = false } = {}) => {
+  for (const set of sets) {
+    for (const q of set.questions) {
+      q.printImage = q.image ? await loadImage(q.image, { png }) : null;
+      q.printOptionImages = Array.isArray(q.option_images) ? await Promise.all(q.option_images.map((r) => (r ? loadImage(r, { png }) : null))) : null;
+    }
+  }
+  return sets;
+};
 
 const headerRows = (headers) =>
   [
@@ -77,16 +123,33 @@ export const renderPaperHtml = ({ sets, headers, form = {}, language: lang }) =>
     <hr/>
     ${headers.notes ? `<p class="notes">${escapeHtmlMultiline(headers.notes)}</p>` : ""}`;
 
+  const img = (image, cls = "qimg") => (image ? `<img class="${cls}" src="${image.src}" alt="${escapeHtml(image.alt)}"/>` : "");
   const questionsHtml = (set) =>
     set.questions
       .map((question, i) => {
         const choices = choicesOf(question, language);
-        const body = choices
-          ? `<div class="options">${choices
-              .map((c, ci) => `<div class="option"><span class="circle">${letter(ci)}</span><bdi>${escapeHtml(c)}</bdi></div>`)
-              .join("")}</div>`
-          : `<div class="lines"><div></div><div></div><div></div></div>`;
-        return `<div class="question"><p><strong><bdi>${i + 1}.</bdi></strong> <bdi>${escapeHtml(question.question_text)}</bdi></p>${body}</div>`;
+        let body;
+        if (question.question_type === "matching") {
+          const { left, right } = matchingOptions(question.options);
+          body = `<p class="hint">${t("paper.matchingHint")}</p><table class="matching"><tbody>${left
+            .map(
+              (l, li) =>
+                `<tr><td><bdi>${li + 1}. ${escapeHtml(l)}</bdi></td><td class="slot">____</td><td><bdi>${letter(li)}. ${escapeHtml(right[li] ?? "")}</bdi></td></tr>`
+            )
+            .join("")}</tbody></table>`;
+        } else if (question.question_type === "fill_blank") {
+          body = "";
+        } else if (choices) {
+          body = `<div class="options">${choices
+            .map(
+              (c, ci) =>
+                `<div class="option"><span class="circle">${letter(ci)}</span><bdi>${escapeHtml(c)}</bdi>${img(question.printOptionImages?.[ci], "oimg")}</div>`
+            )
+            .join("")}</div>`;
+        } else {
+          body = `<div class="lines"><div></div><div></div><div></div></div>`;
+        }
+        return `<div class="question"><p><strong><bdi>${i + 1}.</bdi></strong> <bdi>${escapeHtml(printedStem(question))}</bdi></p>${img(question.printImage)}${body}</div>`;
       })
       .join("");
 
@@ -121,15 +184,24 @@ export const renderPaperHtml = ({ sets, headers, form = {}, language: lang }) =>
   .lines div { border-bottom: 1px solid #999; height: 22px; margin-inline-start: 16px; }
   .key h2 { text-align: center; font-size: ${h}pt; margin-bottom: 18px; } .key h3 { margin: 12px 0 6px; }
   .answers { padding-inline-start: 24px; } .answers li { margin-bottom: 4px; }
+  .qimg { display: block; max-width: 360px; max-height: 220px; margin: 4px 16px 8px; }
+  .oimg { display: block; max-width: 140px; max-height: 90px; margin-top: 4px; }
+  .hint { font-size: ${o}pt; color: #555; margin-inline-start: 16px; }
+  .matching { margin-inline-start: 16px; border-collapse: collapse; font-size: ${o}pt; } .matching td { padding: 3px 10px; vertical-align: top; }
+  .matching .slot { color: #777; }
 </style></head>
 <body>${papers}${key}</body></html>`;
 };
 
-export const renderPaperPdf = async (args) => pdfRenderer.render(renderPaperHtml(args), { format: args.form?.pageSize || "A4" });
+export const renderPaperPdf = async (args) => {
+  await preloadImages(args.sets);
+  return pdfRenderer.render(renderPaperHtml(args), { format: args.form?.pageSize || "A4" });
+};
 
 // ------------------------------------------------------------------ DOCX
 
 export const renderPaperDocx = async ({ sets, headers, language: lang }) => {
+  await preloadImages(sets, { png: true });
   const language = normalizeLanguage(lang);
   const rtl = isRtl(language);
   const font = language === "ur" ? "Noto Nastaliq Urdu" : rtl ? "Noto Naskh Arabic" : "Calibri";
@@ -149,11 +221,24 @@ export const renderPaperDocx = async ({ sets, headers, language: lang }) => {
     children.push(para([run(`${translate(language, "paper.studentName")}: ______________________________`, { bold: true })]));
     if (headers.notes) children.push(para([run(headers.notes, { italics: true })]));
     children.push(new Paragraph({ border: { bottom: { style: BorderStyle.SINGLE, size: 12, color: "1A1A2E" } }, children: [] }));
+    const picture = (image) =>
+      new ImageRun({ type: "png", data: image.data, transformation: { width: image.width, height: image.height }, altText: { name: image.alt, description: image.alt, title: image.alt } });
     set.questions.forEach((question, i) => {
-      children.push(para([run(`${i + 1}. `, { bold: true }), run(question.question_text, { bold: true })], { spacing: { before: 200, after: 80 } }));
+      children.push(para([run(`${i + 1}. `, { bold: true }), run(printedStem(question), { bold: true })], { spacing: { before: 200, after: 80 } }));
+      if (question.printImage) children.push(para([picture(question.printImage)], { indent: { start: 360 } }));
       const choices = choicesOf(question, language);
-      if (choices) {
-        choices.forEach((c, ci) => children.push(para([run(`(${letter(ci)}) `), run(c)], { indent: { start: 360 } })));
+      if (question.question_type === "matching") {
+        const { left, right } = matchingOptions(question.options);
+        children.push(para([run(translate(language, "paper.matchingHint"), { italics: true })], { indent: { start: 360 } }));
+        left.forEach((l, li) => children.push(para([run(`${li + 1}. ${l}   ____   ${letter(li)}. ${right[li] ?? ""}`)], { indent: { start: 360 } })));
+      } else if (question.question_type === "fill_blank") {
+        // The blanks are in the question line itself.
+      } else if (choices) {
+        choices.forEach((c, ci) => {
+          children.push(para([run(`(${letter(ci)}) `), run(c)], { indent: { start: 360 } }));
+          const optionImage = question.printOptionImages?.[ci];
+          if (optionImage) children.push(para([picture({ ...optionImage, width: Math.min(optionImage.width, 140), height: Math.round(optionImage.height * (Math.min(optionImage.width, 140) / optionImage.width)) })], { indent: { start: 720 } }));
+        });
       } else {
         for (let l = 0; l < 3; l++) children.push(para([run("_".repeat(70))], { indent: { start: 360 } }));
       }

@@ -2,6 +2,10 @@ import express from 'express';
 import { protect, authorizeRoles } from '../middleware/authMiddleware.js';
 import { uploadFiles } from '../middleware/uploadMiddleware.js';
 import { aiLimiter } from '../middleware/rateLimiters.js';
+import multer from 'multer';
+import { requireAssessmentAccess } from '../services/assessmentAccess.js';
+import { storeQuestionImage, IMAGE_LIMITS } from '../services/questions/questionImages.js';
+import { storage, publicBaseUrl } from '../helper/storage.js';
 import {
   createAssessment,
   getInstructorAssessments,
@@ -80,6 +84,18 @@ router.post('/:id/publish/retry', ...staff, retryPublish);
 router.get('/:id/pool/status', ...staff, getPoolStatus);
 router.get('/:id/questions', ...staff, listQuestions);
 router.post('/:id/questions', ...staff, addQuestion);
+// Upload an image for a question or option (compressed, stored privately); returns its key and a preview URL.
+const imageUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: IMAGE_LIMITS.maxBytes } });
+router.post('/:id/question-images', ...staff, imageUpload.single('image'), async (req, res, next) => {
+  try {
+    const assessment = await requireAssessmentAccess(req.params.id, req.user);
+    const stored = await storeQuestionImage(assessment.id, req.file);
+    const { url } = await storage.signedUrl(stored.key, { contentType: 'image/webp', baseUrl: publicBaseUrl(req), expiresIn: 3600 });
+    res.status(201).json({ success: true, data: { ...stored, url } });
+  } catch (error) {
+    next(error);
+  }
+});
 router.put('/:id/questions/:questionId', ...staff, editQuestion);
 router.delete('/:id/questions/:questionId', ...staff, retireQuestion);
 router.post('/:id/questions/:questionId/approve', ...staff, approveQuestion);

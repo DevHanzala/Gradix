@@ -98,6 +98,7 @@
     "paperCode": "النموذج {{code}}",
     "studentName": "اسم الطالب",
     "true": "صحيح",
-    "false": "خطأ"
+    "false": "خطأ",
+    "matchingHint": "اكتب حرف العنصر المطابق بجانب كل رقم."
   }
 }

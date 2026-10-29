@@ -116,7 +116,7 @@ export const buildBlueprint = (objectives, blocks, { adaptive = false } = {}) =>
       question_type: block.question_type,
       // Adaptive exams pick difficulty at run time; 3 is the starting level.
       difficulty: adaptive ? null : difficultyQueues[objectiveIndex].shift(),
-      num_options: block.question_type === "multiple_choice" ? Number(block.num_options) || 4 : null,
+      num_options: ["multiple_choice", "matching"].includes(block.question_type) ? Number(block.num_options) || 4 : null,
       duration_per_question: Number(block.duration_per_question) || 120,
       positive_marks: Number(block.positive_marks ?? 1),
       negative_marks: Math.abs(Number(block.negative_marks ?? 0)),

@@ -121,6 +121,14 @@ export const syntheticQuestion = (request, language, chunkIds = []) => {
     return { ...base, options, correct_answer: options[n % options.length] };
   }
   if (request.question_type === "true_false") return { ...base, options: null, correct_answer: n % 2 === 0 };
+  if (request.question_type === "fill_blank") {
+    const [a, b] = t.options(n);
+    return { ...base, question_text: `${t.stem(n)} [[1]] … [[2]]`, options: null, correct_answer: { blanks: [[a], [b, `${b}!`]] } };
+  }
+  if (request.question_type === "matching") {
+    const words = t.options(n).slice(0, request.num_options || 4);
+    return { ...base, options: null, pairs: words.map((w, i) => [w, `${t.answer(n)} ${i + 1}`]), correct_answer: { partial_credit: true } };
+  }
   return { ...base, options: null, correct_answer: { answer: t.answer(n), required_keywords: [t.keyword], min_required_match: 1 } };
 };
 

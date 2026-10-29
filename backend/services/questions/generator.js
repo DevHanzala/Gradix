@@ -35,6 +35,13 @@ const TYPE_FORMAT = {
     `"rubric": [{"concept": "an essential idea, 1-3 words", "accept": ["other wordings or spellings a correct answer may use"]}], ` +
     `"min_required_match": number of rubric concepts required (usually all but one)}. ` +
     `Give 2-4 concepts; write concepts and accepted wordings in the question's language`,
+  fill_blank: () =>
+    `a sentence or two with 1-3 blanks written as [[1]], [[2]], [[3]] in order inside "question_text"; ` +
+    `"options": null; "correct_answer": {"blanks": [["accepted answer", "other accepted spellings or forms"], ...]} ` +
+    `(one list per blank, in order; short answers of 1-3 words)`,
+  matching: (n) =>
+    `"question_text": a short instruction such as "Match each term with its description"; "options": null; ` +
+    `"pairs": exactly ${n} pairs [["term", "its match"], ...] with all terms and all matches distinct; "correct_answer": {"partial_credit": true}`,
 };
 
 /** Passages for an objective: top-k by similarity, plus its source passages. */

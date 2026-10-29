@@ -15,6 +15,7 @@ import { errorHandler, notFound } from "./middleware/errorMiddleware.js";
 import "./jobs/index.js";
 import fileRoutes from "./routes/fileRoutes.js";
 import liveRoutes from "./routes/liveRoutes.js";
+import { signImageUrls } from "./services/questions/questionImages.js";
 
 /**
  * Builds the Express app without connecting to the database or listening,
@@ -47,16 +48,16 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 app.use("/api/auth", authRoutes);
-app.use("/api/assessments", assessmentRoutes);
+app.use("/api/assessments", signImageUrls, assessmentRoutes);
 app.use("/api/resources", resourceRoutes);
-app.use("/api/student-analytics", studentAnalyticsRoutes);
+app.use("/api/student-analytics", signImageUrls, studentAnalyticsRoutes);
 app.use("/api/groups", groupRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api/taking", studentAssessmentRoutes);
-app.use("/api/instructor-analytics", instructorAssessmentAnalyticsRoutes);
+app.use("/api/taking", signImageUrls, studentAssessmentRoutes);
+app.use("/api/instructor-analytics", signImageUrls, instructorAssessmentAnalyticsRoutes);
 app.use("/api/files", fileRoutes);
-app.use("/api/live", liveRoutes);
+app.use("/api/live", signImageUrls, liveRoutes);
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({

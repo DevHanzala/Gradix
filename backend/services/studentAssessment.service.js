@@ -10,7 +10,9 @@ import { replayDifficulty, computeScores, ADAPTIVE_CONFIG } from "./engine/adapt
 import {
   gradeAnswer,
   canonicalStudentAnswer,
-  normalizeOptions,
+  questionOptions,
+  correctAnswerText,
+  STRUCTURED_TYPES,
   decodeStoredValue,
   isAnswered,
 } from "../utils/grading.js";
@@ -118,7 +120,9 @@ const toPublicQuestion = (q) => ({
   question_order: q.question_order,
   question_type: q.question_type,
   question_text: q.question_text,
-  options: q.question_type === "multiple_choice" ? normalizeOptions(q.options) : null,
+  options: questionOptions(q),
+  image: q.image ?? null,
+  option_images: q.option_images ?? null,
   positive_marks: Number(q.positive_marks),
   negative_marks: Number(q.negative_marks),
   duration_per_question: Number(q.duration_per_question),
@@ -239,8 +243,10 @@ const currentDifficulty = (ctx, slotIndex) => {
 const questionFromPoolRow = (row, slot, language) => ({
   question_type: row.question_type,
   question_text: row.question_text,
-  options: row.options ? normalizeOptions(row.options) : null,
+  options: row.options ? questionOptions(row) : null,
   correct_answer: decodeStoredValue(row.correct_answer),
+  image: row.image ?? null,
+  option_images: row.option_images ?? null,
   positive_marks: slot.positive_marks,
   negative_marks: slot.negative_marks,
   duration_per_question: slot.duration_per_question,
@@ -409,7 +415,7 @@ export const buildAttemptResult = async (attempt, client) => {
   const answers = questions.map((q) => {
     const row = saved.get(q.id);
     const studentAnswer = row?.student_answer ?? null;
-    const { answered, correct, score } = gradeAnswer(q, studentAnswer);
+    const { answered, correct, score, fraction } = gradeAnswer(q, studentAnswer);
     if (!answered) unansweredCount += 1;
     else if (correct) correctCount += 1;
     else incorrectCount += 1;
@@ -418,9 +424,13 @@ export const buildAttemptResult = async (attempt, client) => {
       questionOrder: q.question_order,
       questionType: q.question_type,
       questionText: q.question_text,
-      options: q.question_type === "multiple_choice" ? normalizeOptions(q.options) : null,
-      studentAnswer,
+      options: questionOptions(q),
+      image: q.image ?? null,
+      optionImages: q.option_images ?? null,
+      studentAnswer: STRUCTURED_TYPES.includes(q.question_type) ? decodeStoredValue(studentAnswer) : studentAnswer,
       correctAnswer: decodeStoredValue(q.correct_answer),
+      correctAnswerText: correctAnswerText(q),
+      fraction,
       isCorrect: correct,
       answered,
       score,
