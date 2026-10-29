@@ -1,0 +1,26 @@
+{
+  "title": "Exam controls",
+  "description": "Apply to attempts that start after you save.",
+  "loadFailed": "Could not load the exam controls.",
+  "saveFailed": "Could not save.",
+  "saved": "Saved.",
+  "proctoring": "Proctoring",
+  "levels": {
+    "off": "Off",
+    "log": "Record events only",
+    "warn": "Record and warn the student",
+    "auto_submit": "Record, warn and auto-submit"
+  },
+  "maxViolations": "Auto-submit after this many events",
+  "monitoredNote": "Recorded: leaving the tab or window, leaving fullscreen, copy/paste/right-click attempts. No camera or screen capture.",
+  "windowStart": "Opens at",
+  "windowEnd": "Closes at",
+  "lateJoin": "Latest start after opening (minutes)",
+  "lateJoinHint": "Empty: students can start any time while it is open.",
+  "timeZone": "Time zone shown to students",
+  "timeZoneHint": "For example Asia/Karachi.",
+  "shuffle": "Shuffle the options of multiple-choice questions for each student",
+  "extraTime": "Extra time (accommodations)",
+  "extraTimeFor": "Extra time for {{name}}",
+  "noExtra": "Normal time"
+}

@@ -62,6 +62,9 @@ export const getAssessmentStudentsModel = async (assessmentId, instructorId) => 
         percentage,
         time_used: `${minutes}m ${seconds}s`,
         time_taken: timeDiff,
+        attempt_id: row.attempt_id,
+        violation_count: row.violation_count ?? 0,
+        auto_submitted_reason: row.auto_submitted_reason ?? null,
       };
     });
   } catch (error) {

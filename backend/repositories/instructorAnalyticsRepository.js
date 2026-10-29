@@ -27,7 +27,10 @@ export const findAssessmentStudentsBasicQuery = async (assessmentId, instructorI
   const { rows } = await db.query(
     `SELECT
        aa.student_id,
+       aa.id AS attempt_id,
        u.name,
+       aa.violation_count,
+       aa.auto_submitted_reason,
        aa.score AS obtained_score,
        aa.completed_at,
        aa.started_at,
@@ -41,7 +44,7 @@ export const findAssessmentStudentsBasicQuery = async (assessmentId, instructorI
      LEFT JOIN student_answers sa ON sa.question_id = gq.id AND sa.attempt_id = aa.id
      WHERE a.id = $1 AND a.instructor_id = $2
        AND aa.status = 'completed' AND aa.completed_at IS NOT NULL AND ${ONLINE}
-     GROUP BY aa.id, aa.student_id, u.name, aa.started_at, aa.completed_at, aa.score
+     GROUP BY aa.id, aa.student_id, u.name, aa.started_at, aa.completed_at, aa.score, aa.violation_count, aa.auto_submitted_reason
      ORDER BY aa.completed_at DESC`,
     [assessmentId, instructorId]
   );

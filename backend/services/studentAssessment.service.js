@@ -1,4 +1,4 @@
-import { withTransaction } from "../DB/db.js";
+import db, { withTransaction } from "../DB/db.js";
 import { generateAssessmentQuestions } from "../models/assessmentModel.js";
 import * as attemptRepo from "../repositories/attemptRepository.js";
 import { AppError } from "../utils/AppError.js";
@@ -16,6 +16,7 @@ import {
   decodeStoredValue,
   isAnswered,
 } from "../utils/grading.js";
+import { examSettingsOf, assertWithinWindow, shuffleOptions, EVENT_KINDS } from "./examControls.js";
 
 /**
  * Exam engine (Phase 2).
@@ -153,6 +154,7 @@ const buildInProgressState = (ctx, timing) => {
     question: current ? toPublicQuestion(current) : null,
     savedAnswer: current ? (saved.get(current.id)?.student_answer ?? null) : null,
     showLiveScore: Boolean(settings.show_live_score),
+    proctoring: attempt.proctoring_level || "off",
   };
   if (settings.show_live_score) state.liveScore = liveScoreOf(gradedList(ctx));
   return state;
@@ -275,7 +277,8 @@ const chooseForSlot = async (assessment, ctx, slotIndex) => {
     await topUpIfLow(assessment, ctx.attempt.language);
     throw exhausted();
   }
-  return questionFromPoolRow(row, slot, ctx.attempt.language);
+  const question = questionFromPoolRow(row, slot, ctx.attempt.language);
+  return examSettingsOf(assessment).shuffleOptions ? shuffleOptions(question) : question;
 };
 
 /** Store the chosen question for a slot (no-op if another request served it first). */
@@ -540,11 +543,21 @@ export const getAttemptStateService = async (studentId, assessmentId) => {
   const attempt = await attemptRepo.findOnlineAttemptQuery(studentId, id);
   if (!attempt) {
     const ready = (await findLanguageStatesQuery(id)).filter((st) => st.state === "ready").map((st) => st.language);
+    const settings = examSettingsOf(assessment);
     return {
       status: "not_started",
       assessmentId: id,
       title: assessment.title,
       adaptive: Boolean(assessment.adaptive),
+      // What the pre-exam screen must tell the student before they accept.
+      examControls: {
+        proctoring: settings.proctoring,
+        maxViolations: settings.maxViolations,
+        windowStart: settings.windowStart,
+        windowEnd: settings.windowEnd,
+        lateJoinMinutes: settings.lateJoinMinutes,
+        timeZone: settings.timeZone,
+      },
       availableLanguages: availableLanguages({
         assessment_status: assessment.status,
         uses_pool: Boolean(assessment.blueprint),
@@ -562,7 +575,7 @@ export const getAttemptStateService = async (studentId, assessmentId) => {
  * question is chosen BEFORE the attempt row is written, so a failure never
  * leaves a stuck attempt behind.
  */
-export const startAssessmentForStudentService = async (studentId, assessmentId, language = "en") => {
+export const startAssessmentForStudentService = async (studentId, assessmentId, language = "en", { acceptProctoring = false } = {}) => {
   const id = parseAssessmentId(assessmentId);
   if (!SUPPORTED_LANGUAGES.includes(language)) {
     throw new AppError("UNSUPPORTED_LANGUAGE", 400, "Unsupported language");
@@ -587,9 +600,20 @@ export const startAssessmentForStudentService = async (studentId, assessmentId, 
   }
 
   await assertAvailable(assessment, language);
+  const settings = examSettingsOf(assessment);
+  assertWithinWindow(settings);
+  if (settings.proctoring !== "off" && acceptProctoring !== true) {
+    throw new AppError("PROCTORING_CONSENT_REQUIRED", 409, "Read what is monitored during this exam and accept it to start.");
+  }
+  const multiplier = await attemptRepo.findExtraTimeQuery(studentId, id);
   const pooled = Boolean(assessment.blueprint?.slots?.length);
-  // With negative marking switched off, wrong answers never lose marks.
-  const marking = (items) => (assessment.negative_marking === false ? items.map((x) => ({ ...x, negative_marks: 0 })) : items);
+  // With negative marking switched off, wrong answers never lose marks; extra time scales every question's time.
+  const marking = (items) =>
+    items.map((x) => ({
+      ...x,
+      ...(assessment.negative_marking === false ? { negative_marks: 0 } : {}),
+      duration_per_question: Math.round(Number(x.duration_per_question) * multiplier),
+    }));
   const plan = pooled ? marking(planFromBlueprint(assessment.blueprint)) : null;
   const adaptive = pooled && Boolean(assessment.adaptive);
 
@@ -615,6 +639,10 @@ export const startAssessmentForStudentService = async (studentId, assessmentId, 
           difficulty: pooled ? initial[0].difficulty : null,
         },
         client
+      );
+      await client.query(
+        `UPDATE assessment_attempts SET time_multiplier = $2, proctoring_level = $3, proctoring_accepted_at = $4 WHERE id = $1`,
+        [created.id, multiplier, settings.proctoring, settings.proctoring === "off" ? null : new Date()]
       );
       const servedAt = new Date(created.started_at);
       for (const [i, q] of initial.entries()) {
@@ -775,4 +803,41 @@ export const getSubmissionDetailsForStudentService = async (studentId, submissio
     throw new AppError("SUBMISSION_NOT_FOUND", 404, "Submission not found");
   }
   return buildAttemptResult(attempt);
+};
+
+/**
+ * Proctoring event reported by the browser during the student's own attempt. Logged with the
+ * server time; at "auto_submit" the attempt is submitted once the limit is reached.
+ * Returns { violations, level, maxViolations, autoSubmitted }.
+ */
+export const recordAttemptEventService = async (studentId, attemptId, { kind, questionIndex } = {}) => {
+  if (!EVENT_KINDS.includes(kind)) throw new AppError("INVALID_EVENT", 400, "Unknown event.");
+  const id = Number.parseInt(attemptId, 10);
+  const { rows } = await db.query(
+    `SELECT a.id, a.status, a.proctoring_level, s.exam_settings FROM assessment_attempts a JOIN assessments s ON s.id = a.assessment_id
+     WHERE a.id = $1 AND a.student_id = $2`,
+    [Number.isInteger(id) ? id : 0, studentId]
+  );
+  const attempt = rows[0];
+  if (!attempt) throw new AppError("ATTEMPT_NOT_FOUND", 404, "Attempt not found");
+  const level = attempt.proctoring_level || "off";
+  const settings = examSettingsOf({ exam_settings: attempt.exam_settings });
+  if (attempt.status !== "in_progress" || level === "off") return { violations: 0, level, maxViolations: settings.maxViolations, autoSubmitted: false };
+  await db.query(`INSERT INTO attempt_events (attempt_id, kind, question_index) VALUES ($1, $2, $3)`, [
+    attempt.id,
+    kind,
+    Number.isInteger(Number(questionIndex)) ? Number(questionIndex) : null,
+  ]);
+  const { rows: counted } = await db.query(
+    `UPDATE assessment_attempts SET violation_count = violation_count + 1 WHERE id = $1 RETURNING violation_count`,
+    [attempt.id]
+  );
+  const violations = counted[0].violation_count;
+  let autoSubmitted = false;
+  if (level === "auto_submit" && violations >= settings.maxViolations) {
+    await db.query(`UPDATE assessment_attempts SET auto_submitted_reason = 'proctoring' WHERE id = $1`, [attempt.id]);
+    await finalizeAttempt(attempt.id);
+    autoSubmitted = true;
+  }
+  return { violations, level, maxViolations: settings.maxViolations, autoSubmitted };
 };

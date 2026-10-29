@@ -15,5 +15,19 @@
   "reviewAnswers": "مرور پاسخ‌ها",
   "loadingAnswers": "در حال بارگذاری پاسخ‌ها…",
   "answersOf": "پاسخ‌ها: {{name}}",
-  "answersSummary": "درست: {{correct}} · {{score}}"
+  "answersSummary": "درست: {{correct}} · {{score}}",
+  "integrity": "درستکاری",
+  "violations": "رویدادها: {{value}}",
+  "autoSubmitted": "ارسال خودکار",
+  "timelineTitle": "خط زمانی درستکاری: {{name}}",
+  "timelineFailed": "خط زمانی بارگیری نشد.",
+  "onQuestion": "پرسش {{n}}",
+  "events": {
+    "tab_hidden": "ترک زبانه",
+    "window_blur": "ترک پنجره",
+    "fullscreen_exit": "خروج از تمام‌صفحه",
+    "copy": "تلاش برای کپی",
+    "paste": "تلاش برای چسباندن",
+    "context_menu": "کلیک راست"
+  }
 }

@@ -89,6 +89,13 @@
     "INVALID_POLL_ANSWER": "Check your answer to the poll.",
     "POLL_ALREADY_ANSWERED": "You already answered this poll.",
     "LIVE_NO_TEAMS": "This session has no teams.",
-    "INVALID_TEAM": "Choose one of the session's teams."
+    "INVALID_TEAM": "Choose one of the session's teams.",
+    "EXAM_NOT_OPEN": "This exam is not open yet.",
+    "EXAM_CLOSED": "This exam has closed.",
+    "EXAM_LATE_JOIN_CLOSED": "The time to start this exam has passed.",
+    "PROCTORING_CONSENT_REQUIRED": "Read what is monitored and accept it to start.",
+    "INVALID_EXAM_SETTINGS": "Check the exam controls.",
+    "INVALID_EXTRA_TIME": "Extra time must be between 1x and 3x.",
+    "INVALID_IMAGE": "Check the image."
   }
 }

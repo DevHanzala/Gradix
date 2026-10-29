@@ -89,6 +89,13 @@
     "INVALID_POLL_ANSWER": "تحقق من إجابتك عن الاستطلاع.",
     "POLL_ALREADY_ANSWERED": "لقد أجبت عن هذا الاستطلاع بالفعل.",
     "LIVE_NO_TEAMS": "لا توجد فرق في هذه الجلسة.",
-    "INVALID_TEAM": "اختر أحد فرق الجلسة."
+    "INVALID_TEAM": "اختر أحد فرق الجلسة.",
+    "EXAM_NOT_OPEN": "لم يُفتح هذا الاختبار بعد.",
+    "EXAM_CLOSED": "أُغلق هذا الاختبار.",
+    "EXAM_LATE_JOIN_CLOSED": "انتهى وقت بدء هذا الاختبار.",
+    "PROCTORING_CONSENT_REQUIRED": "اقرأ ما يُراقَب ووافق عليه للبدء.",
+    "INVALID_EXAM_SETTINGS": "تحقق من ضوابط الاختبار.",
+    "INVALID_EXTRA_TIME": "يجب أن يكون الوقت الإضافي بين 1 و3 أضعاف.",
+    "INVALID_IMAGE": "تحقق من الصورة."
   }
 }

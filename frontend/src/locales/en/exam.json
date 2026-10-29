@@ -44,5 +44,18 @@
     "saved": "Saved",
     "offline": "Offline – will retry",
     "error": "Not saved"
+  },
+  "window": "Open from {{start}} to {{end}} ({{zone}}).",
+  "lateJoin": "You can start up to {{minutes}} minutes after it opens.",
+  "proctoring": {
+    "title": "This exam is monitored",
+    "tab": "Leaving this tab or window is recorded with the time.",
+    "fullscreen": "The exam runs in fullscreen; leaving fullscreen is recorded.",
+    "copy": "Copy, paste and right-click are blocked, and attempts are recorded.",
+    "nothingElse": "Nothing else is recorded: no camera, no microphone, no screen capture.",
+    "autoSubmit": "After {{max}} recorded events your exam is submitted automatically.",
+    "accept": "I have read this and agree",
+    "warn": "Recorded: you left the exam or tried to copy. Events so far: {{count}}.",
+    "warnAuto": "Recorded: {{count}} of {{max}}. At {{max}} your exam is submitted automatically."
   }
 }

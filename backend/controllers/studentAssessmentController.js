@@ -23,7 +23,7 @@ export const getAttemptState = async (req, res, next) => {
 export const startAssessmentForStudent = async (req, res, next) => {
   try {
     const { language = "en" } = req.body || {};
-    const data = await startAssessmentForStudentService(req.user.id, req.params.assessmentId, language);
+    const data = await startAssessmentForStudentService(req.user.id, req.params.assessmentId, language, { acceptProctoring: req.body?.acceptProctoring === true });
     res.status(200).json({
       success: true,
       code: data.resumed ? "IN_PROGRESS" : "STARTED",

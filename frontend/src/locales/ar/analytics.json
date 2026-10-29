@@ -15,5 +15,19 @@
   "reviewAnswers": "مراجعة الإجابات",
   "loadingAnswers": "جارٍ تحميل الإجابات…",
   "answersOf": "الإجابات: {{name}}",
-  "answersSummary": "صحيح: {{correct}} · {{score}}"
+  "answersSummary": "صحيح: {{correct}} · {{score}}",
+  "integrity": "النزاهة",
+  "violations": "الأحداث: {{value}}",
+  "autoSubmitted": "سُلِّم تلقائيًا",
+  "timelineTitle": "سجل النزاهة: {{name}}",
+  "timelineFailed": "تعذّر تحميل السجل.",
+  "onQuestion": "السؤال {{n}}",
+  "events": {
+    "tab_hidden": "غادر العلامة",
+    "window_blur": "غادر النافذة",
+    "fullscreen_exit": "خرج من ملء الشاشة",
+    "copy": "حاول النسخ",
+    "paste": "حاول اللصق",
+    "context_menu": "نقر بالزر الأيمن"
+  }
 }

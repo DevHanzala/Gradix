@@ -57,6 +57,8 @@ const initialState = {
   errorCode: null,
   /** Languages the student can start in now (empty until the assessment is published). */
   availableLanguages: [],
+  examControls: null,
+  proctoring: "off",
 };
 
 const useStudentAssessmentStore = create((set, get) => {
@@ -78,6 +80,7 @@ const useStudentAssessmentStore = create((set, get) => {
       adaptive: Boolean(data.adaptive),
       liveScore: data.liveScore || null,
       lastAnswer: data.lastAnswer || null,
+      proctoring: data.proctoring || "off",
       questionDeadline: toDeadline(data.questionRemainingSeconds),
       overallDeadline: toDeadline(data.remainingSeconds),
       error: null,
@@ -91,7 +94,7 @@ const useStudentAssessmentStore = create((set, get) => {
     } else if (data.status === "in_progress") {
       applyInProgress(data);
     } else {
-      set({ phase: "not_started", error: null, availableLanguages: data.availableLanguages || [] });
+      set({ phase: "not_started", error: null, availableLanguages: data.availableLanguages || [], examControls: data.examControls || null });
     }
   };
 
@@ -164,10 +167,10 @@ const useStudentAssessmentStore = create((set, get) => {
     },
 
     /** Start (or resume) the attempt in the chosen language. */
-    startAssessment: async (assessmentId, language = "en") => {
+    startAssessment: async (assessmentId, language = "en", { acceptProctoring = false } = {}) => {
       set({ phase: "starting", error: null, errorCode: null });
       try {
-        const response = await startAssessmentApi(assessmentId, { language });
+        const response = await startAssessmentApi(assessmentId, { language, acceptProctoring });
         applyServerState(response.data.data);
       } catch (error) {
         const code = errorCode(error);

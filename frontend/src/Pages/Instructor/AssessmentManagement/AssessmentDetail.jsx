@@ -5,6 +5,7 @@ import { FaBinoculars, FaChartBar, FaDatabase, FaEdit, FaLink, FaListOl, FaPrint
 import AssessmentStatus, { StatusSteps } from "../../../components/assessment/AssessmentStatus.jsx";
 import useAssessmentStore from "../../../store/assessmentStore.js";
 import PhysicalPaperModal from "../../../components/PhysicalPaperModal.jsx";
+import ExamControlsCard from "../../../components/assessment/ExamControlsCard.jsx";
 import { Alert, Button, Card, CardBody, CardHeader, PageHeader, PageSpinner, ResponsiveTable } from "../../../components/ui";
 import { errorMessage } from "../../../utils/forms.js";
 import { formatDateTime, formatDuration, formatNumber } from "../../../utils/format.js";
@@ -149,6 +150,8 @@ function AssessmentDetail() {
               </div>
             </CardBody>
           </Card>
+
+          <ExamControlsCard assessmentId={id} />
 
           <Card>
             <CardHeader title={t("form.sourceMaterial")} />

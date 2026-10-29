@@ -21,3 +21,7 @@ export const submitAssessmentApi = (assessmentId, payload) =>
 
 export const getSubmissionDetailsApi = (submissionId) =>
   apiClient.get(`/taking/submissions/${submissionId}`);
+
+/** Proctoring event during the student's own attempt: { violations, level, maxViolations, autoSubmitted }. */
+export const reportAttemptEventApi = (attemptId, kind, questionIndex) =>
+  apiClient.post(`/taking/attempts/${attemptId}/events`, { kind, questionIndex });

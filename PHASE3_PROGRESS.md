@@ -15,7 +15,7 @@ Gate after every section: `npm run lint`, `npm run i18n:check`, `npm run build`,
 | 2. Live classroom mode | done | 413e41c, 4d5095e |
 | 3. Engagement: game mode, polls, exit tickets | done | 5a29580 |
 | 4. More question types | done (browser check pending) | 6a4109f + frontend commit |
-| 5. Light proctoring and exam controls | not started | |
+| 5. Light proctoring and exam controls | done | (section 5 commit) |
 | 6. Polish, help and accessibility | not started | |
 | 7. Plans and usage limits | not started | |
 | 8. Production readiness (Render free tier) | not started | |
@@ -27,7 +27,7 @@ Gate after every section: `npm run lint`, `npm run i18n:check`, `npm run build`,
 
 1. Section 4 leftover: run a browser check of fill-in-the-blank / matching / images in exam, review, live and
    the bank editor (screens are built; lint, build and 314 backend tests pass).
-2. Section 5: proctoring and exam controls. Then 6-10 and final verification.
+2. Section 6 onwards, then final verification.
 
 Browser checks: `docs/phase3-evidence/scripts/liveFlow.mjs` and `engagementFlow.mjs` (need `demoServer.mjs`,
 a throwaway Postgres in PG* env, and the frontend built with VITE_API_URL=http://127.0.0.1:5056/api served
@@ -111,6 +111,13 @@ the file tool rather than heredocs.
   resized to 1280 px WebP; alt text is required. API responses carry {key, url, alt}; image links live 1 hour
   (documents 5 minutes) because a question can stay on screen for minutes. DOCX gets PNG copies (Word has no WebP).
 - **D4.3** Practice adds fill-in-the-blank and matching only for assessments that use those types.
+- **D5.1** Exam controls live in `assessments.exam_settings` and are editable at any time (also after
+  publishing) from the assessment page; they apply to attempts that start afterwards. A running attempt is never
+  cut off by the window; the window only governs starting. Late join = latest start after windowStart.
+- **D5.2** Copy/paste/context menu are blocked in every graded exam; only when proctoring is on are the events
+  recorded. Window blur is only counted while the tab is visible (switching tabs counts once, as tab_hidden).
+- **D5.3** Extra time multiplies every question's time for that student (1x-3x), snapshotted on the attempt at
+  start. Option shuffling is per question when served (default on); grading uses option text.
 - **D1.4** The AWS SDK v3 S3 client is used for R2 (lazy-loaded only when `STORAGE_DRIVER=r2`). Verified
   against Adobe S3Mock in Docker (put, list, get, presigned GET with the Urdu filename, delete). MinIO
   images are no longer published on Docker Hub/Quay, hence S3Mock; S3Mock does not check signatures, so

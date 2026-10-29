@@ -15,5 +15,19 @@
   "reviewAnswers": "Review answers",
   "loadingAnswers": "Loading answers…",
   "answersOf": "Answers: {{name}}",
-  "answersSummary": "{{correct}} correct · {{score}}"
+  "answersSummary": "{{correct}} correct · {{score}}",
+  "integrity": "Integrity",
+  "violations": "Events: {{value}}",
+  "autoSubmitted": "auto-submitted",
+  "timelineTitle": "Integrity timeline: {{name}}",
+  "timelineFailed": "Could not load the timeline.",
+  "onQuestion": "question {{n}}",
+  "events": {
+    "tab_hidden": "Left the tab",
+    "window_blur": "Left the window",
+    "fullscreen_exit": "Left fullscreen",
+    "copy": "Tried to copy",
+    "paste": "Tried to paste",
+    "context_menu": "Right-click"
+  }
 }

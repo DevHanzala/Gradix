@@ -6,6 +6,9 @@ import multer from 'multer';
 import { requireAssessmentAccess } from '../services/assessmentAccess.js';
 import { storeQuestionImage, IMAGE_LIMITS } from '../services/questions/questionImages.js';
 import { storage, publicBaseUrl } from '../helper/storage.js';
+import { getExamSettingsService, updateExamSettingsService, setExtraTimeService } from '../services/assessment.service.js';
+import { attemptTimeline } from '../services/examControls.js';
+import db from '../DB/db.js';
 import {
   createAssessment,
   getInstructorAssessments,
@@ -84,6 +87,35 @@ router.post('/:id/publish/retry', ...staff, retryPublish);
 router.get('/:id/pool/status', ...staff, getPoolStatus);
 router.get('/:id/questions', ...staff, listQuestions);
 router.post('/:id/questions', ...staff, addQuestion);
+const handleJson = (fn) => async (req, res, next) => {
+  try {
+    res.json({ success: true, data: await fn(req) });
+  } catch (error) {
+    next(error);
+  }
+};
+// Exam controls (proctoring, window, shuffling) and per-student extra time.
+router.get('/:id/exam-settings', ...staff, handleJson((req) => getExamSettingsService(req.params.id, req.user)));
+router.put('/:id/exam-settings', ...staff, handleJson((req) => updateExamSettingsService(req.params.id, req.user, req.body)));
+router.put('/:id/enrollments/:studentId/extra-time', ...staff, handleJson((req) => setExtraTimeService(req.params.id, req.params.studentId, req.user, req.body?.extraTime)));
+router.get('/:id/enrollments/extra-time', ...staff, handleJson(async (req) => {
+  const assessment = await requireAssessmentAccess(req.params.id, req.user);
+  const { rows } = await db.query(
+    'SELECT e.student_id, e.extra_time, u.name FROM enrollments e JOIN users u ON u.id = e.student_id WHERE e.assessment_id = $1 ORDER BY u.name',
+    [assessment.id]
+  );
+  return rows.map((r) => ({ studentId: r.student_id, name: r.name, extraTime: Number(r.extra_time) }));
+}));
+// Integrity timeline of one attempt (instructor of the assessment only).
+router.get('/:id/attempts/:attemptId/integrity', ...staff, handleJson(async (req) => {
+  const assessment = await requireAssessmentAccess(req.params.id, req.user);
+  const { rows } = await db.query(
+    'SELECT id, violation_count, proctoring_level, proctoring_accepted_at, auto_submitted_reason FROM assessment_attempts WHERE id = $1 AND assessment_id = $2',
+    [Number.parseInt(req.params.attemptId, 10) || 0, assessment.id]
+  );
+  if (!rows[0]) return { attempt: null, events: [] };
+  return { attempt: rows[0], events: await attemptTimeline(rows[0].id) };
+}));
 // Upload an image for a question or option (compressed, stored privately); returns its key and a preview URL.
 const imageUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: IMAGE_LIMITS.maxBytes } });
 router.post('/:id/question-images', ...staff, imageUpload.single('image'), async (req, res, next) => {

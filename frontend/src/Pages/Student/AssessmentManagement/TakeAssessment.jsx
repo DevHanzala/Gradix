@@ -6,6 +6,7 @@ import useStudentAssessmentStore from "../../../store/studentAssessmentStore.js"
 import LoadingSpinner from "../../../components/ui/LoadingSpinner";
 import { Button } from "../../../components/ui";
 import { FillBlankInput, MatchingInput, QuestionImage } from "../../../components/questions/QuestionParts.jsx";
+import ProctoringGuard from "../../../components/exam/ProctoringGuard.jsx";
 import { LANGUAGES, isRtl } from "../../../utils/languages.js";
 import { formatClock, formatDuration, formatNumber, formatPercent } from "../../../utils/format.js";
 
@@ -39,6 +40,15 @@ const SaveIndicator = ({ status, t }) => {
   );
 };
 
+/** A date and time in the exam's time zone (default Asia/Karachi), in the student's language. */
+const formatInZone = (value, timeZone, language) => {
+  try {
+    return new Intl.DateTimeFormat(language, { dateStyle: "medium", timeStyle: "short", timeZone: timeZone || "Asia/Karachi" }).format(new Date(value));
+  } catch {
+    return new Date(value).toLocaleString();
+  }
+};
+
 function TakeAssessment() {
   const { t: tUi, i18n } = useTranslation();
   const { assessmentId } = useParams();
@@ -59,6 +69,9 @@ function TakeAssessment() {
     error,
     errorCode,
     availableLanguages,
+    examControls,
+    proctoring,
+    attemptId,
     loadAttempt,
     startAssessment,
     setAnswer,
@@ -70,6 +83,7 @@ function TakeAssessment() {
 
   const [selectedLanguage, setSelectedLanguage] = useState(i18n.language);
   const [confirmSubmit, setConfirmSubmit] = useState(false);
+  const [accepted, setAccepted] = useState(false);
   const firedForIndex = useRef(null);
 
   useEffect(() => {
@@ -191,6 +205,34 @@ function TakeAssessment() {
           </select>
         </div>
 
+        {examControls && (examControls.windowStart || examControls.windowEnd) && (
+          <p className="mt-4 rounded-control bg-surface p-3 text-start text-sm text-ink-muted">
+            {tChosen("exam.window", {
+              start: examControls.windowStart ? formatInZone(examControls.windowStart, examControls.timeZone, chosenLanguage) : "–",
+              end: examControls.windowEnd ? formatInZone(examControls.windowEnd, examControls.timeZone, chosenLanguage) : "–",
+              zone: examControls.timeZone,
+            })}
+            {examControls.lateJoinMinutes !== null && examControls.lateJoinMinutes !== undefined && ` ${tChosen("exam.lateJoin", { minutes: examControls.lateJoinMinutes })}`}
+          </p>
+        )}
+
+        {examControls && examControls.proctoring !== "off" && (
+          <div className="mt-4 rounded-control border border-warning-100 bg-warning-50 p-4 text-start text-sm text-warning-700">
+            <p className="font-semibold">{tChosen("exam.proctoring.title")}</p>
+            <ul className="mt-2 space-y-1">
+              <li>• {tChosen("exam.proctoring.tab")}</li>
+              <li>• {tChosen("exam.proctoring.fullscreen")}</li>
+              <li>• {tChosen("exam.proctoring.copy")}</li>
+              <li>• {tChosen("exam.proctoring.nothingElse")}</li>
+              {examControls.proctoring === "auto_submit" && <li>• {tChosen("exam.proctoring.autoSubmit", { max: examControls.maxViolations })}</li>}
+            </ul>
+            <label className="mt-3 flex min-h-11 cursor-pointer items-center gap-2 font-semibold text-ink">
+              <input type="checkbox" className="h-5 w-5" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
+              {tChosen("exam.proctoring.accept")}
+            </label>
+          </div>
+        )}
+
         <ul className="mt-6 space-y-2 rounded-control bg-primary-50 p-4 text-start text-sm text-primary-800">
           <li>• {tChosen("exam.rules.timer")}</li>
           <li>• {tChosen("exam.rules.noBack")}</li>
@@ -204,7 +246,17 @@ function TakeAssessment() {
           </p>
         )}
 
-        <button type="button" onClick={() => startAssessment(assessmentId, chosenLanguage)} disabled={starting} className="btn-primary mt-6 w-full">
+        <button
+          type="button"
+          onClick={() => {
+            const monitored = examControls && examControls.proctoring !== "off";
+            // Fullscreen needs this click (a user gesture); leaving it later is reported.
+            if (monitored) document.documentElement.requestFullscreen?.().catch(() => {});
+            startAssessment(assessmentId, chosenLanguage, { acceptProctoring: monitored && accepted });
+          }}
+          disabled={starting || (examControls && examControls.proctoring !== "off" && !accepted)}
+          className="btn-primary mt-6 w-full"
+        >
           {starting ? (
             <>
               <LoadingSpinner size="sm" color="white" />
@@ -293,6 +345,8 @@ function TakeAssessment() {
           <h1 className="text-xl font-semibold leading-relaxed text-ink sm:text-2xl">{question.question_text}</h1>
         )}
         <QuestionImage image={question.image} />
+
+        <ProctoringGuard attemptId={attemptId} level={proctoring} questionIndex={currentIndex} t={t} onAutoSubmitted={() => loadAttempt(assessmentId)} />
 
         <div className="mt-6">
           {question.question_type === "multiple_choice" && (

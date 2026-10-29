@@ -15,5 +15,19 @@
   "reviewAnswers": "جوابات دیکھیں",
   "loadingAnswers": "جوابات لوڈ ہو رہے ہیں…",
   "answersOf": "جوابات: {{name}}",
-  "answersSummary": "{{correct}} درست · {{score}}"
+  "answersSummary": "{{correct}} درست · {{score}}",
+  "integrity": "دیانت",
+  "violations": "واقعات: {{value}}",
+  "autoSubmitted": "خود بخود جمع",
+  "timelineTitle": "دیانت کی ٹائم لائن: {{name}}",
+  "timelineFailed": "ٹائم لائن لوڈ نہیں ہو سکی۔",
+  "onQuestion": "سوال {{n}}",
+  "events": {
+    "tab_hidden": "ٹیب چھوڑا",
+    "window_blur": "ونڈو چھوڑی",
+    "fullscreen_exit": "فل اسکرین سے نکلا",
+    "copy": "کاپی کی کوشش",
+    "paste": "پیسٹ کی کوشش",
+    "context_menu": "رائٹ کلک"
+  }
 }

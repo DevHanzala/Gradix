@@ -20,6 +20,7 @@ import {
   normalizeResourceIds,
   normalizeAssessmentInput,
 } from "../validator/assessmentInput.js";
+import { normalizeExamSettings, examSettingsOf } from "./examControls.js";
 
 /** multipart sends booleans as strings; undefined means "not sent". */
 const parseFlag = (value) => {
@@ -70,6 +71,7 @@ export const createAssessmentService = async (body, user, files = []) => {
   const prepared = await prepareUploadedFiles(files);
   const linkSources = await prepareLinks(links);
 
+  const examSettings = normalizeExamSettings(body.exam_settings);
   const created = await withTransaction(async (client) => {
     const assessment = await assessmentRepo.createAssessmentQuery(
       {
@@ -85,6 +87,7 @@ export const createAssessmentService = async (body, user, files = []) => {
       client
     );
 
+    if (examSettings) await client.query(`UPDATE assessments SET exam_settings = $2 WHERE id = $1`, [assessment.id, examSettings]);
     for (const block of blocks) {
       await assessmentRepo.createQuestionBlockQuery({ assessmentId: assessment.id, ...block, instructorId: user.id }, client);
     }
@@ -327,4 +330,35 @@ export const generatePhysicalPaperService = async (assessmentId, user, paperData
   const buffer =
     format === "docx" ? await renderPaperDocx({ sets, headers, language }) : await renderPaperPdf({ sets, headers, form, language });
   return { buffer, format, copies: sets.length };
+};
+
+/**
+ * Exam controls (proctoring, window, shuffling) can change at any time; they apply to
+ * attempts that start afterwards.
+ */
+export const updateExamSettingsService = async (assessmentId, user, body) => {
+  const assessment = await requireAssessmentAccess(assessmentId, user);
+  const { rows } = await db.query(`SELECT exam_settings FROM assessments WHERE id = $1`, [assessment.id]);
+  const settings = normalizeExamSettings(body ?? {}, examSettingsOf(rows[0]));
+  await db.query(`UPDATE assessments SET exam_settings = $2, updated_at = NOW() WHERE id = $1`, [assessment.id, settings]);
+  return settings;
+};
+
+export const getExamSettingsService = async (assessmentId, user) => {
+  const assessment = await requireAssessmentAccess(assessmentId, user);
+  const { rows } = await db.query(`SELECT exam_settings FROM assessments WHERE id = $1`, [assessment.id]);
+  return examSettingsOf(rows[0]);
+};
+
+/** Accommodation: a multiplier on this student's time per question (1 to 3). */
+export const setExtraTimeService = async (assessmentId, studentId, user, extraTime) => {
+  const assessment = await requireAssessmentAccess(assessmentId, user);
+  const value = Number(extraTime);
+  if (!Number.isFinite(value) || value < 1 || value > 3) throw new AppError("INVALID_EXTRA_TIME", 400, "Extra time must be between 1x and 3x.");
+  const { rows } = await db.query(
+    `UPDATE enrollments SET extra_time = $3 WHERE assessment_id = $1 AND student_id = $2 RETURNING student_id, extra_time`,
+    [assessment.id, Number.parseInt(studentId, 10) || 0, Math.round(value * 100) / 100]
+  );
+  if (!rows[0]) throw new AppError("NOT_ENROLLED", 404, "This student is not enrolled.");
+  return { studentId: rows[0].student_id, extraTime: Number(rows[0].extra_time) };
 };

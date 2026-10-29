@@ -7,7 +7,7 @@ import db from "../DB/db.js";
 
 export const findAssessmentForStartQuery = async (assessmentId, client = db) => {
   const { rows } = await client.query(
-    `SELECT id, title, prompt, external_links, is_executed, status, blueprint, languages, adaptive, instructor_id, negative_marking
+    `SELECT id, title, prompt, external_links, is_executed, status, blueprint, languages, adaptive, instructor_id, negative_marking, exam_settings
      FROM assessments WHERE id = $1`,
     [assessmentId]
   );
@@ -186,4 +186,10 @@ export const completeAttemptQuery = async (attemptId, scores, client = db) => {
     ]
   );
   return rows[0];
+};
+
+/** The student's extra-time multiplier for an assessment (1 when none). */
+export const findExtraTimeQuery = async (studentId, assessmentId, client = db) => {
+  const { rows } = await client.query(`SELECT extra_time FROM enrollments WHERE student_id = $1 AND assessment_id = $2`, [studentId, assessmentId]);
+  return Number(rows[0]?.extra_time) || 1;
 };

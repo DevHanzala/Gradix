@@ -8,8 +8,9 @@ import ScoreDistribution from "../../../components/insights/ScoreDistribution.js
 import { errorMessage } from "../../../utils/forms.js";
 import useInstructorAnalyticsStore from "../../../store/useInstructorAssessmentAnalyticsStore";
 import AnswerReview from "../../../components/assessment/AnswerReview.jsx";
-import { formatDuration, formatNumber, formatPercent } from "../../../utils/format.js";
-import { Alert, Badge, Button, Card, CardBody, CardHeader, EmptyState, PageHeader, PageSpinner, ResponsiveTable, SkeletonList, StatCard } from "../../../components/ui";
+import { formatDateTime, formatDuration, formatNumber, formatPercent } from "../../../utils/format.js";
+import apiClient from "../../../lib/apiClient.js";
+import { Alert, Badge, Button, Card, CardBody, CardHeader, EmptyState, Modal, PageHeader, PageSpinner, ResponsiveTable, SkeletonList, StatCard } from "../../../components/ui";
 
 function AssessmentAnalytics() {
   const { t } = useTranslation();
@@ -77,6 +78,16 @@ function AssessmentAnalytics() {
     const avgTime = students.reduce((s, r) => s + (Number(r.time_taken) || 0), 0) / students.length;
     return { count: students.length, avg, avgTime: Math.round(avgTime) };
   }, [students]);
+
+  const [timeline, setTimeline] = useState(null);
+  const openTimeline = async (s) => {
+    try {
+      const res = await apiClient.get(`/assessments/${assessmentId}/attempts/${s.attempt_id}/integrity`);
+      setTimeline({ name: s.name, ...res.data.data });
+    } catch {
+      setTimeline({ name: s.name, events: [], error: true });
+    }
+  };
 
   return (
     <>
@@ -187,6 +198,19 @@ function AssessmentAnalytics() {
                 render: (s) => <Badge tone={s.percentage >= 50 ? "success" : "danger"}>{formatPercent(s.percentage)}</Badge>,
               },
               { key: "time", header: t("analytics.time"), render: (s) => formatDuration(s.time_taken) },
+              {
+                key: "integrity",
+                header: t("analytics.integrity"),
+                render: (s) =>
+                  s.violation_count > 0 ? (
+                    <button type="button" className="inline-flex min-h-11 items-center text-warning-700 underline" onClick={() => openTimeline(s)}>
+                      {t("analytics.violations", { value: formatNumber(s.violation_count) })}
+                      {s.auto_submitted_reason && ` · ${t("analytics.autoSubmitted")}`}
+                    </button>
+                  ) : (
+                    "–"
+                  ),
+              },
             ]}
             actions={(s) => (
               <Button
@@ -224,6 +248,20 @@ function AssessmentAnalytics() {
           </Card>
         </section>
       )}
+      <Modal isOpen={Boolean(timeline)} onClose={() => setTimeline(null)} title={t("analytics.timelineTitle", { name: timeline?.name || "" })}>
+        {timeline?.error ? (
+          <Alert tone="danger">{t("analytics.timelineFailed")}</Alert>
+        ) : (
+          <ol className="space-y-2 text-sm">
+            {(timeline?.events || []).map((e, i) => (
+              <li key={i} className="flex justify-between gap-3 border-b border-line pb-1">
+                <span>{t(`analytics.events.${e.kind}`)}{e.question_index !== null ? ` · ${t("analytics.onQuestion", { n: e.question_index + 1 })}` : ""}</span>
+                <span className="tabular-nums text-ink-muted">{formatDateTime(e.occurred_at)}</span>
+              </li>
+            ))}
+          </ol>
+        )}
+      </Modal>
     </>
   );
 }
