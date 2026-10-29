@@ -10,9 +10,9 @@ Gate after every section: `npm run lint`, `npm run i18n:check`, `npm run build`,
 
 | Section | Status | Commit |
 |---|---|---|
-| 0. Leftovers and providers | done | 8d51a8d, f9fbeaf, 164dc53, fa233fb, 0a376f0, 132d372, (0.5 commit) |
-| 1. File storage (R2) | in progress | |
-| 2. Live classroom mode | not started | |
+| 0. Leftovers and providers | done | 8d51a8d, f9fbeaf, 164dc53, fa233fb, 0a376f0, 132d372, 957a850 |
+| 1. File storage (R2) | done | (section 1 commit) |
+| 2. Live classroom mode | in progress | |
 | 3. Engagement: game mode, polls, exit tickets | not started | |
 | 4. More question types | not started | |
 | 5. Light proctoring and exam controls | not started | |
@@ -25,7 +25,7 @@ Gate after every section: `npm run lint`, `npm run i18n:check`, `npm run build`,
 
 ## Next
 
-Section 1: storage abstraction (local disk / R2), move every stored file, signed URLs, migration script.
+Section 2: live classroom mode (Socket.IO, sessions in DB, join codes, guests, teacher board).
 
 ## Decisions
 
@@ -50,6 +50,24 @@ Section 1: storage abstraction (local disk / R2), move every stored file, signed
   code path was removed (no caller used it), so that variable is no longer required.
 - **D0.5** Email provider: explicit `EMAIL_PROVIDER`, else inferred (Brevo key, Resend key, Gmail SMTP).
   Startup requires the settings of the chosen provider only. nodemailer is loaded only for SMTP.
+- **D1.1** Inventory before section 1: uploads were kept in memory only (originals discarded after text
+  extraction), PDF reports were cached as BYTEA in Postgres, and papers/exports were generated and streamed
+  per request. Nothing used the server's disk. Now: original uploads are kept (`resources.storage_key`),
+  reports live in storage (`learning_reports.pdf_storage_key`; the BYTEA column is emptied by
+  `npm run storage:migrate` or on first download). Papers (PDF/DOCX) and CSV/Excel exports stay generated
+  on demand and streamed: they are never written anywhere, so they cannot be lost on a restart, and storing
+  them would only use R2 space for copies that go stale when the assessment changes. OCR page images are
+  rendered in memory from the stored original and never kept. Question images (section 4) use storage.
+- **D1.2** Signed URLs live 5 minutes. R2: presigned GET straight to R2 with Content-Disposition (Urdu file
+  names via RFC 5987). Local driver: `/api/files/<key>?e&n&t&s`, HMAC-SHA256 with `STORAGE_SIGNING_SECRET`
+  (default `JWT_SECRET`). The report endpoint keeps returning bytes by default (backward compatible);
+  `?as=link` returns the signed link, which the UI now uses.
+- **D1.3** Storage keys use ASCII-only file names (`نوٹس.pdf` -> `file.pdf`); the real name is kept in the
+  DB and restored in the download's Content-Disposition.
+- **D1.4** The AWS SDK v3 S3 client is used for R2 (lazy-loaded only when `STORAGE_DRIVER=r2`). Verified
+  against Adobe S3Mock in Docker (put, list, get, presigned GET with the Urdu filename, delete). MinIO
+  images are no longer published on Docker Hub/Quay, hence S3Mock; S3Mock does not check signatures, so
+  signature tampering is covered by real R2 behaviour and the presign unit test only.
 
 ## Open issues
 

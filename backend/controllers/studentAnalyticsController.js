@@ -1,9 +1,10 @@
 import { getStudentAssessmentsService } from "../services/studentAnalytics.service.js";
 import { getResultsService } from "../services/learning/results.service.js";
 import { getStudyPlanService } from "../services/learning/studyPlan.service.js";
-import { getReportPdfService } from "../services/learning/report.service.js";
+import { getReportPdfService, getReportLinkService, reportFileName } from "../services/learning/report.service.js";
 import { createPracticeService, checkPracticeAnswerService } from "../services/learning/practice.service.js";
 import { getUserById } from "../models/userModel.js";
+import { publicBaseUrl, contentDisposition } from "../helper/storage.js";
 
 // Errors (AppError with code/status, or unexpected ones) go to the error middleware.
 
@@ -42,11 +43,15 @@ export const checkPracticeAnswer = handle((req) =>
 
 export const downloadReport = async (req, res, next) => {
   try {
-    const { pdf, language } = await getReportPdfService(await currentStudent(req), req.params.assessmentId, {
-      language: req.query.language,
-    });
+    const student = await currentStudent(req);
+    // ?as=link: a short-lived signed URL to the stored report instead of the bytes.
+    if (req.query.as === "link") {
+      const link = await getReportLinkService(student, req.params.assessmentId, { language: req.query.language, baseUrl: publicBaseUrl(req) });
+      return res.status(200).json({ success: true, data: link });
+    }
+    const { pdf, language } = await getReportPdfService(student, req.params.assessmentId, { language: req.query.language });
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="gradix-report-${req.params.assessmentId}-${language}.pdf"`);
+    res.setHeader("Content-Disposition", contentDisposition(reportFileName(req.params.assessmentId, language)));
     res.send(pdf);
   } catch (error) {
     next(error);

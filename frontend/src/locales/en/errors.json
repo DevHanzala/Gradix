@@ -60,6 +60,9 @@
     "NOT_A_STUDENT": "That account is not a student account.",
     "USER_EXISTS": "An account with this email already exists.",
     "RATE_LIMITED": "Too many requests. Please wait a moment and try again.",
-    "UNCOVERED_OBJECTIVES": "Some learning objectives would get no question. Remove or merge objectives, add questions, or confirm to publish anyway."
+    "UNCOVERED_OBJECTIVES": "Some learning objectives would get no question. Remove or merge objectives, add questions, or confirm to publish anyway.",
+    "NO_ORIGINAL_FILE": "The original file of this resource was not kept; its text is still used for questions.",
+    "LINK_EXPIRED": "This download link has expired. Try again.",
+    "FILE_NOT_FOUND": "The file was not found."
   }
 }

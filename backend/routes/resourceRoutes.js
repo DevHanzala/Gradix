@@ -13,7 +13,8 @@ import {
 } from "../controllers/resourceController.js";
 import { protect, authorizeRoles } from "../middleware/authMiddleware.js";
 import { uploadFiles } from "../middleware/uploadMiddleware.js";
-import { searchResourcesService } from "../services/resource.service.js";
+import { searchResourcesService, getResourceFileLinkService } from "../services/resource.service.js";
+import { publicBaseUrl } from "../helper/storage.js";
 
 const router = express.Router();
 
@@ -57,6 +58,20 @@ router.get(
   protect,
   authorizeRoles(["instructor", "admin", "super_admin"]),
   getResourceById
+);
+
+// Short-lived signed link to the original uploaded file.
+router.get(
+  "/:resourceId/file",
+  protect,
+  authorizeRoles(["instructor", "admin", "super_admin"]),
+  async (req, res, next) => {
+    try {
+      res.status(200).json({ success: true, data: await getResourceFileLinkService(req.params.resourceId, req.user, publicBaseUrl(req)) });
+    } catch (error) {
+      next(error);
+    }
+  }
 );
 
 router.put(

@@ -27,7 +27,7 @@ export const saveStudyPlanQuery = async ({ attemptId, assessmentId, studentId, l
      VALUES ($1, $2, $3, $4, $5, $6)
      ON CONFLICT (attempt_id, language)
      DO UPDATE SET study_plan = EXCLUDED.study_plan, study_plan_source = EXCLUDED.study_plan_source,
-                   pdf = NULL, pdf_generated_at = NULL, updated_at = NOW()
+                   pdf = NULL, pdf_storage_key = NULL, pdf_generated_at = NULL, updated_at = NOW()
      RETURNING *`,
     [attemptId, assessmentId, studentId, language, JSON.stringify(plan), source]
   );

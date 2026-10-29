@@ -9,8 +9,9 @@ export const fetchResultsAPI = (assessmentId) => apiClient.get(`/student-analyti
 export const fetchStudyPlanAPI = (assessmentId, { language, refresh = false } = {}) =>
   apiClient.post(`/student-analytics/results/${assessmentId}/study-plan`, { language, refresh });
 
-export const downloadReportAPI = (assessmentId, language) =>
-  apiClient.get(`/student-analytics/results/${assessmentId}/report.pdf`, { params: { language }, responseType: "blob" });
+/** Short-lived signed link to the stored PDF report: { url, expiresAt, language }. */
+export const reportLinkAPI = (assessmentId, language) =>
+  apiClient.get(`/student-analytics/results/${assessmentId}/report.pdf`, { params: { language, as: "link" } });
 
 export const createPracticeAPI = (assessmentId, { language, count } = {}) =>
   apiClient.post(`/student-analytics/results/${assessmentId}/practice`, { language, count });

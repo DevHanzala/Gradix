@@ -15,7 +15,8 @@
     "test": "node scripts/runJest.js",
     "lint": "eslint .",
     "seed": "node scripts/seed.js",
-    "rechunk": "node scripts/rechunkResources.js"
+    "rechunk": "node scripts/rechunkResources.js",
+    "storage:migrate": "node scripts/migrateStorage.js"
   },
   "keywords": [
     "education",
@@ -26,6 +27,8 @@
   "author": "Gradewise AI Team",
   "license": "MIT",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1159.0",
+    "@aws-sdk/s3-request-presigner": "^3.1159.0",
     "@google/genai": "^1.21.0",
     "@huggingface/transformers": "^4.3.1",
     "@mozilla/readability": "^0.6.0",

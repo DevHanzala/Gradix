@@ -12,6 +12,7 @@ import { requireAssessmentAccess } from "./assessmentAccess.js";
 import { AppError } from "../utils/AppError.js";
 import { prepareUploadedFile, insertPreparedResource, decodeFilename, prepareLink } from "../helper/resourceIngest.js";
 import db, { withTransaction } from "../DB/db.js";
+import { storage } from "../helper/storage.js";
 
 // ==================== SERVICE FUNCTIONS ====================
 
@@ -116,6 +117,7 @@ export const searchResourcesService = async (user, query = {}) => {
   const total = (await db.query(`SELECT count(*)::int AS n FROM resources r WHERE ${sql}`, params)).rows[0].n;
   const { rows } = await db.query(
     `SELECT r.id, r.name, r.url, r.file_type, r.file_size, r.content_type, r.visibility, r.language, r.extraction_method,
+            (r.storage_key IS NOT NULL) AS has_file,
             r.created_at, r.uploaded_by, u.name AS uploader_name,
             (SELECT count(*)::int FROM resource_chunks rc WHERE rc.resource_id = r.id) AS chunk_count
      FROM resources r JOIN users u ON u.id = r.uploaded_by
@@ -172,8 +174,27 @@ export const deleteResourceService = async (resourceId, userId, userRole) => {
   }
 
   await deleteResource(resourceId);
+  if (resource.storage_key) {
+    await storage.delete(resource.storage_key).catch((error) => console.error(`[storage] delete ${resource.storage_key} failed: ${error.message}`));
+  }
 
   return { success: true };
+};
+
+/**
+ * Short-lived download link for a resource's original file, for users who may use
+ * the resource. Resources uploaded before file storage existed have no original.
+ */
+export const getResourceFileLinkService = async (resourceId, user, baseUrl) => {
+  const resource = await findResourceById(resourceId);
+  if (!resource) throw new AppError("RESOURCE_NOT_FOUND", 404, "Resource not found.");
+  if (!canUseResource(resource, user)) throw new AppError("RESOURCE_FORBIDDEN", 403, "You cannot open this resource.");
+  if (!resource.storage_key) {
+    throw new AppError("NO_ORIGINAL_FILE", 404, "The original file of this resource was not kept; its text is still used for questions.");
+  }
+  const ext = resource.storage_key.match(/\.[\w]+$/)?.[0] || "";
+  const filename = resource.name.toLowerCase().endsWith(ext.toLowerCase()) ? resource.name : `${resource.name}${ext}`;
+  return storage.signedUrl(resource.storage_key, { filename, contentType: resource.file_type || "", baseUrl });
 };
 
 // 7. LINK RESOURCE TO ASSESSMENT SERVICE

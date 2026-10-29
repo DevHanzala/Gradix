@@ -43,5 +43,7 @@
   "linkUrl": "Link",
   "addLink": "Add link",
   "total": "Resources: {{count}}",
-  "noMatch": "No resources match these filters"
+  "noMatch": "No resources match these filters",
+  "openFile": "Original file",
+  "openFileFailed": "Could not open the file."
 }

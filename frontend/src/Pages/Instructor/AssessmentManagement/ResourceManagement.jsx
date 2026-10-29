@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
-import { FaCloudUploadAlt, FaFolderOpen, FaLink, FaTrash } from "react-icons/fa";
+import { FaCloudUploadAlt, FaFileDownload, FaFolderOpen, FaLink, FaTrash } from "react-icons/fa";
 import useResourceStore from "../../../store/resourceStore.js";
-import { addLinkResourceAPI, searchResourcesAPI } from "../../../api/resource.api.js";
+import { addLinkResourceAPI, resourceFileLinkAPI, searchResourcesAPI } from "../../../api/resource.api.js";
+import { openSignedLink } from "../../../utils/download.js";
 import { validateFiles } from "../../../schemas/resourceSchema.js";
 import { ACCEPTED_FILE_TYPES } from "../../../schemas/assessmentSchemas.js";
 import { errorMessage } from "../../../utils/forms.js";
@@ -58,6 +59,18 @@ function ResourceManagement() {
   const [shared, setShared] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [skipped, setSkipped] = useState([]);
+  const [opening, setOpening] = useState(null);
+
+  const openOriginal = async (r) => {
+    setOpening(r.id);
+    try {
+      openSignedLink((await resourceFileLinkAPI(r.id)).data.data.url);
+    } catch (error) {
+      toast.error(errorMessage(error, t("resources.openFileFailed")));
+    } finally {
+      setOpening(null);
+    }
+  };
   const [linkUrl, setLinkUrl] = useState("");
   const [addingLink, setAddingLink] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -297,9 +310,16 @@ function ResourceManagement() {
               { key: "created_at", header: t("resources.addedOn"), render: (r) => formatDate(r.created_at) },
             ]}
             actions={(r) => (
-              <Button variant="ghost" icon={FaTrash} className="text-danger-700 hover:bg-danger-50" onClick={() => setDeleteTarget(r)}>
-                {t("common.delete")}
-              </Button>
+              <>
+                {r.has_file && (
+                  <Button variant="ghost" icon={FaFileDownload} onClick={() => openOriginal(r)} loading={opening === r.id}>
+                    {t("resources.openFile")}
+                  </Button>
+                )}
+                <Button variant="ghost" icon={FaTrash} className="text-danger-700 hover:bg-danger-50" onClick={() => setDeleteTarget(r)}>
+                  {t("common.delete")}
+                </Button>
+              </>
             )}
           />
         )}

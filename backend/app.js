@@ -13,6 +13,7 @@ import instructorAssessmentAnalyticsRoutes from "./routes/instructorAssessmentAn
 import { errorHandler, notFound } from "./middleware/errorMiddleware.js";
 // Registers background job definitions so routes can enqueue them.
 import "./jobs/index.js";
+import fileRoutes from "./routes/fileRoutes.js";
 
 /**
  * Builds the Express app without connecting to the database or listening,
@@ -53,6 +54,7 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/taking", studentAssessmentRoutes);
 app.use("/api/instructor-analytics", instructorAssessmentAnalyticsRoutes);
+app.use("/api/files", fileRoutes);
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({

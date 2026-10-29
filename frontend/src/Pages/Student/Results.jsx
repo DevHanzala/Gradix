@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { FaBullseye, FaChartLine, FaCheckCircle, FaClock, FaDownload, FaListOl } from "react-icons/fa";
-import { downloadReportAPI, fetchResultsAPI } from "../../api/studentAnalytics.api.js";
+import { reportLinkAPI, fetchResultsAPI } from "../../api/studentAnalytics.api.js";
+import { openSignedLink } from "../../utils/download.js";
 import AnswerReview from "../../components/assessment/AnswerReview.jsx";
 import ObjectiveBars from "../../components/results/ObjectiveBars.jsx";
 import DifficultyPathChart from "../../components/results/DifficultyPathChart.jsx";
@@ -46,13 +47,8 @@ function Results() {
     setDownloading(true);
     setDownloadError(null);
     try {
-      const res = await downloadReportAPI(assessmentId, language);
-      const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `gradix-report-${assessmentId}-${language}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const res = await reportLinkAPI(assessmentId, language);
+      openSignedLink(res.data.data.url);
     } catch (e) {
       setDownloadError(errorMessage(e, t("errors.store.report")));
     } finally {

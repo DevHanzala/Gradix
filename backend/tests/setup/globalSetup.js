@@ -1,3 +1,5 @@
+import os from "os";
+import path from "path";
 import { startTestDatabase } from "./testDatabase.js";
 
 /**
@@ -28,6 +30,10 @@ export default async function globalSetup() {
     EMAIL_FROM: "",
     EMAIL_FROM_NAME: "",
     TRUST_PROXY: "",
+    // Files go to a throwaway folder, never the developer's storage or R2.
+    STORAGE_DRIVER: "local",
+    STORAGE_LOCAL_DIR: path.join(os.tmpdir(), `gradix-test-storage-${process.pid}`),
+    STORAGE_SIGNING_SECRET: "",
   });
   globalThis.__stopTestDatabase__ = await startTestDatabase();
 }

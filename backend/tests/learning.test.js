@@ -175,8 +175,10 @@ describe("PDF report", () => {
     expect(rendered).toContain('lang="ur" dir="rtl"');
     expect(rendered).toContain("Noto Nastaliq Urdu");
     expect(rendered).toContain("آپ کا مطالعہ منصوبہ");
-    const stored = (await pool.query("SELECT pdf IS NOT NULL AS has_pdf FROM learning_reports WHERE language = 'ur'")).rows[0];
-    expect(stored.has_pdf).toBe(true);
+    // Kept in file storage, not in the database.
+    const stored = (await pool.query("SELECT pdf IS NULL AS no_bytes, pdf_storage_key FROM learning_reports WHERE language = 'ur'")).rows[0];
+    expect(stored.no_bytes).toBe(true);
+    expect(stored.pdf_storage_key).toMatch(/^reports\/\d+\/ur\.pdf$/);
 
     rendered = null;
     await api(s).pdf(id, "ur");

@@ -21,6 +21,9 @@ export const uploadResourcesAPI = (files, { visibility = "private" } = {}) => {
 export const deleteResourceAPI = (resourceId) =>
   apiClient.delete(`/resources/${resourceId}`);
 
+/** Short-lived signed link to the original uploaded file: { url, expiresAt }. */
+export const resourceFileLinkAPI = (resourceId) => apiClient.get(`/resources/${resourceId}/file`);
+
 /** Library search with filters and pagination (no full text returned). */
 export const searchResourcesAPI = (params) => apiClient.get("/resources/search", { params });
 

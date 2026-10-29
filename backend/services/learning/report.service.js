@@ -7,6 +7,7 @@ import { getResultsService } from "./results.service.js";
 import { findReportQuery } from "./studyPlan.service.js";
 import { createPracticeService } from "./practice.service.js";
 import { normalizeOptions, decodeStoredValue } from "../../utils/grading.js";
+import { storage } from "../../helper/storage.js";
 
 /**
  * Server-rendered PDF learning report in the student's language (Puppeteer,
@@ -158,21 +159,57 @@ const practiceForReport = async (student, results, language) => {
   return questions || [];
 };
 
-export const getReportPdfService = async (student, assessmentId, { language: requested } = {}) => {
+export const reportStorageKey = (attemptId, language) => `reports/${attemptId}/${language}.pdf`;
+export const reportFileName = (assessmentId, language) => `gradix-report-${assessmentId}-${language}.pdf`;
+
+/**
+ * The student's PDF report: rendered once per attempt and language and kept in
+ * file storage (rendered again after the study plan changes).
+ * Returns { key, language, cached } and, when it had to be read or rendered, { pdf }.
+ */
+const ensureReport = async (student, assessmentId, { language: requested, needBytes }) => {
   const results = await getResultsService(student.id, assessmentId);
   const language = normalizeLanguage(requested || student.language_preference || results.language);
   const existing = await findReportQuery(results.attemptId, language);
-  if (existing?.pdf) return { pdf: existing.pdf, language, cached: true };
-
-  const practice = await practiceForReport(student, results, language);
-  const pdf = await pdfRenderer.render(reportHtml({ results, plan: existing?.study_plan || null, practice, language }));
+  const key = reportStorageKey(results.attemptId, language);
+  if (existing?.pdf_storage_key) {
+    if (!needBytes) return { key: existing.pdf_storage_key, language, cached: true };
+    try {
+      return { key: existing.pdf_storage_key, language, cached: true, pdf: await storage.get(existing.pdf_storage_key) };
+    } catch (error) {
+      if (error.code !== "FILE_NOT_FOUND") throw error; // lost file: render again below
+    }
+  }
+  // Reports cached in the database before file storage existed: move them on first use.
+  let pdf = existing?.pdf || null;
+  if (!pdf) {
+    const practice = await practiceForReport(student, results, language);
+    pdf = await pdfRenderer.render(reportHtml({ results, plan: existing?.study_plan || null, practice, language }));
+  }
+  await storage.put(key, pdf, { contentType: "application/pdf" });
   await db.query(
-    `INSERT INTO learning_reports (attempt_id, assessment_id, student_id, language, pdf, pdf_generated_at)
+    `INSERT INTO learning_reports (attempt_id, assessment_id, student_id, language, pdf_storage_key, pdf_generated_at)
      VALUES ($1, $2, $3, $4, $5, NOW())
-     ON CONFLICT (attempt_id, language) DO UPDATE SET pdf = EXCLUDED.pdf, pdf_generated_at = NOW(), updated_at = NOW()`,
-    [results.attemptId, results.assessmentId, student.id, language, pdf]
+     ON CONFLICT (attempt_id, language)
+     DO UPDATE SET pdf_storage_key = EXCLUDED.pdf_storage_key, pdf = NULL, pdf_generated_at = NOW(), updated_at = NOW()`,
+    [results.attemptId, results.assessmentId, student.id, language, key]
   );
-  return { pdf, language, cached: false };
+  return { key, language, cached: Boolean(existing?.pdf), pdf };
+};
+
+/** The report's bytes (the API streams them). */
+export const getReportPdfService = async (student, assessmentId, { language } = {}) => {
+  const { pdf, language: lang, cached } = await ensureReport(student, assessmentId, { language, needBytes: true });
+  return { pdf, language: lang, cached };
+};
+
+/** A short-lived signed URL to the report, for the student who owns it. */
+export const getReportLinkService = async (student, assessmentId, { language, baseUrl } = {}) => {
+  const { key, language: lang } = await ensureReport(student, assessmentId, { language, needBytes: false });
+  return {
+    ...(await storage.signedUrl(key, { filename: reportFileName(assessmentId, lang), contentType: "application/pdf", baseUrl })),
+    language: lang,
+  };
 };
 
 export { reportHtml };

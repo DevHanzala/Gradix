@@ -7,6 +7,7 @@ import { extractLinkText } from "./linkIngest.js";
 import { createResourceQuery } from "../repositories/resourceRepository.js";
 import { createResourceChunkQuery } from "../repositories/assessmentRepository.js";
 import { AppError } from "../utils/AppError.js";
+import { storage, safeFileName } from "./storage.js";
 
 /**
  * Two-phase ingestion so uploads are atomic:
@@ -41,7 +42,7 @@ export const prepareUploadedFile = async (file) => {
 
   // Which extraction path was used is logged and stored (resources.extraction_method).
   console.info(`[ingest] ${name}: text extracted via ${method}`);
-  return { name, mimetype: file.mimetype, size: file.size, extractionMethod: method, ...(await prepareText(text)) };
+  return { name, mimetype: file.mimetype, size: file.size, buffer: file.buffer, extractionMethod: method, ...(await prepareText(text)) };
 };
 
 /** sha256 of the normalised text; identical material hashes the same. */
@@ -124,6 +125,14 @@ export const insertPreparedResource = async (client, prepared, { userId, visibil
   );
 
   await insertChunks(client, resource.id, prepared);
+
+  // Keep the original upload in file storage (private; served through signed URLs).
+  if (prepared.buffer?.length) {
+    const key = `resources/${resource.id}/${safeFileName(prepared.name)}`;
+    await storage.put(key, prepared.buffer, { contentType: prepared.mimetype || "application/octet-stream" });
+    await client.query(`UPDATE resources SET storage_key = $2 WHERE id = $1`, [resource.id, key]);
+    resource.storage_key = key;
+  }
 
   return resource;
 };
