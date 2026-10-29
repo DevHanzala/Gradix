@@ -323,6 +323,24 @@ describe("objectives API", () => {
     expect(regen.status).toBe(409);
   });
 
+  test("publishing is blocked while an objective would get no question, unless the instructor confirms", async () => {
+    const id = (await create()).body.data.id;
+    // 6 questions per student, 7 objectives: one objective is never tested.
+    const seven = Array.from({ length: 7 }, (_, i) => ({ text: `Objective number ${i + 1}`, weight: 1 }));
+    const saved = await putObjectives(id, seven);
+    expect(saved.body.data.blueprint.objectives.filter((o) => o.count === 0)).toHaveLength(1);
+    queueAdapter.mode = "record";
+    const publish = (body) => request(app).post(`/api/assessments/${id}/publish`).set("Authorization", auth(instructor)).send(body);
+
+    const blocked = await publish({ languages: ["en"] });
+    expect(blocked.status).toBe(409);
+    expect(blocked.body.code).toBe("UNCOVERED_OBJECTIVES");
+    expect((await pool.query("SELECT status FROM assessments WHERE id = $1", [id])).rows[0].status).toBe("objectives_ready");
+
+    expect((await publish({ languages: ["en"], allowUncoveredObjectives: "yes" })).status).toBe(409);
+    expect((await publish({ languages: ["en"], allowUncoveredObjectives: true })).status).toBe(202);
+  });
+
   test("regenerate queues a new extraction", async () => {
     const id = (await create()).body.data.id;
     queueAdapter.mode = "record";

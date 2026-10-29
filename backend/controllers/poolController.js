@@ -20,7 +20,9 @@ const handle = (fn, status = 200) => async (req, res, next) => {
 
 export const listQuestions = handle((req) => listQuestionsService(req.params.id, req.user, req.query));
 export const getPoolStatus = handle((req) => poolStatusService(req.params.id, req.user));
-export const publish = handle((req) => publishService(req.params.id, req.user, req.body?.languages), 202);
+export const publish = handle((req) => publishService(req.params.id, req.user, req.body?.languages, {
+    allowUncovered: req.body?.allowUncoveredObjectives === true,
+  }), 202);
 export const retryPublish = handle((req) => retryPublishService(req.params.id, req.user), 202);
 export const addQuestion = handle((req) => addQuestionService(req.params.id, req.user, req.body), 201);
 export const editQuestion = handle((req) => editQuestionService(req.params.id, req.params.questionId, req.user, req.body));

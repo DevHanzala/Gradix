@@ -231,11 +231,16 @@ export const normalizeLanguages = (languages) => {
   return unique;
 };
 
+/** Objectives the blueprint gives no question (more objectives than questions). */
+export const uncoveredObjectiveCount = (blueprint) =>
+  (blueprint?.objectives || []).filter((o) => !(Number(o.count) > 0)).length;
+
 /**
  * Start publishing: lock objectives/blueprint and pre-generate the pool for
- * each selected language in the background.
+ * each selected language in the background. Objectives without any question
+ * block publishing unless the instructor confirmed (allowUncovered).
  */
-export const publishAssessment = async (assessmentId, languages) => {
+export const publishAssessment = async (assessmentId, languages, { allowUncovered = false } = {}) => {
   const chosen = normalizeLanguages(languages);
   await withTransaction(async (client) => {
     const assessment = await objectiveRepo.findAssessmentLifecycleQuery(assessmentId, client, { forUpdate: true });
@@ -246,6 +251,14 @@ export const publishAssessment = async (assessmentId, languages) => {
         assessment.status === "draft"
           ? "Review the learning objectives before publishing."
           : "This assessment is already being published."
+      );
+    }
+    const uncovered = uncoveredObjectiveCount(assessment.blueprint);
+    if (uncovered > 0 && !allowUncovered) {
+      throw new AppError(
+        "UNCOVERED_OBJECTIVES",
+        409,
+        `${uncovered} learning objective(s) would get no question. Remove or merge objectives, add questions, or confirm to publish anyway.`
       );
     }
     await client.query(`UPDATE assessments SET status = 'publishing', languages = $2, updated_at = NOW() WHERE id = $1`, [

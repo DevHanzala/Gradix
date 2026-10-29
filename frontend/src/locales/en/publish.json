@@ -17,5 +17,7 @@
   "progressFor": "Progress: {{language}}",
   "retry": "Retry failed languages",
   "confirmTitle": "Publish this assessment?",
-  "confirmBody": "Objectives, question settings and source material will be locked. Questions are then prepared in the selected languages ({{count}}); students can start as soon as their language is ready."
+  "confirmBody": "Objectives, question settings and source material will be locked. Questions are then prepared in the selected languages ({{count}}); students can start as soon as their language is ready.",
+  "uncoveredTitle": "Objectives without a question: {{count}}",
+  "uncoveredBody": "These objectives will not be tested. Publish anyway, or cancel and remove objectives or add questions."
 }

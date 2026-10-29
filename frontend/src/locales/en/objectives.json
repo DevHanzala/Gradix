@@ -41,5 +41,7 @@
   "stalledTitle": "This is taking longer than usual",
   "stalledBody": "Reading the material has not finished yet. Try again to restart it, or add objectives yourself.",
   "untestedTitle": "Objectives without a question: {{count}}",
-  "untestedBody": "Each student answers {{questions}} questions, but there are {{objectives}} objectives, so some are never tested. Remove or merge objectives, or add more questions to the assessment."
+  "untestedBody": "Each student answers {{questions}} questions, but there are {{objectives}} objectives, so some are never tested. Remove or merge objectives, or add more questions to the assessment.",
+  "unevenTitle": "Uneven coverage",
+  "unevenBody": "Some objectives get {{max}} questions and others only {{min}}. If that isn't what you want, adjust the weights or the number of questions."
 }

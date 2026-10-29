@@ -12,8 +12,9 @@ const DEFAULT_LANGUAGES = ["en", "ur", "ar"];
 /**
  * Publishing: choose languages, start pre-generation, and follow its progress
  * per language. Shown on the objectives page once objectives are ready.
+ * Objectives without a question need an explicit confirmation (the server enforces it too).
  */
-function PublishPanel({ assessmentId, status, canPublish, onStatusChange }) {
+function PublishPanel({ assessmentId, status, canPublish, uncovered = 0, onStatusChange }) {
   const { t } = useTranslation();
   const [languages, setLanguages] = useState(DEFAULT_LANGUAGES);
   const [pool, setPool] = useState(null);
@@ -52,7 +53,7 @@ function PublishPanel({ assessmentId, status, canPublish, onStatusChange }) {
     setBusy(true);
     setError(null);
     try {
-      const res = await publishAssessmentApi(assessmentId, languages);
+      const res = await publishAssessmentApi(assessmentId, languages, { allowUncoveredObjectives: uncovered > 0 });
       setPool(res.data.data);
       onStatusChange?.(res.data.data.status);
     } catch (e) {
@@ -171,6 +172,11 @@ function PublishPanel({ assessmentId, status, canPublish, onStatusChange }) {
         confirmText={t("publish.publish")}
       >
         {t("publish.confirmBody", { count: languages.length })}
+        {uncovered > 0 && (
+          <Alert tone="warning" title={t("publish.uncoveredTitle", { count: uncovered })} className="mt-4">
+            {t("publish.uncoveredBody")}
+          </Alert>
+        )}
       </Modal>
     </Card>
   );

@@ -165,6 +165,10 @@ function AssessmentObjectives() {
   const invalid = drafts.some((d) => d.text.trim().length < 3) || drafts.length === 0;
   // Saved objectives the question plan gives no question (more objectives than questions).
   const untested = view.blueprint ? (view.objectives || []).filter((o) => !(blueprintByObjective.get(o.id)?.count > 0)).length : 0;
+  // Uneven coverage: tested objectives whose question counts differ by 2 or more.
+  const testedCounts = (view.blueprint?.objectives || []).map((b) => b.count).filter((c) => c > 0);
+  const coverage = testedCounts.length > 1 ? { min: Math.min(...testedCounts), max: Math.max(...testedCounts) } : null;
+  const uneven = coverage && coverage.max - coverage.min >= 2;
 
   return (
     <>
@@ -211,6 +215,11 @@ function AssessmentObjectives() {
       {untested > 0 && editable && (
         <Alert tone="warning" title={t("objectives.untestedTitle", { count: untested })} className="mb-6">
           {t("objectives.untestedBody", { questions: view.blueprint?.slots?.length || 0, objectives: view.objectives.length })}
+        </Alert>
+      )}
+      {uneven && editable && (
+        <Alert tone="info" title={t("objectives.unevenTitle")} className="mb-6">
+          {t("objectives.unevenBody", { min: coverage.min, max: coverage.max })}
         </Alert>
       )}
       {saveError && (
@@ -365,6 +374,7 @@ function AssessmentObjectives() {
           assessmentId={id}
           status={view.status}
           canPublish={view.status === "objectives_ready" && !dirty && drafts.length > 0}
+          uncovered={untested}
           onStatusChange={() => load({ force: !dirty })}
         />
       )}

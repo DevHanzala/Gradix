@@ -68,8 +68,8 @@ export const regenerateObjectivesApi = (assessmentId) =>
    Publishing + question bank
 ========================= */
 
-export const publishAssessmentApi = (assessmentId, languages) =>
-  apiClient.post(`/assessments/${assessmentId}/publish`, { languages });
+export const publishAssessmentApi = (assessmentId, languages, { allowUncoveredObjectives = false } = {}) =>
+  apiClient.post(`/assessments/${assessmentId}/publish`, { languages, allowUncoveredObjectives });
 
 export const retryPublishApi = (assessmentId) =>
   apiClient.post(`/assessments/${assessmentId}/publish/retry`);

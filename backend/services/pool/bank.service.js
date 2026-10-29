@@ -84,9 +84,9 @@ export const poolStatusService = async (assessmentId, user) => {
 
 // ---------------------------------------------------------- publish
 
-export const publishService = async (assessmentId, user, languages) => {
+export const publishService = async (assessmentId, user, languages, options = {}) => {
   const owned = await requireAssessmentAccess(assessmentId, user);
-  await publishAssessment(owned.id, languages);
+  await publishAssessment(owned.id, languages, { allowUncovered: options.allowUncovered === true });
   return poolStatus(owned.id);
 };
 
