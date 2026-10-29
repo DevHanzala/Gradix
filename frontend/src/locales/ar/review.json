@@ -3,7 +3,8 @@
   "state": {
     "correct": "صحيح",
     "wrong": "خاطئ",
-    "unanswered": "لم تتم الإجابة"
+    "unanswered": "لم تتم الإجابة",
+    "partial": "صحيح جزئيًا"
   },
   "objective": "الهدف {{number}}: {{text}}",
   "chosenMarker": "(إجابتك)",

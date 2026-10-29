@@ -5,6 +5,7 @@ import { checkPracticeAnswerAPI, createPracticeAPI } from "../../api/studentAnal
 import { errorMessage } from "../../utils/forms.js";
 import { isRtl } from "../../utils/languages.js";
 import { Alert, Badge, Button, EmptyState } from "../ui";
+import { FillBlankInput, MatchingInput } from "../questions/QuestionParts.jsx";
 
 /**
  * Ungraded practice on the weak objectives. Fresh questions (never from the
@@ -95,7 +96,8 @@ function PracticeQuiz({ assessmentId, language, hasObjectives }) {
   const q = session.questions[index];
   const choices = q.question_type === "multiple_choice" ? q.options : [true, false];
   const label = (c) => (typeof c === "boolean" ? (c ? tq("common.true") : tq("common.false")) : c);
-  const correctLabel = feedback && label(feedback.correctAnswer);
+  const structured = ["fill_blank", "matching"].includes(q.question_type);
+  const correctLabel = feedback && (structured ? feedback.correctAnswerText : label(feedback.correctAnswer));
 
   return (
     <div dir={dir} lang={session.language} className="space-y-4">
@@ -103,7 +105,13 @@ function PracticeQuiz({ assessmentId, language, hasObjectives }) {
         <span>{tq("exam.progress", { current: index + 1, total: session.questions.length })}</span>
         <Badge>{tq("learning.practiceUngradedShort")}</Badge>
       </div>
-      <p className="text-lg font-semibold text-ink">{q.question_text}</p>
+      {q.question_type === "fill_blank" ? (
+        <FillBlankInput text={q.question_text} value={answer} onChange={setAnswer} disabled={Boolean(feedback)} size="md" />
+      ) : (
+        <p className="text-lg font-semibold text-ink">{q.question_text}</p>
+      )}
+      {q.question_type === "matching" && <MatchingInput options={q.options} value={answer} onChange={setAnswer} disabled={Boolean(feedback)} />}
+      {!structured && (
       <div role="radiogroup" aria-label={tq("exam.answerOptions")} className="grid gap-2 sm:grid-cols-2">
         {choices.map((c) => {
           const selected = answer === c;
@@ -124,6 +132,7 @@ function PracticeQuiz({ assessmentId, language, hasObjectives }) {
           );
         })}
       </div>
+      )}
       {feedback && (
         <Alert tone={feedback.correct ? "success" : "danger"}>
           <span className="inline-flex items-center gap-2 font-semibold">

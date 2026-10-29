@@ -16,6 +16,7 @@ import QuestionEditor from "../../../components/assessment/QuestionEditor.jsx";
 import { Alert, Badge, Button, Card, CardHeader, EmptyState, Input, Modal, PageHeader, Select, SkeletonList } from "../../../components/ui";
 import { errorMessage } from "../../../utils/forms.js";
 import { LANGUAGE_NAMES, isRtl } from "../../../utils/languages.js";
+import { BlankStem, QuestionImage } from "../../../components/questions/QuestionParts.jsx";
 
 const PAGE_SIZE = 20;
 
@@ -32,6 +33,15 @@ function CorrectAnswer({ question }) {
             {t("bank.rubricShort", { rubric: answer.rubric.map((r) => [r.concept, ...(r.accept || [])].join(" / ")).join(" · ") })}
           </span>
         )}
+      </span>
+    );
+  }
+  if (question.questionType === "fill_blank") return <span>{(answer?.blanks || []).map((a, i) => `(${i + 1}) ${a.join(" / ")}`).join("  ")}</span>;
+  if (question.questionType === "matching") {
+    return (
+      <span>
+        {(question.options?.left || []).map((l, i) => `${l} → ${answer?.pairs?.[i] ?? ""}`).join(" · ")}
+        {answer?.partial_credit !== false && <span className="block text-xs text-ink-muted">{t("bank.partialCredit")}</span>}
       </span>
     );
   }
@@ -55,8 +65,9 @@ function QuestionCard({ question, objectiveIndex, onEdit, onRegenerate, onApprov
         <Badge>{t("bank.served", { count: question.timesServed })}</Badge>
       </div>
       <div dir={dir} lang={question.language}>
-        <p className="font-medium text-ink">{question.questionText}</p>
-        {question.options && (
+        <p className="font-medium text-ink">{question.questionType === "fill_blank" ? <BlankStem text={question.questionText} /> : question.questionText}</p>
+        <QuestionImage image={question.image} className="my-2 max-h-40 w-auto rounded-control border border-line" />
+        {Array.isArray(question.options) && (
           <ol className="mt-2 grid gap-1 sm:grid-cols-2">
             {question.options.map((option, i) => (
               <li
@@ -71,7 +82,7 @@ function QuestionCard({ question, objectiveIndex, onEdit, onRegenerate, onApprov
             ))}
           </ol>
         )}
-        {!question.options && (
+        {!Array.isArray(question.options) && (
           <p className="mt-2 text-sm text-success-700">
             <CorrectAnswer question={question} />
           </p>
@@ -294,6 +305,7 @@ function QuestionBank() {
           defaults={{ language: filters.language || languages[0], objectiveId: filters.objective_id }}
           saving={busy === "save"}
           error={editorError}
+          assessmentId={id}
         />
       )}
 

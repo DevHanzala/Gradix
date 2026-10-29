@@ -219,7 +219,13 @@ function LiveHost() {
                 <p className="mb-4 text-lg font-semibold text-ink" dir={textDirection(current.question.text)}>
                   {current.question.text}
                 </p>
-                <AnswerBars options={optionsFor(current.question)} distribution={current.distribution} correct={current.question.correctAnswer} />
+                {optionsFor(current.question) ? (
+                  <AnswerBars options={optionsFor(current.question)} distribution={current.distribution} correct={current.question.correctAnswer} />
+                ) : (
+                  <p className="text-ink-muted">
+                    {t("live.correctAnswer")}: {String(current.question.correctAnswer)}
+                  </p>
+                )}
               </>
             ) : (
               <p className="text-ink-muted">{t("live.uniqueQuestionsNote", { answered: formatNumber(current.answered), correct: formatNumber(current.correct) })}</p>
@@ -360,7 +366,7 @@ function LiveHost() {
                   <p className="mb-3 text-ink" dir={textDirection(q.question.text)}>
                     {q.question.text}
                   </p>
-                  {q.answered > 0 && <AnswerBars options={optionsFor(q.question)} distribution={q.distribution} correct={q.question.correctAnswer} />}
+                  {q.answered > 0 && optionsFor(q.question) && <AnswerBars options={optionsFor(q.question)} distribution={q.distribution} correct={q.question.correctAnswer} />}
                 </>
               )}
             </section>

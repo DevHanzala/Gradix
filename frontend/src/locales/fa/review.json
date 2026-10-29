@@ -3,7 +3,8 @@
   "state": {
     "correct": "درست",
     "wrong": "نادرست",
-    "unanswered": "پاسخ داده نشد"
+    "unanswered": "پاسخ داده نشد",
+    "partial": "تا حدی درست"
   },
   "objective": "هدف {{number}}: {{text}}",
   "chosenMarker": "(پاسخ شما)",

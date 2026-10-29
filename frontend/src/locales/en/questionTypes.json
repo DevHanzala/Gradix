@@ -1,5 +1,7 @@
 {
   "multiple_choice": "Multiple choice",
   "true_false": "True / False",
-  "short_answer": "Short answer"
+  "short_answer": "Short answer",
+  "fill_blank": "Fill in the blank",
+  "matching": "Matching"
 }

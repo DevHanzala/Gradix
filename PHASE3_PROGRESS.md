@@ -13,8 +13,8 @@ Gate after every section: `npm run lint`, `npm run i18n:check`, `npm run build`,
 | 0. Leftovers and providers | done | 8d51a8d, f9fbeaf, 164dc53, fa233fb, 0a376f0, 132d372, 957a850 |
 | 1. File storage (R2) | done | 3c7716f |
 | 2. Live classroom mode | done | 413e41c, 4d5095e |
-| 3. Engagement: game mode, polls, exit tickets | done | (section 3 commit) |
-| 4. More question types | in progress | |
+| 3. Engagement: game mode, polls, exit tickets | done | 5a29580 |
+| 4. More question types | done (browser check pending) | 6a4109f + frontend commit |
 | 5. Light proctoring and exam controls | not started | |
 | 6. Polish, help and accessibility | not started | |
 | 7. Plans and usage limits | not started | |
@@ -25,15 +25,15 @@ Gate after every section: `npm run lint`, `npm run i18n:check`, `npm run build`,
 
 ## Next
 
-Section 4: image questions (upload, compress, alt text, storage), fill in the blank (several blanks,
-accepted answers, shared grader, AI generation), matching (pairs, partial credit, AI generation), in every
-place: generation/validation, bank, graded exam (adaptive, negative marking), live/practice, review,
-reports, analytics, print (PDF/DOCX incl. RTL).
+1. Section 4 leftover: run a browser check of fill-in-the-blank / matching / images in exam, review, live and
+   the bank editor (screens are built; lint, build and 314 backend tests pass).
+2. Section 5: proctoring and exam controls. Then 6-10 and final verification.
 
 Browser checks: `docs/phase3-evidence/scripts/liveFlow.mjs` and `engagementFlow.mjs` (need `demoServer.mjs`,
 a throwaway Postgres in PG* env, and the frontend built with VITE_API_URL=http://127.0.0.1:5056/api served
-on 127.0.0.1:5174). Helper scripts for locale merges live in %TEMP%/gradix-tools (the session scratchpad
-gets cleaned).
+on 127.0.0.1:5174). Locale merge helper: %TEMP%/gradix-tools/addkeys.py. In Git Bash set
+MSYS_NO_PATHCONV=1 for commands containing regexes like /x|y/, and write files with non-ASCII text using
+the file tool rather than heredocs.
 
 ## Decisions
 
@@ -104,6 +104,13 @@ gets cleaned).
   team's correct answers / (members x questions), so a bigger team does not win by size.
 - **D3.4** Sounds are synthesised with Web Audio (no files to download): right/wrong at reveal on phones, a
   fanfare at the podium on phones and the projector; only when the session's Sounds setting is on.
+- **D4.1** Fill in the blank: `[[n]]` markers in the stem, accepted answers per blank, all blanks must be right
+  (no partial credit). Matching: right column stored shuffled, pairs in correct_answer, partial credit on by
+  default (configurable per question); negative marks only when no pair is right.
+- **D4.2** Images are an attribute of any question (plus one per MCQ option), not a separate type. Uploads are
+  resized to 1280 px WebP; alt text is required. API responses carry {key, url, alt}; image links live 1 hour
+  (documents 5 minutes) because a question can stay on screen for minutes. DOCX gets PNG copies (Word has no WebP).
+- **D4.3** Practice adds fill-in-the-blank and matching only for assessments that use those types.
 - **D1.4** The AWS SDK v3 S3 client is used for R2 (lazy-loaded only when `STORAGE_DRIVER=r2`). Verified
   against Adobe S3Mock in Docker (put, list, get, presigned GET with the Urdu filename, delete). MinIO
   images are no longer published on Docker Hub/Quay, hence S3Mock; S3Mock does not check signatures, so

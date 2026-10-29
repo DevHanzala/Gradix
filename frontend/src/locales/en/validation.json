@@ -31,5 +31,6 @@
   "fileTooLarge": "Files must not exceed {{value}} MB.",
   "fileType": "Invalid file type. Upload PDF, DOC, DOCX, TXT, PPT, PPTX or image files.",
   "fileRequired": "Select at least one file.",
-  "tooManyFiles": "You can upload at most {{value}} files at once."
+  "tooManyFiles": "You can upload at most {{value}} files at once.",
+  "pairsRange": "Use 3 to 6 pairs."
 }

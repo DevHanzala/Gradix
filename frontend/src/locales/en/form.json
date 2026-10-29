@@ -43,5 +43,8 @@
   "negativeMarking": "Negative marking",
   "negativeMarkingDescription": "Wrong answers lose the deduction set in each question block. Turn off to never deduct marks.",
   "negativeOffHint": "Negative marking is off for this assessment",
-  "linksSkipped": "These links could not be read and were not used: {{links}}"
+  "linksSkipped": "These links could not be read and were not used: {{links}}",
+  "pairsPerQuestion": "Pairs per question",
+  "fillBlankNote": "The AI writes sentences with 1-3 blanks and several accepted answers per blank.",
+  "matchingNote": "Students match each item with one from a second list. Partial credit by default."
 }

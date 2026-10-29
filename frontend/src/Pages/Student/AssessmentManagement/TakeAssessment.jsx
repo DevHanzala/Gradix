@@ -5,6 +5,7 @@ import { FaClock, FaCheckCircle, FaCloud, FaCloudUploadAlt, FaExclamationTriangl
 import useStudentAssessmentStore from "../../../store/studentAssessmentStore.js";
 import LoadingSpinner from "../../../components/ui/LoadingSpinner";
 import { Button } from "../../../components/ui";
+import { FillBlankInput, MatchingInput, QuestionImage } from "../../../components/questions/QuestionParts.jsx";
 import { LANGUAGES, isRtl } from "../../../utils/languages.js";
 import { formatClock, formatDuration, formatNumber, formatPercent } from "../../../utils/format.js";
 
@@ -286,7 +287,12 @@ function TakeAssessment() {
           )}
         </div>
 
-        <h1 className="text-xl font-semibold leading-relaxed text-ink sm:text-2xl">{question.question_text}</h1>
+        {question.question_type === "fill_blank" ? (
+          <h1 className="sr-only">{question.question_text.replace(/\[\[(\d+)\]\]/g, "___")}</h1>
+        ) : (
+          <h1 className="text-xl font-semibold leading-relaxed text-ink sm:text-2xl">{question.question_text}</h1>
+        )}
+        <QuestionImage image={question.image} />
 
         <div className="mt-6">
           {question.question_type === "multiple_choice" && (
@@ -311,7 +317,10 @@ function TakeAssessment() {
                     >
                       {String.fromCharCode(65 + i)}
                     </span>
-                    <span className="pt-0.5">{option}</span>
+                    <span className="pt-0.5">
+                      {option}
+                      <QuestionImage image={question.option_images?.[i]} className="mt-2 max-h-32 w-auto max-w-full rounded-control" />
+                    </span>
                   </button>
                 );
               })}
@@ -338,6 +347,14 @@ function TakeAssessment() {
                 );
               })}
             </div>
+          )}
+
+          {question.question_type === "fill_blank" && (
+            <FillBlankInput text={question.question_text} value={answer} onChange={(v) => setAnswer(question.id, v, question.question_type)} />
+          )}
+
+          {question.question_type === "matching" && (
+            <MatchingInput options={question.options} value={answer} onChange={(v) => setAnswer(question.id, v, question.question_type)} />
           )}
 
           {question.question_type === "short_answer" && (

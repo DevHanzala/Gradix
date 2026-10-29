@@ -13,6 +13,7 @@ import LanguageSwitcher from "../../components/LanguageSwitcher.jsx";
 import { Alert, Button, Card, CardBody, PageSpinner } from "../../components/ui";
 import Leaderboard from "../../components/live/Leaderboard.jsx";
 import Podium from "../../components/live/Podium.jsx";
+import { BlankStem, FillBlankInput, MatchingInput, QuestionImage, StructuredAnswer } from "../../components/questions/QuestionParts.jsx";
 import PollResponder from "../../components/live/PollResponder.jsx";
 import TeamRace from "../../components/live/TeamRace.jsx";
 import { liveSounds } from "../../utils/liveSounds.js";
@@ -235,8 +236,9 @@ function LivePlay() {
               )}
             </div>
             <h1 className="mt-3 text-xl font-bold leading-relaxed text-ink sm:text-2xl" dir={textDirection(question.text)}>
-              {question.text}
+              {question.type === "fill_blank" ? <BlankStem text={question.text} /> : question.text}
             </h1>
+            <QuestionImage image={question.image} />
 
             {paused && (
               <Alert tone="info" className="mt-4" title={t("live.pausedTitle")}>
@@ -245,7 +247,33 @@ function LivePlay() {
               </Alert>
             )}
 
-            {options ? (
+            {["fill_blank", "matching"].includes(question.type) ? (
+              <form
+                className="mt-6 space-y-4"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  submit(draft);
+                }}
+              >
+                {myAnswer ? (
+                  <StructuredAnswer question={{ question_type: question.type, options: question.options }} answer={chosen} />
+                ) : question.type === "fill_blank" ? (
+                  <FillBlankInput text={question.text} value={draft || []} onChange={setDraft} disabled={paused || closed} size="md" />
+                ) : (
+                  <MatchingInput options={question.options} value={draft || {}} onChange={setDraft} disabled={paused || closed} />
+                )}
+                {!myAnswer && (
+                  <Button type="submit" loading={busy} disabled={!draft || paused || closed}>
+                    {t("live.submitAnswer")}
+                  </Button>
+                )}
+                {reveal && (
+                  <p className="font-semibold text-success-700">
+                    {t("live.correctAnswer")}: {String(correctAnswer)}
+                  </p>
+                )}
+              </form>
+            ) : options ? (
               <div role="radiogroup" aria-label={t("exam.answerOptions")} className="mt-6 grid gap-3 sm:grid-cols-2">
                 {options.map((option, i) => {
                   const selected = chosen !== undefined && String(chosen) === String(option);
@@ -274,6 +302,7 @@ function LivePlay() {
                       </span>
                       <span className="pt-0.5" dir={textDirection(String(optionLabel(t, option)))}>
                         {optionLabel(t, option)}
+                        <QuestionImage image={question.optionImages?.[i]} className="mt-2 max-h-28 w-auto max-w-full rounded-control" />
                       </span>
                       {isRight && <FaCheckCircle aria-label={t("live.correctAnswer")} className="ms-auto mt-1 shrink-0 text-success-600" />}
                       {isWrongPick && <FaTimesCircle aria-label={t("live.yourWrongAnswer")} className="ms-auto mt-1 shrink-0 text-danger-600" />}

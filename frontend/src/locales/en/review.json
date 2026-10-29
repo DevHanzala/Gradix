@@ -3,7 +3,8 @@
   "state": {
     "correct": "Correct",
     "wrong": "Incorrect",
-    "unanswered": "Not answered"
+    "unanswered": "Not answered",
+    "partial": "Partly right"
   },
   "objective": "Objective {{number}}: {{text}}",
   "chosenMarker": "(your answer)",

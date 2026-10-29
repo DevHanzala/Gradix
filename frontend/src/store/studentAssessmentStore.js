@@ -20,7 +20,7 @@ import {
  * saveStatus: idle | saving | saved | offline | error
  */
 
-const SAVE_DEBOUNCE_MS = { short_answer: 800, default: 250 };
+const SAVE_DEBOUNCE_MS = { short_answer: 800, fill_blank: 800, default: 250 };
 const RETRY_DELAY_MS = 3000;
 const PREPARING_RETRY_MS = 3000;
 

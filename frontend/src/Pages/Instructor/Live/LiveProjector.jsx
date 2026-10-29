@@ -98,9 +98,13 @@ function LiveProjector() {
               {current.question.text}
             </p>
           )}
-          {revealed && current.question ? (
+          {revealed && current.question && !optionsFor(current.question) ? (
+            <p className="text-3xl font-semibold text-success-700">
+              {t("live.correctAnswer")}: {String(current.question.correctAnswer)}
+            </p>
+          ) : revealed && current.question ? (
             <AnswerBars large options={optionsFor(current.question)} distribution={current.distribution} correct={current.question.correctAnswer} />
-          ) : current.question?.options ? (
+          ) : Array.isArray(current.question?.options) ? (
             <ol className="grid gap-4 sm:grid-cols-2">
               {current.question.options.map((o, i) => (
                 <li key={o} className="flex items-start gap-4 rounded-card border-2 border-line bg-surface p-5 text-2xl">

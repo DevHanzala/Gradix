@@ -22,6 +22,8 @@ export const QUESTION_TYPES = [
   { value: "multiple_choice", labelKey: "questionTypes.multiple_choice" },
   { value: "true_false", labelKey: "questionTypes.true_false" },
   { value: "short_answer", labelKey: "questionTypes.short_answer" },
+  { value: "fill_blank", labelKey: "questionTypes.fill_blank" },
+  { value: "matching", labelKey: "questionTypes.matching" },
 ];
 
 export const ACCEPTED_FILE_TYPES = ".pdf,.doc,.docx,.txt,.ppt,.pptx,.jpg,.jpeg,.png,.webp";
@@ -30,7 +32,7 @@ const L = ASSESSMENT_LIMITS;
 
 export const questionBlockSchema = z
   .object({
-    question_type: z.enum(["multiple_choice", "true_false", "short_answer"]),
+    question_type: z.enum(["multiple_choice", "true_false", "short_answer", "fill_blank", "matching"]),
     question_count: z.number().int("validation.wholeNumber").min(1, "validation.atLeast|1").max(L.maxQuestionsPerBlock, `validation.atMost|${L.maxQuestionsPerBlock}`),
     duration_per_question: z
       .number()
@@ -46,6 +48,12 @@ export const questionBlockSchema = z
       const n = block.num_options;
       if (!Number.isInteger(n) || n < L.minOptions || n > L.maxOptions) {
         ctx.addIssue({ code: "custom", path: ["num_options"], message: "validation.optionsRange" });
+      }
+    }
+    if (block.question_type === "matching") {
+      const n = block.num_options;
+      if (!Number.isInteger(n) || n < 3 || n > 6) {
+        ctx.addIssue({ code: "custom", path: ["num_options"], message: "validation.pairsRange" });
       }
     }
   });

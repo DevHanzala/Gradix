@@ -1,5 +1,7 @@
 {
   "multiple_choice": "چندگزینه‌ای",
   "true_false": "درست / نادرست",
-  "short_answer": "پاسخ کوتاه"
+  "short_answer": "پاسخ کوتاه",
+  "fill_blank": "جای خالی",
+  "matching": "جورکردنی"
 }

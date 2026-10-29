@@ -3,7 +3,8 @@
   "state": {
     "correct": "درست",
     "wrong": "غلط",
-    "unanswered": "جواب نہیں دیا"
+    "unanswered": "جواب نہیں دیا",
+    "partial": "جزوی درست"
   },
   "objective": "مقصد {{number}}: {{text}}",
   "chosenMarker": "(آپ کا جواب)",

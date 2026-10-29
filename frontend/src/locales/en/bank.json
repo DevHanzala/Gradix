@@ -37,5 +37,21 @@
   "noMatch": "No questions match",
   "noMatchBody": "Change the filters, or wait for publishing to finish.",
   "removeTitle": "Remove this question?",
-  "removeBody": "It will no longer be given to students. Students who already answered it are not affected."
+  "removeBody": "It will no longer be given to students. Students who already answered it are not affected.",
+  "addImage": "Add image",
+  "replaceImage": "Replace image",
+  "removeImage": "Remove image",
+  "optionImage": "Image",
+  "altText": "Image description (alt text)",
+  "altTextHint": "Required: describes the image for students who cannot see it.",
+  "imageFailed": "The image could not be uploaded.",
+  "blankHint": "Write [[1]], [[2]]… where the blanks go.",
+  "blankAnswers": "Accepted answers",
+  "blankAnswersHint": "One line per blank; separate several accepted answers with commas.",
+  "pairsLegend": "Pairs",
+  "pairLeft": "Item {{number}}",
+  "pairRight": "Match {{number}}",
+  "removePair": "Remove pair {{number}}",
+  "addPair": "Add pair",
+  "partialCredit": "Partial credit for each correct pair"
 }

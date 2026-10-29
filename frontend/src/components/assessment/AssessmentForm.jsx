@@ -28,7 +28,7 @@ const toFormData = (values, files) => {
     JSON.stringify(
       values.blocks.map((b) => ({
         ...b,
-        num_options: b.question_type === "multiple_choice" ? b.num_options : null,
+        num_options: ["multiple_choice", "matching"].includes(b.question_type) ? b.num_options : null,
       }))
     )
   );
@@ -77,6 +77,7 @@ function QuestionBlockEditor({ index, block, errors, disabled, onChange, onRemov
           hint={t("form.secondsHint", { min: ASSESSMENT_LIMITS.minDuration, max: ASSESSMENT_LIMITS.maxDuration })}
           {...numberField("duration_per_question")}
         />
+        {block.question_type === "matching" && <Input label={t("form.pairsPerQuestion")} min={3} max={6} {...numberField("num_options")} />}
         {block.question_type === "multiple_choice" && (
           <Input label={t("form.optionsPerQuestion")} min={ASSESSMENT_LIMITS.minOptions} max={ASSESSMENT_LIMITS.maxOptions} {...numberField("num_options")} />
         )}
@@ -92,6 +93,8 @@ function QuestionBlockEditor({ index, block, errors, disabled, onChange, onRemov
         />
       </div>
       {block.question_type === "short_answer" && <p className="mt-3 text-sm text-ink-subtle">{t("form.shortAnswerNote")}</p>}
+      {block.question_type === "fill_blank" && <p className="mt-3 text-sm text-ink-subtle">{t("form.fillBlankNote")}</p>}
+      {block.question_type === "matching" && <p className="mt-3 text-sm text-ink-subtle">{t("form.matchingNote")}</p>}
     </fieldset>
   );
 }

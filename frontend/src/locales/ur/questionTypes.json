@@ -1,5 +1,7 @@
 {
   "multiple_choice": "کثیر انتخابی",
   "true_false": "درست / غلط",
-  "short_answer": "مختصر جواب"
+  "short_answer": "مختصر جواب",
+  "fill_blank": "خالی جگہ پُر کریں",
+  "matching": "جوڑ ملائیں"
 }

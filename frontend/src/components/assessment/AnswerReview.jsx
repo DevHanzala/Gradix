@@ -3,6 +3,7 @@ import { FaCheckCircle, FaClock, FaMinusCircle, FaTimesCircle } from "react-icon
 import { textDirection } from "../../utils/text.js";
 import { formatDuration } from "../../utils/format.js";
 import { Badge } from "../ui";
+import { BlankStem, QuestionImage, StructuredAnswer } from "../questions/QuestionParts.jsx";
 
 /**
  * Read-only review of one attempt. `items` come from the API, already graded
@@ -27,12 +28,14 @@ function AnswerReview({ items, objectives = [] }) {
   return (
     <ol className="space-y-4">
       {items.map((q, i) => {
-        const student = displayAnswer(q.student_answer, q.question_type);
-        const correct = displayAnswer(q.correct_answer, q.question_type);
-        const state = !student ? "unanswered" : q.is_correct ? "correct" : "wrong";
+        const structured = ["fill_blank", "matching"].includes(q.question_type);
+        const student = structured ? (q.answered ? <StructuredAnswer question={q} answer={q.student_answer} /> : null) : displayAnswer(q.student_answer, q.question_type);
+        const correct = structured ? q.correct_answer_text : displayAnswer(q.correct_answer, q.question_type);
+        const partial = q.fraction > 0 && q.fraction < 1;
+        const state = !student ? "unanswered" : q.is_correct ? "correct" : partial ? "partial" : "wrong";
         const dir = textDirection(q.question_text);
-        const tone = { correct: "success", wrong: "danger", unanswered: "neutral" }[state];
-        const Icon = { correct: FaCheckCircle, wrong: FaTimesCircle, unanswered: FaMinusCircle }[state];
+        const tone = { correct: "success", wrong: "danger", unanswered: "neutral", partial: "warning" }[state];
+        const Icon = { correct: FaCheckCircle, wrong: FaTimesCircle, unanswered: FaMinusCircle, partial: FaMinusCircle }[state];
         const objective = objectiveIndex.get(q.objective_id);
 
         return (
@@ -63,8 +66,9 @@ function AnswerReview({ items, objectives = [] }) {
             )}
 
             <p dir={dir} className="font-medium text-ink">
-              {q.question_text}
+              {q.question_type === "fill_blank" ? <BlankStem text={q.question_text} /> : q.question_text}
             </p>
+            <QuestionImage image={q.image} />
 
             {Array.isArray(q.options) && q.options.length > 0 && (
               <ul dir={dir} className="mt-3 grid gap-2 sm:grid-cols-2">

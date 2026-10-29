@@ -94,3 +94,10 @@ export const approveBankQuestionApi = (assessmentId, questionId) =>
 
 export const regenerateBankQuestionApi = (assessmentId, questionId) =>
   apiClient.post(`/assessments/${assessmentId}/questions/${questionId}/regenerate`);
+
+/** Upload a question/option image (resized and stored privately): { key, url, width, height }. */
+export const uploadQuestionImageApi = (assessmentId, file) => {
+  const data = new FormData();
+  data.append("image", file);
+  return apiClient.post(`/assessments/${assessmentId}/question-images`, data, { headers: { "Content-Type": "multipart/form-data" } });
+};
