@@ -17,10 +17,16 @@ export default async function globalSetup() {
     FIREBASE_CLIENT_EMAIL: "test@example.com",
     FIREBASE_PRIVATE_KEY: "unused",
     GEMINI_CREATION_API_KEY_1: "unused",
-    GEMINI_CHECKING_API_KEY: "unused",
     // Present-but-empty so dotenv never loads real keys from a developer .env.
     GEMINI_CREATION_API_KEY_2: "",
     GROQ_API_KEY: "",
+    GEMINI_API_KEYS: "",
+    GEMINI_API_KEY: "",
+    EMAIL_PROVIDER: "smtp",
+    BREVO_API_KEY: "",
+    RESEND_API_KEY: "",
+    EMAIL_FROM: "",
+    EMAIL_FROM_NAME: "",
     TRUST_PROXY: "",
   });
   globalThis.__stopTestDatabase__ = await startTestDatabase();

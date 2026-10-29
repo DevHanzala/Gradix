@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import { hasGeminiKey } from "../services/ai/aiProviders.js";
+import { missingEmailSettings } from "../helper/emailProviders.js";
 
 dotenv.config();
 
@@ -42,6 +43,7 @@ export const validateEnv = (env = process.env, required = REQUIRED_ENV, required
   const missing = [
     ...required.filter((key) => !env[key] || !String(env[key]).trim()),
     ...requiredAny.filter(([, check]) => !check(env)).map(([description]) => description),
+    ...missingEmailSettings(env),
   ];
   if (missing.length > 0) {
     throw new Error(

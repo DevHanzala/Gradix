@@ -1,4 +1,3 @@
-import nodemailer from "nodemailer";
 import {
   verificationEmailTemplate,
   passwordResetEmailTemplate,
@@ -10,30 +9,14 @@ import {
   resultsReadyTemplate,
 } from "../utils/emailTemplates.js";
 import { formatDateTime, normalizeLanguage } from "./i18n.js";
-
-let transporter = null;
-const getTransporter = () => {
-  if (!transporter) {
-    transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-    });
-  }
-  return transporter;
-};
+import { sendWithProvider } from "./emailProviders.js";
 
 /**
  * Indirection so tests can capture emails instead of sending them.
+ * Delivery goes through the configured provider (helper/emailProviders.js).
  */
 export const mailer = {
-  send: async ({ to, subject, html }) =>
-    getTransporter().sendMail({
-      from: `"Gradix" <${process.env.EMAIL_USER}>`,
-      to,
-      subject,
-      html,
-      text: html.replace(/<[^>]*>/g, ""),
-    }),
+  send: async ({ to, subject, html }) => sendWithProvider({ to, subject, html, text: html.replace(/<[^>]*>/g, "") }),
 };
 
 /**
