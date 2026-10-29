@@ -83,6 +83,12 @@
     "LIVE_ANSWER_FIRST": "پہلے اس سوال کا جواب دیں۔",
     "LIVE_INVALID_ACTION": "یہ اس وقت ممکن نہیں۔",
     "LIVE_ENDED": "یہ سیشن ختم ہو چکا ہے۔",
-    "LIVE_PARTICIPANT_NOT_FOUND": "شریک نہیں ملا۔"
+    "LIVE_PARTICIPANT_NOT_FOUND": "شریک نہیں ملا۔",
+    "INVALID_POLL": "رائے شماری جانچیں: ایک سوال، اور انتخابی رائے شماری کے لیے 2 سے 6 مختلف اختیارات۔",
+    "POLL_NOT_OPEN": "یہ رائے شماری بند ہو چکی ہے۔",
+    "INVALID_POLL_ANSWER": "رائے شماری کا اپنا جواب جانچیں۔",
+    "POLL_ALREADY_ANSWERED": "آپ اس رائے شماری کا جواب دے چکے ہیں۔",
+    "LIVE_NO_TEAMS": "اس سیشن میں ٹیمیں نہیں ہیں۔",
+    "INVALID_TEAM": "سیشن کی ٹیموں میں سے ایک منتخب کریں۔"
   }
 }

@@ -83,6 +83,12 @@
     "LIVE_ANSWER_FIRST": "Answer this question first.",
     "LIVE_INVALID_ACTION": "That is not possible right now.",
     "LIVE_ENDED": "This session has ended.",
-    "LIVE_PARTICIPANT_NOT_FOUND": "Participant not found."
+    "LIVE_PARTICIPANT_NOT_FOUND": "Participant not found.",
+    "INVALID_POLL": "Check the poll: a question, and 2 to 6 different options for a choice poll.",
+    "POLL_NOT_OPEN": "This poll is closed.",
+    "INVALID_POLL_ANSWER": "Check your answer to the poll.",
+    "POLL_ALREADY_ANSWERED": "You already answered this poll.",
+    "LIVE_NO_TEAMS": "This session has no teams.",
+    "INVALID_TEAM": "Choose one of the session's teams."
   }
 }

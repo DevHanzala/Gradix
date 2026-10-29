@@ -15,7 +15,11 @@ import {
   participantStateService,
   answerService,
   nextQuestionService,
+  ownSession,
+  loadParticipant,
+  verifyParticipantToken,
 } from "../services/live/live.service.js";
+import { openPollService, closePollService, respondPollService, setParticipantTeamService } from "../services/live/engagement.service.js";
 
 /**
  * Live classroom sessions.
@@ -69,6 +73,16 @@ router.get("/sessions", ...teacher, handle((req) => listSessionsService(req.user
 router.get("/sessions/:id", ...teacher, handle((req) => getHostViewService(req.params.id, req.user)));
 router.post("/sessions/:id/control", ...teacher, handle((req) => controlService(req.params.id, req.user, req.body?.action)));
 router.delete("/sessions/:id/participants/:participantId", ...teacher, handle((req) => removeParticipantService(req.params.id, req.user, req.params.participantId)));
+router.post("/sessions/:id/polls", ...teacher, handle(async (req) => openPollService(await ownSession(req.params.id, req.user), req.body), 201));
+router.post("/sessions/:id/polls/:pollId/close", ...teacher, handle(async (req) => closePollService(await ownSession(req.params.id, req.user), req.params.pollId)));
+router.put(
+  "/sessions/:id/participants/:participantId/team",
+  ...teacher,
+  handle(async (req) => {
+    await setParticipantTeamService(await ownSession(req.params.id, req.user), req.params.participantId, req.body?.team);
+    return getHostViewService(req.params.id, req.user);
+  })
+);
 router.get("/sessions/:id/export.csv", ...teacher, async (req, res, next) => {
   try {
     const { filename, csv } = await exportCsvService(req.params.id, req.user);
@@ -87,5 +101,9 @@ router.post("/join", joinLimiter, optionalUser, handle((req) => joinService({ co
 router.get("/me", handle((req) => participantStateService(liveToken(req))));
 router.post("/me/answer", handle((req) => answerService(liveToken(req), { index: req.body?.index, answer: req.body?.answer })));
 router.post("/me/next", handle((req) => nextQuestionService(liveToken(req))));
+router.post(
+  "/me/poll",
+  handle(async (req) => respondPollService(await loadParticipant(verifyParticipantToken(liveToken(req))), { pollId: req.body?.pollId, answer: req.body?.answer }))
+);
 
 export default router;

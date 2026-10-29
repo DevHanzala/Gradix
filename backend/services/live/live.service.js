@@ -7,6 +7,7 @@ import { requireAssessmentAccess } from "../assessmentAccess.js";
 import { generateContent } from "../ai/generateContent.js";
 import { validateQuestion, LANGUAGES } from "../questions/validation.js";
 import { liveEvents } from "./liveEvents.js";
+import { openPollFor, pollsForHost, pickTeam, teamCount, teamStandings, TEAM_LIMITS } from "./engagement.service.js";
 
 /**
  * Live classroom sessions.
@@ -30,7 +31,7 @@ export const LIVE_LIMITS = {
   graceMs: 750,
   tokenTtl: "12h",
 };
-export const DEFAULT_SETTINGS = { game: false, showLeaderboard: true, sounds: true, anonymousNames: false };
+export const DEFAULT_SETTINGS = { game: false, showLeaderboard: true, sounds: true, anonymousNames: false, teams: 0 };
 
 const bad = (code, message, status = 400) => new AppError(code, status, message);
 const now = () => Date.now();
@@ -82,6 +83,13 @@ export const normalizeSettings = (raw = {}, base = DEFAULT_SETTINGS) => {
   const out = { ...base };
   for (const key of ["game", "showLeaderboard", "sounds", "anonymousNames"]) {
     if (raw[key] !== undefined) out[key] = raw[key] === true;
+  }
+  if (raw.teams !== undefined && raw.teams !== null && raw.teams !== "") {
+    const teams = Number.parseInt(raw.teams, 10);
+    if (!(teams === 0 || (teams >= TEAM_LIMITS.min && teams <= TEAM_LIMITS.max))) {
+      throw bad("INVALID_LIVE_SETTINGS", `Teams: 0 (no teams) or ${TEAM_LIMITS.min} to ${TEAM_LIMITS.max}.`);
+    }
+    out.teams = teams;
   }
   return out;
 };
@@ -235,7 +243,7 @@ const loadSession = async (sessionId, client = db, { forUpdate = false } = {}) =
   return rows[0];
 };
 
-const ownSession = async (sessionId, user, client = db, options) => {
+export const ownSession = async (sessionId, user, client = db, options) => {
   const session = await loadSession(sessionId, client, options);
   if (session.instructor_id !== user.id && user.role !== "super_admin") throw bad("LIVE_FORBIDDEN", "This is not your session.", 403);
   return session;
@@ -366,11 +374,13 @@ export const joinService = async ({ code, nickname, user = null }) => {
     if (!wanted) throw bad("NICKNAME_REQUIRED", "Enter a nickname to join.");
     const name = await uniqueNickname(client, session.id, wanted);
 
+    const teams = teamCount(session.settings);
+    const team = teams ? await pickTeam(client, session.id, teams) : null;
     const participant = (
       await client.query(
-        `INSERT INTO live_participants (session_id, user_id, nickname, current_index)
-         VALUES ($1, $2, $3, $4) RETURNING *`,
-        [session.id, user?.id ?? null, name, 0]
+        `INSERT INTO live_participants (session_id, user_id, nickname, current_index, team)
+         VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+        [session.id, user?.id ?? null, name, 0, team]
       )
     ).rows[0];
     if (session.question_mode === "unique") await assignOwnQuestions(client, session, participant.id);
@@ -384,7 +394,7 @@ export const joinService = async ({ code, nickname, user = null }) => {
   };
 };
 
-const loadParticipant = async ({ sessionId, participantId }, client = db, { forUpdate = false } = {}) => {
+export const loadParticipant = async ({ sessionId, participantId }, client = db, { forUpdate = false } = {}) => {
   const { rows } = await client.query(`SELECT * FROM live_participants WHERE id = $1 AND session_id = $2${forUpdate ? " FOR UPDATE" : ""}`, [
     participantId,
     sessionId,
@@ -427,6 +437,17 @@ export const leaderboard = async (sessionId, client = db, limit = 5) =>
     )
   ).rows;
 
+/** Team race standings from one aggregate query (cheap enough for every participant refresh). */
+const teamProgress = async (session, client = db) => {
+  const { rows } = await client.query(
+    `SELECT p.team, p.id, p.score AS points,
+            (SELECT count(*)::int FROM live_answers a WHERE a.participant_id = p.id AND a.is_correct) AS correct
+     FROM live_participants p WHERE p.session_id = $1 AND p.removed_at IS NULL AND p.team IS NOT NULL`,
+    [session.id]
+  );
+  return teamStandings(session.settings, rows, session.question_count);
+};
+
 /**
  * Everything one participant needs to render their screen. Answers appear only
  * after reveal (teacher-paced) or after they answered (student-paced).
@@ -445,6 +466,8 @@ export const participantStateService = async (token) => {
     myAnswer: null,
     reveal: null,
     finished: false,
+    poll: await openPollFor(session.id, p.id),
+    teams: teamCount(session.settings) ? await teamProgress(session) : [],
   };
   const game = session.settings?.game === true;
 
@@ -695,6 +718,8 @@ export const hostView = async (sessionId, client = db) => {
 
   return {
     session: { ...publicState(s), assessmentId: s.assessment_id, source: s.source, timeLimitMinutes: s.time_limit_minutes, createdAt: s.created_at, endedAt: s.ended_at },
+    teams: teamStandings(s.settings, people, s.question_count),
+    polls: await pollsForHost(s.id, client),
     participants: people,
     perQuestion,
     current: s.pacing === "teacher" && s.current_index >= 0 ? perQuestion[s.current_index] : null,

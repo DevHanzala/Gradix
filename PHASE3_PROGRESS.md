@@ -12,9 +12,9 @@ Gate after every section: `npm run lint`, `npm run i18n:check`, `npm run build`,
 |---|---|---|
 | 0. Leftovers and providers | done | 8d51a8d, f9fbeaf, 164dc53, fa233fb, 0a376f0, 132d372, 957a850 |
 | 1. File storage (R2) | done | 3c7716f |
-| 2. Live classroom mode | done | 413e41c, (section 2 commit) |
-| 3. Engagement: game mode, polls, exit tickets | in progress | |
-| 4. More question types | not started | |
+| 2. Live classroom mode | done | 413e41c, 4d5095e |
+| 3. Engagement: game mode, polls, exit tickets | done | (section 3 commit) |
+| 4. More question types | in progress | |
 | 5. Light proctoring and exam controls | not started | |
 | 6. Polish, help and accessibility | not started | |
 | 7. Plans and usage limits | not started | |
@@ -25,12 +25,15 @@ Gate after every section: `npm run lint`, `npm run i18n:check`, `npm run build`,
 
 ## Next
 
-Section 3: game mode UI (sounds, podium), team race, polls (single/multi/open text, anonymity), exit tickets.
-Scoring (points, speed, streak), the game/leaderboard/sounds/anonymous settings and the top-5 leaderboard
-already exist from section 2; section 3 adds teams, podium, sounds, polls and exit tickets.
+Section 4: image questions (upload, compress, alt text, storage), fill in the blank (several blanks,
+accepted answers, shared grader, AI generation), matching (pairs, partial credit, AI generation), in every
+place: generation/validation, bank, graded exam (adaptive, negative marking), live/practice, review,
+reports, analytics, print (PDF/DOCX incl. RTL).
 
-Browser check: `docs/phase3-evidence/scripts/liveFlow.mjs` (needs `demoServer.mjs`, a throwaway Postgres in
-PG* env, and the frontend built with VITE_API_URL=http://127.0.0.1:5056/api served on 127.0.0.1:5174).
+Browser checks: `docs/phase3-evidence/scripts/liveFlow.mjs` and `engagementFlow.mjs` (need `demoServer.mjs`,
+a throwaway Postgres in PG* env, and the frontend built with VITE_API_URL=http://127.0.0.1:5056/api served
+on 127.0.0.1:5174). Helper scripts for locale merges live in %TEMP%/gradix-tools (the session scratchpad
+gets cleaned).
 
 ## Decisions
 
@@ -92,6 +95,15 @@ PG* env, and the frontend built with VITE_API_URL=http://127.0.0.1:5056/api serv
 - **D2.8** Results appear in the instructor's Live sessions list (participants, % correct) and on the session
   board after it ends, with CSV export (UTF-8 BOM, formula injection neutralised). Live sessions are not
   mixed into graded-exam analytics, because they are ungraded practice.
+- **D3.1** Polls and exit tickets are one table (`live_polls`, kind single/multiple/text/exit_ticket), one open
+  poll per session (opening a new one closes the old), one response per participant, never graded. Anonymous
+  polls hide names from the teacher too; participants never see other people's answers.
+- **D3.2** The exit ticket stores no text: its three prompts (understanding 1-5, one thing learned, one
+  question) come from the UI catalogs in the *session's* language, whatever the student's UI language is.
+- **D3.3** Team race: 2-6 numbered teams, balanced automatically on join, teacher can move people. Progress =
+  team's correct answers / (members x questions), so a bigger team does not win by size.
+- **D3.4** Sounds are synthesised with Web Audio (no files to download): right/wrong at reveal on phones, a
+  fanfare at the podium on phones and the projector; only when the session's Sounds setting is on.
 - **D1.4** The AWS SDK v3 S3 client is used for R2 (lazy-loaded only when `STORAGE_DRIVER=r2`). Verified
   against Adobe S3Mock in Docker (put, list, get, presigned GET with the Urdu filename, delete). MinIO
   images are no longer published on Docker Hub/Quay, hence S3Mock; S3Mock does not check signatures, so

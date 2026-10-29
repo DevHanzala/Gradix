@@ -58,7 +58,7 @@ const armTimer = (session) => {
 
 // Only these change what participants see. Answers, joins and progress only update the teacher's
 // board, so 200 answers do not turn into 200 x 200 messages.
-const PUBLIC_KINDS = new Set(["start", "next", "pause", "resume", "reveal", "end", "timer", "closed"]);
+const PUBLIC_KINDS = new Set(["start", "next", "pause", "resume", "reveal", "end", "timer", "closed", "poll", "teams"]);
 
 const broadcast = async (sessionId, kind) => {
   if (!io) return;

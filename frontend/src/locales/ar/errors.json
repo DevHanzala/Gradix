@@ -83,6 +83,12 @@
     "LIVE_ANSWER_FIRST": "أجب عن هذا السؤال أولًا.",
     "LIVE_INVALID_ACTION": "هذا غير ممكن الآن.",
     "LIVE_ENDED": "انتهت هذه الجلسة.",
-    "LIVE_PARTICIPANT_NOT_FOUND": "لم يُعثر على المشارك."
+    "LIVE_PARTICIPANT_NOT_FOUND": "لم يُعثر على المشارك.",
+    "INVALID_POLL": "تحقق من الاستطلاع: سؤال، ومن 2 إلى 6 خيارات مختلفة لاستطلاع الاختيار.",
+    "POLL_NOT_OPEN": "هذا الاستطلاع مغلق.",
+    "INVALID_POLL_ANSWER": "تحقق من إجابتك عن الاستطلاع.",
+    "POLL_ALREADY_ANSWERED": "لقد أجبت عن هذا الاستطلاع بالفعل.",
+    "LIVE_NO_TEAMS": "لا توجد فرق في هذه الجلسة.",
+    "INVALID_TEAM": "اختر أحد فرق الجلسة."
   }
 }

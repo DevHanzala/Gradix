@@ -22,7 +22,7 @@ const EMPTY_FORM = {
   pacing: "teacher",
   questionMode: "same",
   timeLimitMinutes: 15,
-  settings: { game: false, showLeaderboard: true, sounds: true, anonymousNames: false },
+  settings: { game: false, showLeaderboard: true, sounds: true, anonymousNames: false, teams: 0 },
 };
 
 /** The instructor's live sessions, and a form to start a new one. */
@@ -148,6 +148,14 @@ function LiveSessions() {
                 ]}
               />
             )}
+
+            <Select
+              label={t("live.teams")}
+              hint={t("live.teamsHint")}
+              value={String(form.settings.teams)}
+              onChange={(e) => setSetting("teams", Number(e.target.value))}
+              options={[{ value: "0", label: t("live.noTeams") }, ...[2, 3, 4, 5, 6].map((n) => ({ value: String(n), label: t("live.teamCount", { n }) }))]}
+            />
 
             <fieldset className="md:col-span-2">
               <legend className="mb-1 text-sm font-semibold text-ink">{t("live.settings")}</legend>

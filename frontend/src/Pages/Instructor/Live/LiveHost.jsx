@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { FaDesktop, FaEye, FaFileCsv, FaForward, FaPause, FaPlay, FaStop, FaUserMinus } from "react-icons/fa";
-import { controlLiveSessionApi, exportLiveCsvApi, fetchLiveSessionApi, removeLiveParticipantApi } from "../../../api/live.api.js";
+import { closePollApi, controlLiveSessionApi, exportLiveCsvApi, fetchLiveSessionApi, openPollApi, removeLiveParticipantApi, setTeamApi } from "../../../api/live.api.js";
 import { openLiveSocket } from "../../../lib/liveSocket.js";
 import { errorMessage } from "../../../utils/forms.js";
 import { formatNumber } from "../../../utils/format.js";
@@ -11,6 +11,9 @@ import AnswerBars from "../../../components/live/AnswerBars.jsx";
 import JoinInfo from "../../../components/live/JoinInfo.jsx";
 import LiveTimer from "../../../components/live/LiveTimer.jsx";
 import Leaderboard from "../../../components/live/Leaderboard.jsx";
+import PollComposer from "../../../components/live/PollComposer.jsx";
+import PollResults from "../../../components/live/PollResults.jsx";
+import TeamRace from "../../../components/live/TeamRace.jsx";
 import { optionsFor } from "../../../components/live/liveOptions.js";
 import { Alert, Badge, Button, Card, CardBody, CardHeader, EmptyState, Modal, PageHeader, ResponsiveTable, SkeletonList, StatCard } from "../../../components/ui";
 
@@ -23,6 +26,38 @@ function LiveHost() {
   const [busy, setBusy] = useState(null);
   const [removing, setRemoving] = useState(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
+  const [pollBusy, setPollBusy] = useState(false);
+  const [pollError, setPollError] = useState(null);
+
+  const launchPoll = async (body) => {
+    setPollBusy(true);
+    setPollError(null);
+    try {
+      await openPollApi(id, body);
+      await load();
+      return true;
+    } catch (e) {
+      setPollError(errorMessage(e, t("live.pollLaunchFailed")));
+      return false;
+    } finally {
+      setPollBusy(false);
+    }
+  };
+  const closePoll = async (pollId) => {
+    try {
+      await closePollApi(id, pollId);
+      await load();
+    } catch (e) {
+      setPollError(errorMessage(e, t("live.actionFailed")));
+    }
+  };
+  const moveTeam = async (participantId, team) => {
+    try {
+      setView((await setTeamApi(id, participantId, team)).data.data);
+    } catch (e) {
+      setError(errorMessage(e, t("live.actionFailed")));
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -195,6 +230,42 @@ function LiveHost() {
 
       {session.settings.game && <Leaderboard rows={view.leaderboard} />}
 
+      {view.teams?.length > 0 && (
+        <Card className="my-6">
+          <CardBody>
+            <TeamRace teams={view.teams} />
+          </CardBody>
+        </Card>
+      )}
+
+      <div className="my-6 grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader title={t("live.quickPoll")} description={t("live.quickPollHint")} />
+          <CardBody>{ended ? <p className="text-ink-muted">{t("live.sessionEnded")}</p> : <PollComposer onLaunch={launchPoll} busy={pollBusy} error={pollError} />}</CardBody>
+        </Card>
+        <Card>
+          <CardHeader title={t("live.pollResultsTitle")} />
+          <CardBody className="space-y-6">
+            {!view.polls?.length && <p className="text-ink-muted">{t("live.noPollsYet")}</p>}
+            {[...(view.polls || [])].reverse().map((poll) => (
+              <section key={poll.id} className="border-b border-line pb-4 last:border-0">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <Badge tone={poll.status === "open" ? "success" : "neutral"}>
+                    {poll.kind === "exit_ticket" ? t("live.exitTicket") : t(`live.pollKind.${poll.kind}`)} · {poll.status === "open" ? t("live.pollOpen") : t("live.pollClosed")}
+                  </Badge>
+                  {poll.status === "open" && (
+                    <Button variant="secondary" onClick={() => closePoll(poll.id)}>
+                      {t("live.closePoll")}
+                    </Button>
+                  )}
+                </div>
+                <PollResults poll={poll} />
+              </section>
+            ))}
+          </CardBody>
+        </Card>
+      </div>
+
       {struggling.length > 0 && (
         <Alert tone="warning" title={t("live.strugglingTitle", { count: struggling.length })} className="my-6">
           {struggling.map((p) => p.nickname).join(" · ")}
@@ -233,6 +304,29 @@ function LiveHost() {
                       ? t("live.finished")
                       : t("live.onQuestion", { index: formatNumber(p.currentIndex + 1) }),
               },
+              ...(view.teams?.length
+                ? [
+                    {
+                      key: "team",
+                      header: t("live.team"),
+                      render: (p) => (
+                        <select
+                          aria-label={t("live.teamFor", { name: p.nickname })}
+                          value={p.team || ""}
+                          disabled={ended}
+                          onChange={(e) => moveTeam(p.id, e.target.value)}
+                          className="min-h-11 rounded-control border border-line-strong px-2"
+                        >
+                          {view.teams.map((tm) => (
+                            <option key={tm.team} value={tm.team}>
+                              {t("live.teamName", { n: tm.team })}
+                            </option>
+                          ))}
+                        </select>
+                      ),
+                    },
+                  ]
+                : []),
               { key: "score", header: t("live.correctOfAnswered"), render: (p) => `${formatNumber(p.correct)} / ${formatNumber(p.answered)}` },
               { key: "accuracy", header: t("live.accuracy"), render: (p) => (p.accuracy === null ? "–" : `${formatNumber(p.accuracy)}%`) },
               ...(session.settings.game ? [{ key: "points", header: t("live.pointsHeader"), render: (p) => formatNumber(p.points) }] : []),

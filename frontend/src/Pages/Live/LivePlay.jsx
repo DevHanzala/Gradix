@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { FaArrowRight, FaCheckCircle, FaPause, FaTimesCircle } from "react-icons/fa";
-import { answerLiveApi, fetchLiveMeApi, nextLiveApi } from "../../api/live.api.js";
+import { answerLiveApi, fetchLiveMeApi, nextLiveApi, respondPollApi } from "../../api/live.api.js";
 import { openLiveSocket } from "../../lib/liveSocket.js";
 import { forgetLiveToken, liveTokenFor } from "../../utils/liveTokens.js";
 import { errorMessage } from "../../utils/forms.js";
@@ -12,6 +12,10 @@ import LiveTimer from "../../components/live/LiveTimer.jsx";
 import LanguageSwitcher from "../../components/LanguageSwitcher.jsx";
 import { Alert, Button, Card, CardBody, PageSpinner } from "../../components/ui";
 import Leaderboard from "../../components/live/Leaderboard.jsx";
+import Podium from "../../components/live/Podium.jsx";
+import PollResponder from "../../components/live/PollResponder.jsx";
+import TeamRace from "../../components/live/TeamRace.jsx";
+import { liveSounds } from "../../utils/liveSounds.js";
 
 const optionLabel = (t, option) => (option === true || option === "true" ? t("common.true") : option === false || option === "false" ? t("common.false") : option);
 
@@ -54,9 +58,8 @@ function LivePlay() {
     socket.on("connect", load);
     socket.on("live:state", (s) => {
       const prev = lastPublic.current;
-      if (!prev || prev.status !== s.status || prev.currentIndex !== s.currentIndex || prev.phase !== s.phase || prev.questionDeadline !== s.questionDeadline) {
-        load();
-      }
+      const changed = !prev || prev.status !== s.status || prev.currentIndex !== s.currentIndex || prev.phase !== s.phase || prev.questionDeadline !== s.questionDeadline;
+      if (changed || s.kind === "poll" || s.kind === "teams") load();
     });
     socket.on("live:removed", () => setGone("removed"));
     return () => socket.close();
@@ -77,6 +80,27 @@ function LivePlay() {
     setDraft("");
     setFeedback(null);
   }, [questionKey]);
+
+  // Sounds (when the session has them on): right/wrong at reveal, a fanfare at the end.
+  const soundKey = state ? `${state.session.status}-${state.question?.index}-${Boolean(state.reveal)}` : "";
+  const lastSound = useRef(null);
+  useEffect(() => {
+    if (!state?.session.settings.sounds || lastSound.current === soundKey) return;
+    lastSound.current = soundKey;
+    if (state.session.status === "ended" && state.session.settings.game) liveSounds.fanfare();
+    else if (state.reveal && state.myAnswer) (state.myAnswer.correct ? liveSounds.correct : liveSounds.wrong)();
+  }, [soundKey, state]);
+
+  const answerPoll = async (answer) => {
+    try {
+      await respondPollApi(token, state.poll.id, answer);
+      await load();
+      return null;
+    } catch (e) {
+      await load();
+      return errorMessage(e, t("live.pollFailed"));
+    }
+  };
 
   const submit = async (answer) => {
     if (busy || state?.myAnswer) return;
@@ -112,13 +136,22 @@ function LivePlay() {
           {state?.me && (
             <p className="truncate text-sm text-ink-muted">
               {state.me.nickname}
+              {state.me.team && ` · ${t("live.teamName", { n: state.me.team })}`}
               {state.session.settings.game && ` · ${t("live.points", { count: state.me.points, value: formatNumber(state.me.points) })}`}
             </p>
           )}
         </div>
         <LanguageSwitcher />
       </header>
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">{children}</main>
+      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
+        {state?.poll && <PollResponder key={state.poll.id} poll={state.poll} sessionLanguage={state.session.language} onSubmit={answerPoll} />}
+        {children}
+        {state?.teams?.length > 0 && (
+          <div className="mt-6">
+            <TeamRace teams={state.teams} myTeam={state.me.team} />
+          </div>
+        )}
+      </main>
     </div>
   );
 
@@ -156,7 +189,11 @@ function LivePlay() {
           <p className="mt-3 text-2xl font-bold text-ink">{session.status === "ended" ? t("live.sessionEnded") : t("live.youFinished")}</p>
           <p className="mt-2 text-lg text-ink-muted">{answeredCount}</p>
           {session.settings.game && <p className="mt-1 text-lg font-semibold text-primary-700">{t("live.points", { count: me.points, value: formatNumber(me.points) })}</p>}
-          <Leaderboard rows={state.leaderboard} highlightId={me.id} />
+          {session.status === "ended" && session.settings.game ? (
+            <Podium rows={state.leaderboard} />
+          ) : (
+            <Leaderboard rows={state.leaderboard} highlightId={me.id} />
+          )}
           {state.finished && session.status !== "ended" && <p className="mt-4 text-sm text-ink-muted">{t("live.waitForOthers")}</p>}
         </CardBody>
       </Card>

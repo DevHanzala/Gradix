@@ -10,6 +10,10 @@ import AnswerBars from "../../../components/live/AnswerBars.jsx";
 import JoinInfo from "../../../components/live/JoinInfo.jsx";
 import LiveTimer from "../../../components/live/LiveTimer.jsx";
 import Leaderboard from "../../../components/live/Leaderboard.jsx";
+import Podium from "../../../components/live/Podium.jsx";
+import PollResults from "../../../components/live/PollResults.jsx";
+import TeamRace from "../../../components/live/TeamRace.jsx";
+import { liveSounds } from "../../../utils/liveSounds.js";
 import { optionsFor } from "../../../components/live/liveOptions.js";
 import { Alert, PageSpinner } from "../../../components/ui";
 
@@ -39,6 +43,12 @@ function LiveProjector() {
     return () => socket.close();
   }, [id, load]);
 
+  const ended = view?.session.status === "ended";
+  const fanfare = Boolean(view?.session.settings.game && view?.session.settings.sounds && ended);
+  useEffect(() => {
+    if (fanfare) liveSounds.fanfare();
+  }, [fanfare]);
+
   if (error) return <Alert tone="danger">{error}</Alert>;
   if (!view) return <PageSpinner label={t("common.loading")} />;
 
@@ -46,6 +56,7 @@ function LiveProjector() {
   const teacherPaced = session.pacing === "teacher";
   const revealed = session.phase === "reveal";
   const answered = participants.filter((p) => p.answeredCurrent).length;
+  const openPoll = view.polls?.find((p) => p.status === "open");
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas px-6 py-8 sm:px-12">
@@ -120,10 +131,23 @@ function LiveProjector() {
         </main>
       )}
 
+      {openPoll && (
+        <section className="mb-8 rounded-card border-2 border-primary-300 bg-surface p-6" aria-label={t("live.quickPoll")}>
+          <p className="mb-3 text-2xl font-semibold text-primary-700">{openPoll.kind === "exit_ticket" ? t("live.exitTicket") : t("live.quickPoll")}</p>
+          <PollResults poll={openPoll} large />
+        </section>
+      )}
+
+      {view.teams?.length > 0 && session.status !== "lobby" && (
+        <section className="mt-8">
+          <TeamRace teams={view.teams} large />
+        </section>
+      )}
+
       {session.status === "ended" && (
         <main className="flex flex-1 flex-col items-center justify-center">
           <p className="text-5xl font-bold text-ink">{t("live.sessionEnded")}</p>
-          {session.settings.game && session.settings.showLeaderboard && <Leaderboard rows={view.leaderboard} large />}
+          {session.settings.game && session.settings.showLeaderboard && <Podium rows={view.leaderboard} large />}
         </main>
       )}
     </div>

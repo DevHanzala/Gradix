@@ -15,3 +15,9 @@ export const joinLiveApi = (code, nickname) => apiClient.post("/live/join", { co
 export const fetchLiveMeApi = (token) => apiClient.get("/live/me", withToken(token));
 export const answerLiveApi = (token, index, answer) => apiClient.post("/live/me/answer", { index, answer }, withToken(token));
 export const nextLiveApi = (token) => apiClient.post("/live/me/next", {}, withToken(token));
+
+/* Polls, exit tickets and teams */
+export const openPollApi = (id, body) => apiClient.post(`/live/sessions/${id}/polls`, body);
+export const closePollApi = (id, pollId) => apiClient.post(`/live/sessions/${id}/polls/${pollId}/close`);
+export const setTeamApi = (id, participantId, team) => apiClient.put(`/live/sessions/${id}/participants/${participantId}/team`, { team });
+export const respondPollApi = (token, pollId, answer) => apiClient.post("/live/me/poll", { pollId, answer }, withToken(token));
