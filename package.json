@@ -32,6 +32,9 @@
       "mammoth": "^1.13.0",
       "js-yaml": "^4.3.2",
       "fflate": "^0.8.3"
+    },
+    "@firebase/firestore": {
+      "@grpc/grpc-js": "^1.14.6"
     }
   }
 }
