@@ -14,6 +14,10 @@ export const PASSWORD = "Passw0rdGood";
 let passwordHash;
 
 const TABLES = [
+  "live_answers",
+  "live_questions",
+  "live_participants",
+  "live_sessions",
   "llm_usage_log",
   "practice_sessions",
   "learning_reports",

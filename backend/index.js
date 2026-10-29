@@ -18,7 +18,12 @@ const startServer = async () => {
     await connectDB();
 
     const port = Number(process.env.PORT) || 5001;
-    app.listen(port, "0.0.0.0", () => {
+    const { createServer } = await import("http");
+    const server = createServer(app);
+    // Live sessions push updates over Socket.IO on the same port (works through Render's proxy).
+    const { attachRealtime } = await import("./services/live/realtime.js");
+    await attachRealtime(server);
+    server.listen(port, "0.0.0.0", () => {
       console.log(`Gradix backend listening on port ${port}`);
     });
 
