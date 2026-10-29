@@ -11,9 +11,9 @@ Gate after every section: `npm run lint`, `npm run i18n:check`, `npm run build`,
 | Section | Status | Commit |
 |---|---|---|
 | 0. Leftovers and providers | done | 8d51a8d, f9fbeaf, 164dc53, fa233fb, 0a376f0, 132d372, 957a850 |
-| 1. File storage (R2) | done | (section 1 commit) |
-| 2. Live classroom mode | in progress | |
-| 3. Engagement: game mode, polls, exit tickets | not started | |
+| 1. File storage (R2) | done | 3c7716f |
+| 2. Live classroom mode | done | 413e41c, (section 2 commit) |
+| 3. Engagement: game mode, polls, exit tickets | in progress | |
 | 4. More question types | not started | |
 | 5. Light proctoring and exam controls | not started | |
 | 6. Polish, help and accessibility | not started | |
@@ -25,7 +25,12 @@ Gate after every section: `npm run lint`, `npm run i18n:check`, `npm run build`,
 
 ## Next
 
-Section 2: live classroom mode (Socket.IO, sessions in DB, join codes, guests, teacher board).
+Section 3: game mode UI (sounds, podium), team race, polls (single/multi/open text, anonymity), exit tickets.
+Scoring (points, speed, streak), the game/leaderboard/sounds/anonymous settings and the top-5 leaderboard
+already exist from section 2; section 3 adds teams, podium, sounds, polls and exit tickets.
+
+Browser check: `docs/phase3-evidence/scripts/liveFlow.mjs` (needs `demoServer.mjs`, a throwaway Postgres in
+PG* env, and the frontend built with VITE_API_URL=http://127.0.0.1:5056/api served on 127.0.0.1:5174).
 
 ## Decisions
 
@@ -64,6 +69,29 @@ Section 2: live classroom mode (Socket.IO, sessions in DB, join codes, guests, t
   `?as=link` returns the signed link, which the UI now uses.
 - **D1.3** Storage keys use ASCII-only file names (`نوٹس.pdf` -> `file.pdf`); the real name is kept in the
   DB and restored in the download's Content-Disposition.
+- **D2.1** Commands are REST, Socket.IO only pushes. Every screen rebuilds from `GET /api/live/me` (participant)
+  or `GET /api/live/sessions/:id` (teacher), so a dropped socket, a reload or a server restart loses nothing.
+  Only public state changes (start, next, pause, resume, reveal, time up, end) are broadcast to the whole
+  room; answers and joins only refresh the teacher board, throttled to one push per 400 ms per session.
+- **D2.2** "Correct answers only at reveal": teacher-paced = when the teacher presses Show answer;
+  student-paced = after that student has answered (or their time ran out) for that question. The teacher's
+  own board shows the correct answer during the question; the projector view does not.
+- **D2.3** A teacher-paced question closes automatically when every active participant has answered, or
+  at its deadline (+750 ms grace for network latency). Pause stores the remaining time; resume restarts it.
+- **D2.4** Guests get a participant token signed with a different secret (`JWT_SECRET + ":live-participant"`),
+  valid 12 h, accepted only by `/api/live/me*` and the socket. It can never authenticate as a user, so guests
+  cannot reach graded exams. A removed participant's token stops working; the nickname becomes free.
+- **D2.5** Duplicate nicknames get a number ("Ali 2"), case-insensitively. Anonymous names ("Student N") are
+  a session setting. Join is rate-limited per IP at 300/min (a whole class often shares one school IP).
+- **D2.6** Unique-per-student mode needs an assessment bank (AI quick sets are one shared set). Each
+  participant gets their own snapshot spread over objectives with no repeats; a small bank is reused rather
+  than leaving a student without questions.
+- **D2.7** Scoring: correct = 500 + up to 500 for speed + 100 per streak step (max +500); wrong = 0. Points
+  are shown only in game mode; results always show correct/answered and accuracy. "Struggling" = at least 2
+  answers and accuracy <= 50%, or the last two wrong.
+- **D2.8** Results appear in the instructor's Live sessions list (participants, % correct) and on the session
+  board after it ends, with CSV export (UTF-8 BOM, formula injection neutralised). Live sessions are not
+  mixed into graded-exam analytics, because they are ungraded practice.
 - **D1.4** The AWS SDK v3 S3 client is used for R2 (lazy-loaded only when `STORAGE_DRIVER=r2`). Verified
   against Adobe S3Mock in Docker (put, list, get, presigned GET with the Urdu filename, delete). MinIO
   images are no longer published on Docker Hub/Quay, hence S3Mock; S3Mock does not check signatures, so

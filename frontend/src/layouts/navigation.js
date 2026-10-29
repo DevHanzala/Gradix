@@ -1,11 +1,13 @@
 import {
   FaBook,
+  FaBroadcastTower,
   FaChartBar,
   FaClipboardList,
   FaFolderOpen,
   FaHome,
   FaLayerGroup,
   FaPlusCircle,
+  FaSignInAlt,
   FaUserCog,
   FaUserPlus,
   FaUsers,
@@ -16,11 +18,13 @@ export const NAVIGATION = {
   student: [
     { to: "/student/dashboard", labelKey: "nav.dashboard", icon: FaHome },
     { to: "/student/analytics", labelKey: "nav.results", icon: FaChartBar },
+    { to: "/join", labelKey: "nav.joinLive", icon: FaSignInAlt },
   ],
   instructor: [
     { to: "/instructor/dashboard", labelKey: "nav.dashboard", icon: FaHome },
     { to: "/instructor/assessments", labelKey: "nav.assessments", icon: FaClipboardList, end: true },
     { to: "/instructor/assessments/create", labelKey: "nav.newAssessment", icon: FaPlusCircle },
+    { to: "/instructor/live", labelKey: "nav.live", icon: FaBroadcastTower },
     { to: "/instructor/resources", labelKey: "nav.resources", icon: FaFolderOpen },
     { to: "/instructor/students", labelKey: "nav.registerStudent", icon: FaUserPlus },
   ],

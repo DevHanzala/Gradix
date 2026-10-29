@@ -16,5 +16,7 @@
   "profile": "My profile",
   "logout": "Log out",
   "goToMyDashboard": "Go to my dashboard",
-  "groups": "Groups"
+  "groups": "Groups",
+  "live": "Live sessions",
+  "joinLive": "Join live session"
 }

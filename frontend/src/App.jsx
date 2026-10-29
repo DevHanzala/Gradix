@@ -86,6 +86,13 @@ const StudentAnalytics = lazy(() =>
   import("./Pages/Student/StudentAnalytics")
 );
 
+/* Live sessions */
+const JoinLive = lazy(() => import("./Pages/Live/JoinLive"));
+const LivePlay = lazy(() => import("./Pages/Live/LivePlay"));
+const LiveSessions = lazy(() => import("./Pages/Instructor/Live/LiveSessions"));
+const LiveHost = lazy(() => import("./Pages/Instructor/Live/LiveHost"));
+const LiveProjector = lazy(() => import("./Pages/Instructor/Live/LiveProjector"));
+
 /* Shared */
 const ProtectedRoute = lazy(() =>
   import("./components/ProtectedRoutes")
@@ -104,6 +111,8 @@ const INSTRUCTOR_ROUTES = [
   { path: "/instructor/assessments/:id/objectives", page: AssessmentObjectives },
   { path: "/instructor/assessments/:id/questions", page: QuestionBank },
   { path: "/instructor/students", page: AddStudent },
+  { path: "/instructor/live", page: LiveSessions },
+  { path: "/instructor/live/:id", page: LiveHost },
 ];
 
 /* Layouts */
@@ -151,6 +160,21 @@ function App() {
           <Route path="/forgot-password" element={<ResetPassword />} />
           <Route path="/reset-password/:resetId" element={<SetNewPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
+
+          {/* LIVE SESSIONS – open to guests (nickname only) and signed-in users */}
+          <Route path="/join" element={<JoinLive />} />
+          <Route path="/join/:code" element={<JoinLive />} />
+          <Route path="/live/:sessionId" element={<LivePlay />} />
+          <Route
+            path="/instructor/live/:id/projector"
+            element={
+              <ProtectedRoute allowedRoles={["instructor"]}>
+                <ExamLayout>
+                  <LiveProjector />
+                </ExamLayout>
+              </ProtectedRoute>
+            }
+          />
 
           {/* HOME – WITH NAVBAR */}
           <Route

@@ -1,0 +1,10 @@
+participant,guest,team,question,question_text,answer,correct,response_seconds,points
+Ali Raza,no,,1,Synthetic question number 6 about the lesson?,Alpha 6,no,0.0,0
+Ali Raza,no,,2,Synthetic question number 10 about the lesson?,Alpha 10,no,0.0,0
+Ali Raza,no,,3,Synthetic question number 9 about the lesson?,,,,
+Guest Zara,yes,,1,Synthetic question number 6 about the lesson?,Alpha 6,no,0.0,0
+Guest Zara,yes,,2,Synthetic question number 10 about the lesson?,Bravo 10,no,0.0,0
+Guest Zara,yes,,3,Synthetic question number 9 about the lesson?,,,,
+Sana Khan,no,,1,Synthetic question number 6 about the lesson?,Bravo 6,no,0.0,0
+Sana Khan,no,,2,Synthetic question number 10 about the lesson?,Alpha 10,no,0.0,0
+Sana Khan,no,,3,Synthetic question number 9 about the lesson?,,,,

@@ -56,13 +56,18 @@ const armTimer = (session) => {
   timers.set(session.id, timer);
 };
 
+// Only these change what participants see. Answers, joins and progress only update the teacher's
+// board, so 200 answers do not turn into 200 x 200 messages.
+const PUBLIC_KINDS = new Set(["start", "next", "pause", "resume", "reveal", "end", "timer", "closed"]);
+
 const broadcast = async (sessionId, kind) => {
   if (!io) return;
+  scheduleBoard(sessionId);
+  if (!PUBLIC_KINDS.has(kind)) return;
   const session = await loadState(sessionId);
   if (!session) return;
   io.to(`live:${sessionId}`).emit("live:state", { ...livePublicState(session), kind });
-  scheduleBoard(sessionId);
-  if (["start", "next", "resume", "pause", "end", "reveal", "timer"].includes(kind)) armTimer(session);
+  armTimer(session);
 };
 
 const authenticate = async (socket) => {

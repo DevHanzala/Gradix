@@ -63,6 +63,26 @@
     "UNCOVERED_OBJECTIVES": "Some learning objectives would get no question. Remove or merge objectives, add questions, or confirm to publish anyway.",
     "NO_ORIGINAL_FILE": "The original file of this resource was not kept; its text is still used for questions.",
     "LINK_EXPIRED": "This download link has expired. Try again.",
-    "FILE_NOT_FOUND": "The file was not found."
+    "FILE_NOT_FOUND": "The file was not found.",
+    "LIVE_TOKEN_INVALID": "Your place in this session has expired. Join again with the code.",
+    "LIVE_QUICK_SET_FAILED": "The AI could not write usable questions for this topic. Try a clearer topic.",
+    "LIVE_NO_QUESTIONS": "This assessment has no questions in that language yet. Publish it in that language first.",
+    "INVALID_LIVE_SETTINGS": "Check the session settings.",
+    "LIVE_NOT_FOUND": "Session not found.",
+    "LIVE_FORBIDDEN": "This is not your session.",
+    "LIVE_CODE_UNKNOWN": "No open session has this code. Check the code with your teacher.",
+    "LIVE_REMOVED": "The teacher removed you from this session.",
+    "LIVE_FULL": "This session is full.",
+    "NICKNAME_REQUIRED": "Enter a nickname to join.",
+    "LIVE_NOT_ACCEPTING": "Answers are not open right now.",
+    "LIVE_WRONG_QUESTION": "This question is no longer open.",
+    "LIVE_TIME_UP": "Time is up for this question.",
+    "LIVE_EMPTY_ANSWER": "Choose or type an answer first.",
+    "LIVE_ALREADY_ANSWERED": "You already answered this question.",
+    "LIVE_TEACHER_PACED": "Your teacher moves the class to the next question.",
+    "LIVE_ANSWER_FIRST": "Answer this question first.",
+    "LIVE_INVALID_ACTION": "That is not possible right now.",
+    "LIVE_ENDED": "This session has ended.",
+    "LIVE_PARTICIPANT_NOT_FOUND": "Participant not found."
   }
 }

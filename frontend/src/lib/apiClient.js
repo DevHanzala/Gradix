@@ -38,6 +38,9 @@ apiClient.interceptors.response.use(
       "/auth/forgot-password",
       "/auth/reset-password",
       "/auth/resend-verification",
+      // Live-session participants (often guests) are not logged in; a 401 there means "join again".
+      "/live/me",
+      "/live/join",
     ];
 
     const isAuthFree = authFreeEndpoints.some((endpoint) =>
