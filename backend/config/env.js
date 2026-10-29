@@ -1,4 +1,5 @@
 import dotenv from "dotenv";
+import { hasGeminiKey } from "../services/ai/aiProviders.js";
 
 dotenv.config();
 
@@ -20,20 +21,28 @@ export const REQUIRED_ENV = [
   "RECAPTCHA_SECRET_KEY",
   // App
   "FRONTEND_URL",
-  // Email
-  "EMAIL_USER",
-  "EMAIL_PASS",
-  // AI
-  "GEMINI_CREATION_API_KEY_1",
-  "GEMINI_CHECKING_API_KEY",
+];
+
+/**
+ * Requirements that one of several variables can satisfy, as [description, check(env)].
+ * The description is what the startup error names.
+ */
+export const REQUIRED_ANY = [
+  [
+    "a Gemini key (GEMINI_API_KEYS, GEMINI_CREATION_API_KEY_1 or GEMINI_API_KEY)",
+    (env) => hasGeminiKey(env),
+  ],
 ];
 
 /**
  * Throws one error listing every missing variable, so a misconfigured
  * deployment fails at boot instead of on the first request that needs it.
  */
-export const validateEnv = (env = process.env, required = REQUIRED_ENV) => {
-  const missing = required.filter((key) => !env[key] || !String(env[key]).trim());
+export const validateEnv = (env = process.env, required = REQUIRED_ENV, requiredAny = REQUIRED_ANY) => {
+  const missing = [
+    ...required.filter((key) => !env[key] || !String(env[key]).trim()),
+    ...requiredAny.filter(([, check]) => !check(env)).map(([description]) => description),
+  ];
   if (missing.length > 0) {
     throw new Error(
       `Missing required environment variables: ${missing.join(", ")}. ` +

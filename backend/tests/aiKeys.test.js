@@ -7,7 +7,7 @@ import { generateWithProviders, generateContent, aiAdapter } from "../services/a
 import { classifyRateLimit, keyStatus, pickKeys, resetKeyPoolState } from "../services/ai/keyPool.js";
 import { pool, resetDatabase, createUser, createAssessment, auth, installFakes } from "./helpers.js";
 
-const KEY_ENV = ["GEMINI_CREATION_API_KEY_1", "GEMINI_CREATION_API_KEY_2", "GEMINI_CREATION_API_KEY_3", "GROQ_API_KEY", "GROQ_API_KEY_2"];
+const KEY_ENV = ["GEMINI_API_KEYS", "GEMINI_API_KEY", "GEMINI_CREATION_API_KEY_1", "GEMINI_CREATION_API_KEY_2", "GEMINI_CREATION_API_KEY_3", "GROQ_API_KEY", "GROQ_API_KEY_2"];
 const saved = Object.fromEntries(KEY_ENV.map((k) => [k, process.env[k]]));
 
 /** Fake API clients: each key answers or fails as `plan[label]` says; calls are recorded. */
@@ -82,13 +82,48 @@ describe("API keys", () => {
     expect(classifyRateLimit(new Error("Empty Gemini response"))).toBeNull();
   });
 
-  test("calls are spread over the keys and logged with the key label", async () => {
+  test("GEMINI_API_KEYS (comma-separated) and the single-key variables work together", () => {
+    useKeys({ GEMINI_API_KEYS: "p, q ,,", GEMINI_CREATION_API_KEY_2: "b", GEMINI_API_KEY: "s", GROQ_API_KEY: "g" });
+    expect(listCreationKeys().map((k) => k.label)).toEqual(["gemini-2", "gemini-3", "gemini-4", "gemini-5", "groq-1"]);
+  });
+
+  test("calls rotate over the Gemini keys; Groq is only the fallback; logged with the key label", async () => {
     useKeys({ GEMINI_CREATION_API_KEY_1: "a", GEMINI_CREATION_API_KEY_2: "b", GROQ_API_KEY: "g" });
     aiAdapter.generate = generateWithProviders;
-    for (let i = 0; i < 30; i++) await generateContent("hello", { purpose: "question_generation" });
-    const { rows } = await pool.query(`SELECT key_label, count(*)::int AS n FROM llm_usage_log GROUP BY 1 ORDER BY 1`);
+    // 16 calls stay under the two keys' combined 20 requests per minute.
+    for (let i = 0; i < 16; i++) await generateContent("hello", { purpose: "question_generation" });
+    let { rows } = await pool.query(`SELECT key_label, count(*)::int AS n FROM llm_usage_log GROUP BY 1 ORDER BY 1`);
+    expect(rows.map((r) => r.key_label)).toEqual(["gemini-1", "gemini-2"]);
+    expect(rows.every((r) => r.n >= 6)).toBe(true);
+    // Past both keys' per-minute limit, Groq takes the extra calls.
+    for (let i = 0; i < 6; i++) await generateContent("hello", { purpose: "question_generation" });
+    ({ rows } = await pool.query(`SELECT key_label FROM llm_usage_log GROUP BY 1 ORDER BY 1`));
     expect(rows.map((r) => r.key_label)).toEqual(["gemini-1", "gemini-2", "groq-1"]);
-    expect(rows.every((r) => r.n >= 3)).toBe(true);
+  });
+
+  test("a 429 on one Gemini key moves to the next key, then to Groq, and the caller still gets an answer", async () => {
+    useKeys(
+      { GEMINI_CREATION_API_KEY_1: "a", GEMINI_CREATION_API_KEY_2: "b", GROQ_API_KEY: "g" },
+      { "gemini-1": rateLimit("Resource exhausted (429): requests per minute"), "gemini-2": rateLimit("429 Too Many Requests") }
+    );
+    aiAdapter.generate = generateWithProviders;
+    expect(await generateContent("hello", { purpose: "pool_generation" })).toBe("answer from groq-1");
+    expect(calls.slice(0, 2).sort()).toEqual(["gemini-1", "gemini-2"]);
+    expect(calls[2]).toBe("groq-1");
+    // Both Gemini keys cool down: the next call goes straight to Groq.
+    calls = [];
+    expect(await generateContent("hello", { purpose: "pool_generation" })).toBe("answer from groq-1");
+    expect(calls).toEqual(["groq-1"]);
+    const status = await keyStatus({ fresh: true });
+    for (const label of ["gemini-1", "gemini-2"]) expect(status.find((k) => k.label === label).blockedUntil).toBeTruthy();
+  });
+
+  test("OCR and embedding work never falls back to Groq", async () => {
+    useKeys({ GEMINI_CREATION_API_KEY_1: "a", GROQ_API_KEY: "g" });
+    for (const purpose of ["ocr_fallback", "embedding"]) {
+      expect((await pickKeys({ purpose })).map((k) => k.type)).toEqual(["gemini"]);
+    }
+    expect((await pickKeys({ purpose: "study_plan" })).map((k) => k.type)).toEqual(["gemini", "groq"]);
   });
 
   test("a key that is out of free quota today is skipped", async () => {

@@ -8,7 +8,8 @@ export const GROQ_MODEL = "openai/gpt-oss-20b";
  * Every configured API key, each with a stable label ("gemini-1", "groq-2"…).
  * Labels are what gets logged and shown; the keys themselves never leave here.
  *
- *   Gemini: GEMINI_CREATION_API_KEY_1, GEMINI_CREATION_API_KEY_2, … (any number)
+ *   Gemini: GEMINI_API_KEYS (comma-separated list), GEMINI_CREATION_API_KEY_1, _2, …
+ *           and the single GEMINI_API_KEY (all optional; any mix works)
  *   Groq:   GROQ_API_KEY, GROQ_API_KEY_2, GROQ_API_KEY_3, …
  *
  * Free-plan limits apply per Google project / Groq account, so keys from
@@ -24,10 +25,30 @@ const numbered = (env, pattern) =>
 let keys = null;
 const clients = new Map();
 
+/** Gemini keys: numbered ones keep their number; listed ones take the next free numbers. */
+const geminiKeys = (env) => {
+  const fixed = numbered(env, /^GEMINI_CREATION_API_KEY_(\d+)$/);
+  const listed = [...String(env.GEMINI_API_KEYS || "").split(","), env.GEMINI_API_KEY || ""]
+    .map((v) => v.trim())
+    .filter(Boolean);
+  let next = fixed.reduce((max, k) => Math.max(max, k.n), 0) + 1;
+  return [...fixed, ...listed.map((value) => ({ n: next++, value }))];
+};
+
+/** Whether any Gemini key is configured (startup check). */
+export const hasGeminiKey = (env = process.env) => geminiKeys(env).length > 0;
+
+/**
+ * Tasks Groq does not do: images (vision/OCR) and embeddings. For every other
+ * purpose Groq is the fallback after the Gemini keys.
+ */
+export const GEMINI_ONLY_PURPOSES = new Set(["ocr_fallback", "embedding"]);
+export const groqCanHandle = ({ purpose, needsImages = false } = {}) => !needsImages && !GEMINI_ONLY_PURPOSES.has(purpose);
+
 export const listCreationKeys = (env = process.env) => {
   if (keys && env === process.env) return keys;
   const list = [
-    ...numbered(env, /^GEMINI_CREATION_API_KEY_(\d+)$/).map(({ n, value }) => ({
+    ...geminiKeys(env).map(({ n, value }) => ({
       label: `gemini-${n}`,
       type: "gemini",
       model: GEMINI_MODEL,
@@ -72,19 +93,3 @@ export const setClientForTests = (label, client) => clients.set(label, client);
 
 /** Public description of the keys (no secrets). */
 export const describeKeys = () => listCreationKeys().map(({ label, type, model }) => ({ label, provider: type, model }));
-
-/* =========================
-   CHECKING MODEL (SINGLE)
-========================= */
-
-let checkingClient = null;
-
-export const getCheckingModel = async () => {
-  if (!checkingClient) {
-    if (!process.env.GEMINI_CHECKING_API_KEY) {
-      throw new Error("Missing GEMINI_CHECKING_API_KEY");
-    }
-    checkingClient = new GoogleGenAI({ apiKey: process.env.GEMINI_CHECKING_API_KEY });
-  }
-  return checkingClient;
-};

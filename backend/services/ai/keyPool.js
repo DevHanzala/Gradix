@@ -1,5 +1,5 @@
 import db from "../../DB/db.js";
-import { listCreationKeys } from "./aiProviders.js";
+import { listCreationKeys, groqCanHandle } from "./aiProviders.js";
 
 /**
  * Free-plan quota tracking per API key.
@@ -142,8 +142,9 @@ const shuffle = (list) => {
  * our counters think are used up come after (the counters are estimates); keys a
  * provider has actually refused for the day are left out until their reset.
  */
-export const pickKeys = async ({ needsImages = false } = {}) => {
-  const all = listCreationKeys().filter((k) => !needsImages || k.type === "gemini");
+export const pickKeys = async ({ needsImages = false, purpose } = {}) => {
+  const groqAllowed = groqCanHandle({ purpose, needsImages });
+  const all = listCreationKeys().filter((k) => k.type === "gemini" || groqAllowed);
   if (!all.length) throw new Error("No AI provider keys are configured");
   let statuses = [];
   try {
@@ -162,7 +163,9 @@ export const pickKeys = async ({ needsImages = false } = {}) => {
     if (!s || (s.status !== "exhausted" && !s.blockedUntil && !overMinute)) ready.push(key);
     else later.push(key);
   }
-  const order = [...shuffle(ready), ...shuffle(later)];
+  // Gemini first (rotated), Groq as the fallback; keys that are cooling down go last.
+  const geminiFirst = (list) => [...shuffle(list.filter((k) => k.type === "gemini")), ...shuffle(list.filter((k) => k.type !== "gemini"))];
+  const order = [...geminiFirst(ready), ...geminiFirst(later)];
   if (!order.length) {
     const resets = statuses.map((s) => s.resetsAt).filter(Boolean).sort();
     const error = new Error(`Every AI key has reached its free daily limit. Usage resets at ${resets[0] || "the next daily reset"}.`);

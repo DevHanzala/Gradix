@@ -1,5 +1,5 @@
 import db from "../../DB/db.js";
-import { getCheckingModel, clientFor, GEMINI_MODEL, GROQ_MODEL } from "./aiProviders.js";
+import { clientFor, GEMINI_MODEL, GROQ_MODEL } from "./aiProviders.js";
 import { pickKeys, noteRequest, noteFailure } from "./keyPool.js";
 
 /**
@@ -77,11 +77,26 @@ const timed = async (fn) => {
 };
 
 /**
+ * Keys to try for one call, in the pool's order (ready keys before cooling ones):
+ * up to MAX_KEY_ATTEMPTS Gemini keys plus one Groq key as the fallback, or up
+ * to MAX_KEY_ATTEMPTS Groq keys when no Gemini key is configured.
+ */
+export const attemptOrder = (keys) => {
+  const hasGemini = keys.some((k) => k.type === "gemini");
+  let gemini = 0;
+  let groq = 0;
+  return keys.filter((k) => {
+    if (k.type === "gemini") return ++gemini <= MAX_KEY_ATTEMPTS;
+    return ++groq <= (hasGemini ? 1 : MAX_KEY_ATTEMPTS);
+  });
+};
+
+/**
  * Real implementation: returns { text, attempts: [...] }.
- * Calls use the key pool (keyPool.js): keys with free quota left today are
- * shuffled so usage spreads over every account; on failure the next key is
- * tried (up to MAX_KEY_ATTEMPTS), and a key the provider rate-limits is parked
- * until its limit resets. Each attempt is logged with its key label.
+ * Calls use the key pool (keyPool.js): Gemini keys with free quota left today
+ * are rotated so usage spreads over every account; on failure the next key is
+ * tried, then Groq for text tasks. A key the provider rate-limits (429/quota)
+ * is parked until its limit resets. Each attempt is logged with its key label.
  */
 export const generateWithProviders = async (prompt, options = {}) => {
   const attempts = [];
@@ -95,13 +110,7 @@ export const generateWithProviders = async (prompt, options = {}) => {
     return r;
   };
 
-  if (options.useCheckingKey) {
-    const r = await run("gemini", async () => callGemini(await getCheckingModel(), prompt, options), { keyLabel: "gemini-checking", model: GEMINI_MODEL });
-    if (r.ok) return { text: r.value.text, attempts };
-    throw Object.assign(r.error, { attempts });
-  }
-
-  const keys = (await pickKeys({ needsImages: Boolean(options.images?.length) })).slice(0, MAX_KEY_ATTEMPTS);
+  const keys = attemptOrder(await pickKeys({ needsImages: Boolean(options.images?.length), purpose: options.purpose }));
   let lastError;
   for (const key of keys) {
     noteRequest(key.label);
@@ -152,7 +161,7 @@ const writeUsageLog = async (context, prompt, attempt, outputText) => {
  * @param {object} options
  *   purpose (required for reporting), assessmentId, userId,
  *   maxOutputTokens, temperature, topP, responseMimeType,
- *   images: [{ mimeType, data(base64) }], useCheckingKey
+ *   images: [{ mimeType, data(base64) }]
  * @returns {Promise<string>} the model's text
  */
 export const generateContent = async (prompt, options = {}) => {
