@@ -1,183 +1,120 @@
 # Gradix
 
-Gradix is an AI-based assessment and learning platform. An instructor uploads course material (PDF, Word, PowerPoint, text, images, web pages or YouTube videos) and/or writes a short prompt. Gradix then:
+Gradix is an integrity-first assessment and live-quiz platform for English, Urdu, Arabic and Persian classrooms.
+An instructor uploads course material (PDF, Word, PowerPoint, text, images, web pages) and/or writes a short prompt.
+Gradix then:
 
 - extracts the **learning objectives** the material teaches;
-- prepares a checked **question pool** in English, Urdu, Arabic and/or Persian, written natively in each language;
-- gives every student their **own question set** that covers the same objectives the same number of times;
-- serves questions **one at a time**, optionally **adapting the difficulty** to the student's answers;
-- shows the student **results immediately**: per-objective scores, weak areas, an AI **study plan**, ungraded **practice** and a downloadable **PDF report** in their language;
-- lets the instructor **print papers** (PDF or Word, one paper for all or a different paper per student, with an answer key).
+- prepares a checked **question pool** in each language, written natively: multiple choice, true/false, short
+  answer, **fill in the blank**, **matching**, with optional **images**;
+- gives every student their **own question set** covering the same objectives the same number of times, served
+  **one question at a time** with server-side timers, optional **adaptive difficulty** and **negative marking**;
+- offers **light proctoring** (with the student's consent; no camera), **exam windows**, **extra time** and option
+  shuffling;
+- shows results **immediately**: per-objective scores, weak areas, an AI **study plan**, unlimited **practice** and a
+  **PDF report** in the student's language;
+- prints **papers** (PDF or Word, one for all or different per student, with an answer key);
+- runs **live classroom sessions**: join by code or QR (guests welcome), teacher- or student-paced, real-time teacher
+  board, projector view, **game mode**, **team race**, **quick polls** and **exit tickets**.
 
-The whole interface works in English, Urdu, Arabic and Persian, with right-to-left layout for Urdu, Arabic and Persian. There are four roles: **Super Admin**, **Admin** (manages the users of their groups), **Instructor** and **Student**.
+The interface works in English, Urdu, Arabic, Persian and Sindhi, with right-to-left layout for the last four. Roles:
+**Super Admin**, **Admin** (manages the members of their groups), **Instructor**, **Student**; guests in live sessions.
+Plans (Free / Pro / Institution) meter usage; the Super Admin assigns them.
 
 | Folder | What it is |
 |---|---|
-| `backend/` | REST API and background jobs: Node.js + Express, PostgreSQL with pgvector, pg-boss job queue, Gemini/Groq LLMs, local multilingual embeddings, Tesseract OCR, Puppeteer PDF |
-| `frontend/` | Single-page app: React 19 + Vite + Tailwind CSS 4 + Zustand + react-i18next |
+| `backend/` | REST API, Socket.IO and background jobs: Node.js + Express, PostgreSQL with pgvector, pg-boss, Gemini/Groq, Cloudflare R2 (or local disk), Brevo/Resend email, Puppeteer PDFs |
+| `frontend/` | Single-page app (installable PWA): React 19 + Vite + Tailwind CSS 4 + Zustand + react-i18next |
+| `docs/` | Evidence of the Phase 3 checks, load-test scripts, quick-start guides (EN/UR, Markdown and PDF), translation review lists |
 
-This is an npm workspaces monorepo: run every command below from this folder (the repository root).
+This is an npm workspaces monorepo: run the commands below from this folder (the repository root).
 
----
+## Documents
 
-## Prerequisites
-
-- **Node.js 22.13 or newer** (`node -v`)
-- **PostgreSQL 14+ with the [pgvector](https://github.com/pgvector/pgvector) extension.** A hosted Postgres such as **Neon** works (pgvector is available there). For a local database with Docker: `docker compose -f backend/docker-compose.yml up -d db` (Postgres 16 + pgvector on port 5433).
-- Keys for the external services:
-  - **Google Gemini** API key(s); **Groq** key(s) are optional. Free-plan keys are fine (see [AI keys and free limits](#ai-keys-and-free-limits)).
-  - **Firebase** project with Google sign-in, plus a service account key for the backend
-  - **Google reCAPTCHA v3** site key and secret
-  - **Gmail** account with an app password, for sending email
-
-Puppeteer downloads its own Chromium during `npm install`. On servers without it, set `PUPPETEER_EXECUTABLE_PATH`.
+| Document | For |
+|---|---|
+| [DEPLOYMENT.md](DEPLOYMENT.md) | Deploying on Render + Neon + Cloudflare R2 + Brevo, step by step |
+| [USER_MANUAL.md](USER_MANUAL.md) | Every feature, role by role |
+| [DEMO_SCRIPT.md](DEMO_SCRIPT.md) | A 10-minute demo, with `npm run seed:demo` |
+| [TRACEABILITY.md](TRACEABILITY.md) | SRS requirements → code → tests → status |
+| `docs/quickstart/` | One-page guides for instructors and students (English, Urdu) |
+| `PHASE3_REPORT.md`, `FINAL_STATUS.md` | What Phase 3 delivered, measurements, open issues |
 
 ---
 
-## Setup
+## Local setup
+
+Prerequisites: **Node.js 22.13+**, **PostgreSQL 14+ with pgvector** (a Neon database works; or
+`docker compose -f backend/docker-compose.yml up -d db` for a local one on port 5433), and keys for Gemini
+(Groq optional), Firebase (Google sign-in), reCAPTCHA v3, and an email provider (Gmail SMTP is fine locally).
 
 ```bash
-# 1. Environment files (then fill in every value; each variable is described in the file)
-cp backend/.env.example backend/.env
+cp backend/.env.example backend/.env       # fill in every value; each variable is described in the file
 cp frontend/.env.example frontend/.env
-
-# 2. Install both workspaces
 npm install
-
-# 3. Create or update the database schema (safe to run again; applies only what is missing)
-npm run migrate
-
-# 4. Optional: sample accounts (one per role) and a sample assessment
-npm run seed
-#    or, for production, only a super admin (password of 12+ characters):
+npm run migrate                            # create/update the schema (only applies what is missing)
 npm run create-super-admin --workspace backend
-
-# 5. Run the backend and the frontend together
-npm run dev
+npm run dev                                # backend + frontend
 ```
 
-Open **http://localhost:5173**. The API runs on **http://localhost:5001** (health check: `/api/health`).
+Open **http://localhost:5173** (API on **http://localhost:5001**, health check `/api/health`). Locally files go to
+`backend/storage/` (`STORAGE_DRIVER=local`), embeddings use the local model (`EMBEDDING_PROVIDER=local`) and OCR uses
+Tesseract. Production uses R2, Gemini embeddings and Gemini OCR to stay under 512 MB (see DEPLOYMENT.md).
 
-Make sure the two apps point at each other:
-
-- `frontend/.env`: `VITE_API_URL=http://localhost:5001/api` (the backend's port; `PORT` in `backend/.env` changes it)
-- `backend/.env`: `FRONTEND_URL=http://localhost:5173`
-
-The backend refuses to start if a required variable is missing, and the error names it. Never commit `.env` files (they are git-ignored).
-
-Migrations are in `backend/migrations/` (one SQL file per change, applied in order and recorded in the `pgmigrations` table). Take a backup before migrating a production database; on Neon, create a branch first.
+The backend refuses to start if a required variable is missing and names it. Never commit `.env` files.
 
 ---
 
-## How it works
+## How it fits together
 
-**Instructor**
-
-1. **Create** an assessment: title, optional prompt, source material (upload files, pick from the resource library, or add web/YouTube links) and question blocks (type, count, seconds per question, marks, negative marking).
-2. **Objectives** are extracted automatically from the material (a few seconds; never more objectives than questions). Review them: edit, reorder, weight, add or delete.
-3. **Publish** in the chosen languages. A question pool is generated and validated per objective, difficulty and language. Students can start as soon as their language is ready.
-4. **Enroll** students one by one or a whole group, then follow the results: per-objective accuracy, hardest objectives, score distribution, difficulty reached, each student's answers, and CSV/Excel export.
-5. **Print** a paper (PDF or Word), the same for everyone or different per student, with a combined answer key.
-
-**Student**
-
-- Chooses the exam language and answers one question at a time, each with its own timer. Answers are saved as they go, and refreshing the page resumes the exam.
-- After submitting: score and difficulty-adjusted score, results per objective, weak areas, an AI study plan with the exact passages to re-read, unlimited ungraded practice, and a PDF report.
-
-**Admins**
-
-- The **Super Admin** manages every account and role, creates groups, and sees platform activity and AI usage.
-- An **Admin** sees and manages only the members of their own groups.
-
----
-
-## Background jobs
-
-Objective extraction, question pools and re-processing of uploaded files run as background jobs in a pg-boss queue stored in the same Postgres database. **The backend process runs these jobs itself**, so one process is a complete server (`npm run dev` locally, `npm start --workspace backend` in production). Work interrupted by a restart is picked up again automatically.
-
-To run jobs on a separate machine instead, start `npm run worker` there and set `JOBS_IN_API=false` on the API.
-
----
-
-## AI keys and free limits
-
-Add as many keys as you have in `backend/.env`:
-
-```
-GEMINI_CREATION_API_KEY_1=...
-GEMINI_CREATION_API_KEY_2=...
-GROQ_API_KEY=...
-GROQ_API_KEY_2=...
-```
-
-- Each AI call goes to a randomly chosen key that **still has free quota today**. If a call fails, another key is tried.
-- A key the provider rate-limits is paused: for a minute after a per-minute limit, or until its daily reset after a daily limit.
-- Every call is logged with its key's label (for example `gemini-2`); the key itself is never stored or shown.
-- The **Super Admin dashboard** shows AI requests and tokens used today, and for each key: requests and tokens used against its limit, what is left, its status and when it resets. It also shows a chart of tokens per day. No costs are shown.
-- Default free limits:
-
-  | Model | Requests per minute | Requests per day | Tokens per day | Daily reset |
-  |---|---|---|---|---|
-  | Gemini 2.5 Flash | 10 | 250 | no limit | midnight Pacific time |
-  | Groq gpt-oss-20b | 30 | 1,000 | 200,000 | midnight UTC |
-
-  Free limits change and apply per Google project or Groq account, so keys from different accounts add capacity. If your consoles show other numbers, set `LLM_FREE_LIMITS_JSON`, for example `{"gemini-2.5-flash":{"rpd":500}}`.
-
-Embeddings run locally (a multilingual model of about 120 MB, downloaded once on first use), so they need no API key.
-
----
-
-## Configuration reference
-
-Every variable is listed with a description in `backend/.env.example` and `frontend/.env.example`. The optional ones you are most likely to change:
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `PORT` | `5001` | Backend port |
-| `JOBS_IN_API` | `true` | Run background jobs in the backend process |
-| `WORKER_CONCURRENCY` | `2` | Jobs processed in parallel |
-| `LLM_FREE_LIMITS_JSON` | built-in free limits | Your plan's limits per model |
-| `LLM_LOG_RETENTION_DAYS` | `365` | How long AI usage rows are kept |
-| `POOL_ON_DEMAND_TIMEOUT_MS` | `20000` | Max wait for a question generated during an exam |
-| `OCR_GEMINI_FALLBACK` | `false` | Send unreadable scanned pages to Gemini (sends documents to Google) |
-| `EMBEDDING_MODEL` / `EMBEDDING_CACHE_DIR` | multilingual-e5-small | Local embedding model and its cache folder |
+- **Background jobs** (objective extraction, question pools, re-chunking, re-embedding) are pg-boss jobs in Postgres,
+  run inside the API process by default (`RUN_WORKER_IN_PROCESS=true`, one at a time in production). Unfinished work
+  resumes after a restart.
+- **Live sessions** keep all state in Postgres; Socket.IO only pushes changes, so a reload, a dropped connection or a
+  server restart loses nothing. Correct answers leave the server only at reveal.
+- **AI keys**: list Gemini keys in `GEMINI_API_KEYS` (comma-separated) and optionally `GROQ_API_KEY`. Calls rotate over
+  the Gemini keys with free quota left; a key that returns a 429 cools down and the next one is tried, then Groq (text
+  tasks only). The Super Admin dashboard shows usage per key against the free limits.
+- **Files** are private and served through links that expire (5 minutes; question images 1 hour).
+- **Email** goes through Brevo or Resend over HTTPS (Render's free tier blocks SMTP); Gmail SMTP for development.
 
 ---
 
 ## Tests and checks
 
 ```bash
-npm test             # backend: Jest + Supertest
+npm test             # backend: Jest + Supertest (in-process PGlite with pgvector; all external services faked)
 npm run lint         # ESLint (backend + frontend) and the translation check
-npm run i18n:check   # translation check only: missing keys, hard-coded text
-npm run build        # production build of the frontend (frontend/dist)
+npm run i18n:check   # translation check only
+npm run build        # production build of the frontend
 ```
 
-Backend tests need no external services or keys. They start an in-process PostgreSQL (PGlite with pgvector), run the migrations, and replace the AI, email, reCAPTCHA, Firebase and embedding model with in-memory fakes. To use a real Postgres instead, set `TEST_PGHOST`, `TEST_PGPORT`, `TEST_PGDATABASE`, `TEST_PGUSER` and `TEST_PGPASSWORD`. To see the app's log output during tests, run `npm test -- --silent=false`.
-
-UI text lives in `frontend/src/locales/<language>/<area>.json`; email and report text in `backend/locales/<language>.json`. Every key must exist in every language (the check fails otherwise).
-
----
+GitHub Actions runs all four on every push and pull request. `YOUTUBE_LIVE_TEST=true npm test -- tests/youtube.live.test.js`
+runs the optional live YouTube test.
 
 ## Scripts
 
 | Script | Purpose |
 |---|---|
-| `npm run dev` | Backend and frontend together |
-| `npm run dev:backend` / `npm run dev:frontend` | One app only |
+| `npm run dev` / `dev:backend` / `dev:frontend` | Development servers |
 | `npm run build` | Frontend production build |
-| `npm run lint` / `npm test` / `npm run i18n:check` | Checks |
 | `npm run migrate` | Apply database migrations |
-| `npm run seed` | Sample data for development |
-| `npm run rechunk` | Re-process older uploaded resources (also done automatically in the background) |
-| `npm run worker` | Optional separate job worker (with `JOBS_IN_API=false`) |
+| `npm run seed` | Sample accounts for development |
+| `npm run seed:demo` | Demo data for DEMO_SCRIPT.md (uses the real AI keys) |
+| `npm run backup` / `npm run restore -- <key>` | Logical backup to storage / restore it |
+| `npm run storage:migrate --workspace backend` | Move cached reports (and local files, `--copy-local`) into the configured storage |
+| `npm run rechunk` | Re-process older resources |
+| `npm run worker` | Optional separate job worker (with `RUN_WORKER_IN_PROCESS=false`) |
 
-Workspace-only scripts: `npm run migrate:down --workspace backend`, `npm run create-super-admin --workspace backend`.
-
----
+Developer tools: `node backend/scripts/translateUi.js <lang>` fills missing UI strings from English with Gemini (listed in
+`docs/translation-review-<lang>.md` for native review); `node frontend/scripts/add-strings.mjs <file.json>` merges strings.
 
 ## Troubleshooting
 
-- **The objectives page keeps saying "Reading your material…"**: check that the backend log shows `[jobs] running … job type(s)` at startup and that `JOBS_IN_API` is not `false` (unless you run `npm run worker`). After 3 minutes the page offers **Try again**. The first extraction after installing can take a few minutes while the embedding model downloads.
-- **"Every AI key has reached its free daily limit"**: all keys are used up for today. Add keys from other accounts or wait for the reset time shown on the Super Admin dashboard. Published question pools keep working.
-- **The frontend shows network errors**: `VITE_API_URL` must match the backend's port, and `FRONTEND_URL` must match the frontend's address (CORS).
+- **"Reading your material…" never ends**: the log must show `[jobs] running … job type(s)` at startup; after 3 minutes
+  the page offers **Try again**.
+- **"Every AI key has reached its free daily limit"**: add keys from other Google accounts or wait for the reset time shown
+  on the Super Admin dashboard. Published pools keep working.
+- **Network errors in the browser**: `VITE_API_URL` must point at the API (ending in `/api`) and `FRONTEND_URL` must be the
+  site's exact address (CORS).
+- **"Waking up the server…"**: the free Render instance was asleep; requests retry by themselves for up to ~90 s.
