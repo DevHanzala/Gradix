@@ -1,0 +1,130 @@
+# Render Blueprint for Gradix: Dashboard > New > Blueprint > pick this repository.
+# Only variable NAMES are here; Render asks for every "sync: false" value when you create
+# the Blueprint (never commit secrets). See DEPLOYMENT.md for what each variable means.
+services:
+  # ---------------------------------------------------------------- API (Node)
+  - type: web
+    name: gradix-api
+    runtime: node
+    plan: free
+    region: singapore          # pick the region closest to your Neon database
+    branch: main
+    rootDir: .                 # npm workspaces: install from the repository root
+    buildCommand: npm ci
+    startCommand: npm start --workspace backend
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22.20.0
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "1"
+      # Background jobs run inside this process, one at a time (512 MB instance).
+      - key: RUN_WORKER_IN_PROCESS
+        value: "true"
+      - key: WORKER_CONCURRENCY
+        value: "1"
+      # Memory: Gemini for embeddings and OCR instead of the local model and Tesseract.
+      - key: EMBEDDING_PROVIDER
+        value: gemini
+      - key: OCR_PROVIDER
+        value: gemini
+      - key: STORAGE_DRIVER
+        value: r2
+      - key: EMAIL_PROVIDER
+        value: brevo
+      - key: EMAIL_FROM_NAME
+        value: Gradix
+      # Database (Neon: use the DIRECT host, not the "-pooler" one)
+      - key: PGHOST
+        sync: false
+      - key: PGPORT
+        value: "5432"
+      - key: PGDATABASE
+        sync: false
+      - key: PGUSER
+        sync: false
+      - key: PGPASSWORD
+        sync: false
+      # App
+      - key: FRONTEND_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      # Google sign-in (Firebase Admin) and reCAPTCHA
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+      - key: RECAPTCHA_SECRET_KEY
+        sync: false
+      # AI (comma-separated Gemini keys; Groq is the optional fallback)
+      - key: GEMINI_API_KEYS
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      # Email (Brevo HTTP API; EMAIL_FROM must be a sender verified in Brevo)
+      - key: BREVO_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      # File storage (Cloudflare R2)
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      # Optional error monitoring
+      - key: SENTRY_DSN
+        sync: false
+
+  # ------------------------------------------------------- Frontend (static)
+  - type: web
+    name: gradix
+    runtime: static
+    branch: main
+    rootDir: .
+    buildCommand: npm ci && npm run build --workspace frontend
+    staticPublishPath: frontend/dist
+    autoDeploy: true
+    # Single-page app: every path serves index.html (the service worker and assets are real files).
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+    envVars:
+      - key: NODE_VERSION
+        value: 22.20.0
+      # Built into the bundle at build time: redeploy after changing any of these.
+      - key: VITE_API_URL
+        sync: false
+      - key: VITE_FIREBASE_API_KEY
+        sync: false
+      - key: VITE_FIREBASE_AUTH_DOMAIN
+        sync: false
+      - key: VITE_FIREBASE_PROJECT_ID
+        sync: false
+      - key: VITE_FIREBASE_STORAGE_BUCKET
+        sync: false
+      - key: VITE_FIREBASE_MESSAGING_SENDER_ID
+        sync: false
+      - key: VITE_FIREBASE_APP_ID
+        sync: false
+      - key: VITE_RECAPTCHA_SITE_KEY
+        sync: false
+      - key: VITE_SENTRY_DSN
+        sync: false

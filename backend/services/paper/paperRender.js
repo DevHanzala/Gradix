@@ -1,14 +1,3 @@
-import {
-  AlignmentType,
-  BorderStyle,
-  Document,
-  HeadingLevel,
-  ImageRun,
-  Packer,
-  PageBreak,
-  Paragraph,
-  TextRun,
-} from "docx";
 import { escapeHtml, escapeHtmlMultiline } from "../../utils/escapeHtml.js";
 import { normalizeOptions, canonicalOptionIndex, parseBoolean, decodeStoredValue, matchingOptions, parseMatchingRule, parseBlankRule, BLANK_MARKER } from "../../utils/grading.js";
 import { imageBytes } from "../questions/questionImages.js";
@@ -202,6 +191,8 @@ export const renderPaperPdf = async (args) => {
 
 export const renderPaperDocx = async ({ sets, headers, language: lang }) => {
   await preloadImages(sets, { png: true });
+  // Loaded only when a Word paper is printed.
+  const { AlignmentType, BorderStyle, Document, HeadingLevel, ImageRun, Packer, PageBreak, Paragraph, TextRun } = await import("docx");
   const language = normalizeLanguage(lang);
   const rtl = isRtl(language);
   const font = language === "ur" ? "Noto Nastaliq Urdu" : rtl ? "Noto Naskh Arabic" : "Calibri";

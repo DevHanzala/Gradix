@@ -9,6 +9,7 @@ import { POOL_LANGUAGES, publishAssessment, retryPublish, poolStatus, loadAssess
 import { AppError } from "../../utils/AppError.js";
 import { decodeStoredValue, normalizeOptions, questionOptions, matchingOptions } from "../../utils/grading.js";
 import { normalizeImageRef, normalizeOptionImages } from "../questions/questionImages.js";
+import { assertWithinPlan } from "../plans.service.js";
 
 /**
  * Instructor question bank: browse, preview, edit (versioned), retire,
@@ -89,6 +90,8 @@ export const poolStatusService = async (assessmentId, user) => {
 
 export const publishService = async (assessmentId, user, languages, options = {}) => {
   const owned = await requireAssessmentAccess(assessmentId, user);
+  // Publishing writes AI questions: it needs AI budget left this month (running exams are never stopped).
+  await assertWithinPlan(user, "aiQuestionsPerMonth", 1);
   await publishAssessment(owned.id, languages, { allowUncovered: options.allowUncovered === true });
   return poolStatus(owned.id);
 };

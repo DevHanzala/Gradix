@@ -15,7 +15,11 @@ import { errorHandler, notFound } from "./middleware/errorMiddleware.js";
 import "./jobs/index.js";
 import fileRoutes from "./routes/fileRoutes.js";
 import liveRoutes from "./routes/liveRoutes.js";
+import feedbackRoutes from "./routes/feedbackRoutes.js";
+import planRoutes from "./routes/planRoutes.js";
 import { signImageUrls } from "./services/questions/questionImages.js";
+import { healthReport } from "./services/health.js";
+import { requestLogger } from "./middleware/requestLogger.js";
 
 /**
  * Builds the Express app without connecting to the database or listening,
@@ -23,6 +27,7 @@ import { signImageUrls } from "./services/questions/questionImages.js";
  */
 const app = express();
 app.disable("x-powered-by");
+app.use(requestLogger);
 
 // Behind a reverse proxy (Render, Railway, Nginx) set TRUST_PROXY=1 so rate
 // limits see the real client IP.
@@ -58,13 +63,12 @@ app.use("/api/taking", signImageUrls, studentAssessmentRoutes);
 app.use("/api/instructor-analytics", signImageUrls, instructorAssessmentAnalyticsRoutes);
 app.use("/api/files", fileRoutes);
 app.use("/api/live", signImageUrls, liveRoutes);
+app.use("/api/feedback", feedbackRoutes);
+app.use("/api/plans", planRoutes);
 
-app.get("/api/health", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "Gradix backend is running",
-    timestamp: new Date().toISOString(),
-  });
+app.get("/api/health", async (req, res) => {
+  const report = await healthReport();
+  res.status(report.status === "down" ? 503 : 200).json(report);
 });
 
 app.use(notFound);

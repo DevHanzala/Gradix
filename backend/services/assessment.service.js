@@ -21,6 +21,7 @@ import {
   normalizeAssessmentInput,
 } from "../validator/assessmentInput.js";
 import { normalizeExamSettings, examSettingsOf } from "./examControls.js";
+import { assertWithinPlan } from "./plans.service.js";
 
 /** multipart sends booleans as strings; undefined means "not sent". */
 const parseFlag = (value) => {
@@ -68,6 +69,7 @@ export const createAssessmentService = async (body, user, files = []) => {
   });
 
   await assertResourcesUsable(resourceIds, user);
+  await assertWithinPlan(user, "assessmentsPerMonth", 1);
   const prepared = await prepareUploadedFiles(files);
   const linkSources = await prepareLinks(links);
 
@@ -238,6 +240,7 @@ export const enrollStudentService = async (assessmentId, email, user) => {
   const student = await findUserByEmail(normalizedEmail);
   if (!student) throw new AppError("STUDENT_NOT_FOUND", 404, "No account exists with that email.");
   if (student.role !== "student") throw new AppError("NOT_A_STUDENT", 400, "That account is not a student account.");
+  if (await isNewStudentFor(user.id, [student.id])) await assertWithinPlan(user, "students", 1);
 
   let enrollment;
   try {
@@ -262,6 +265,8 @@ export const enrollStudentService = async (assessmentId, email, user) => {
 export const enrollGroupService = async (assessmentId, groupId, user) => {
   const assessment = await requireAssessmentAccess(assessmentId, user);
   const { group, students } = await groupStudentsForEnrollment(user, groupId);
+  const newcomers = await isNewStudentFor(user.id, students.map((s) => s.id));
+  if (newcomers) await assertWithinPlan(user, "students", newcomers);
   const instructor = await getUserById(user.id);
   const added = [];
   for (const student of students) {
@@ -361,4 +366,15 @@ export const setExtraTimeService = async (assessmentId, studentId, user, extraTi
   );
   if (!rows[0]) throw new AppError("NOT_ENROLLED", 404, "This student is not enrolled.");
   return { studentId: rows[0].student_id, extraTime: Number(rows[0].extra_time) };
+};
+
+/** How many of these students are not yet enrolled in any of the instructor's assessments (plan metering). */
+const isNewStudentFor = async (instructorId, studentIds) => {
+  if (!studentIds.length) return 0;
+  const { rows } = await db.query(
+    `SELECT count(*)::int AS n FROM unnest($2::int[]) AS s(id)
+     WHERE NOT EXISTS (SELECT 1 FROM enrollments e JOIN assessments a ON a.id = e.assessment_id WHERE a.instructor_id = $1 AND e.student_id = s.id)`,
+    [instructorId, studentIds]
+  );
+  return rows[0].n;
 };

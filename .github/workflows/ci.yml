@@ -1,0 +1,28 @@
+# Lint, translation check, build and tests on every push and pull request.
+# Tests need no secrets or services: they use an in-process Postgres (PGlite) and fakes.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Chromium is not needed in CI (PDF tests use a fake renderer).
+      PUPPETEER_SKIP_DOWNLOAD: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.20.0
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run i18n:check
+      - run: npm run build
+        env:
+          VITE_API_URL: http://localhost:5001/api
+      - run: npm test

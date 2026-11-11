@@ -13,6 +13,7 @@ import { AppError } from "../utils/AppError.js";
 import { prepareUploadedFile, insertPreparedResource, decodeFilename, prepareLink } from "../helper/resourceIngest.js";
 import db, { withTransaction } from "../DB/db.js";
 import { storage } from "../helper/storage.js";
+import { assertWithinPlan } from "./plans.service.js";
 
 // ==================== SERVICE FUNCTIONS ====================
 
@@ -29,6 +30,11 @@ export const uploadResourceService = async (data, userId, files) => {
   }
   if (!uploadedFiles.length && !url) {
     throw new Error("NO_FILES_OR_URL");
+  }
+  if (uploadedFiles.length) {
+    const { rows } = await db.query(`SELECT id, role FROM users WHERE id = $1`, [userId]);
+    const megabytes = Math.ceil(uploadedFiles.reduce((s, f) => s + (f.size || 0), 0) / (1024 * 1024));
+    await assertWithinPlan(rows[0], "storageMb", megabytes);
   }
 
   const uploadedResources = [];

@@ -8,6 +8,7 @@ import { generateContent } from "../ai/generateContent.js";
 import { validateQuestion, LANGUAGES } from "../questions/validation.js";
 import { liveEvents } from "./liveEvents.js";
 import { openPollFor, pollsForHost, pickTeam, teamCount, teamStandings, TEAM_LIMITS } from "./engagement.service.js";
+import { assertWithinPlan, liveSessionLimit } from "../plans.service.js";
 
 /**
  * Live classroom sessions.
@@ -194,6 +195,9 @@ export const createSessionService = async (user, input = {}) => {
   const seconds = intIn(input.secondsPerQuestion, 5, 600, 30);
   const timeLimit = pacing === "student" ? intIn(input.timeLimitMinutes, 1, 240, Math.max(1, Math.ceil((count * seconds * 1.5) / 60))) : null;
   const settings = normalizeSettings(input.settings);
+  // The plan decides how many people can join one session.
+  const planSize = await liveSessionLimit(user);
+  if (planSize) settings.maxParticipants = planSize;
   let title = String(input.title || "").trim().slice(0, 200);
 
   let assessment = null;
@@ -208,6 +212,7 @@ export const createSessionService = async (user, input = {}) => {
     if (questionMode === "unique") throw bad("INVALID_LIVE_SETTINGS", "Unique questions per student need an assessment's question bank.");
     const topic = String(input.topic || "").trim().slice(0, 500);
     if (topic.length < 3) throw bad("INVALID_LIVE_SETTINGS", "Describe the topic for the AI questions.");
+    await assertWithinPlan(user, "aiQuestionsPerMonth", count);
     shared = await generateQuickSet({ topic, count, language, userId: user.id });
     title ||= topic.slice(0, 200);
   }

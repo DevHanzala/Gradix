@@ -3,7 +3,7 @@ import { defineJob } from "../registry.js";
 import { enqueue } from "../queue.js";
 import { prepareText, insertChunks } from "../../helper/resourceIngest.js";
 import { CHUNKING_VERSION } from "../../helper/chunker.js";
-import { EMBEDDING_MODEL } from "../../helper/embeddingGenerator.js";
+import { EMBEDDING_MODEL, embedPassages, toPgVector } from "../../helper/embeddingGenerator.js";
 
 /**
  * Bring a resource up to the current chunking + embedding version.
@@ -62,8 +62,28 @@ export const rechunkSweepJob = async () => {
   for (const { id } of rows) {
     await enqueue("resources.rechunk", { resourceId: id }, { singletonKey: `resource-${id}` });
   }
-  return { enqueued: rows.length };
+  const pool = await db.query(`SELECT count(*)::int AS n FROM question_pool WHERE embedding IS NOT NULL AND embedding_model IS DISTINCT FROM $1`, [EMBEDDING_MODEL]);
+  if (pool.rows[0].n) await enqueue("pool.reembed", {}, { singletonKey: "pool-reembed" });
+  return { enqueued: rows.length, poolQuestions: pool.rows[0].n };
+};
+
+/** Re-embed pool questions made with another embedding model (batches of 100 until none are left). */
+export const reembedPoolJob = async () => {
+  let done = 0;
+  for (;;) {
+    const { rows } = await db.query(
+      `SELECT id, question_text FROM question_pool WHERE embedding IS NOT NULL AND embedding_model IS DISTINCT FROM $1 ORDER BY id LIMIT 100`,
+      [EMBEDDING_MODEL]
+    );
+    if (!rows.length) return { reembedded: done };
+    const vectors = await embedPassages(rows.map((r) => r.question_text));
+    for (const [i, r] of rows.entries()) {
+      await db.query(`UPDATE question_pool SET embedding = $2::vector, embedding_model = $3 WHERE id = $1`, [r.id, toPgVector(vectors[i]), EMBEDDING_MODEL]);
+    }
+    done += rows.length;
+  }
 };
 
 defineJob("resources.rechunk", rechunkResourceJob, { policy: "stately" });
 defineJob("resources.rechunk-sweep", rechunkSweepJob, { policy: "stately", retryLimit: 1 });
+defineJob("pool.reembed", reembedPoolJob, { policy: "stately", retryLimit: 2 });

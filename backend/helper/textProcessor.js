@@ -1,8 +1,5 @@
 import path from "path";
 import { fileURLToPath } from "url";
-import pdfParse from "pdf-parse/lib/pdf-parse.js";
-import { createWorker } from "tesseract.js";
-import { getTextExtractor } from "office-text-extractor";
 import { AppError } from "../utils/AppError.js";
 import { assessTextQuality } from "./textQuality.js";
 import { generateContent } from "../services/ai/generateContent.js";
@@ -12,13 +9,23 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** Local Tesseract language data shipped in assets/tessdata (uncompressed). */
 export const TESSDATA_DIR = path.join(__dirname, "..", "assets", "tessdata");
 const OCR_LANGUAGES = ["eng", "ara", "urd", "fas"];
+// Heavy libraries are loaded on first use only (memory on a 512 MB server).
+const loadPdfParse = async () => (await import("pdf-parse/lib/pdf-parse.js")).default;
+const loadTesseract = async () => (await import("tesseract.js")).createWorker;
+const loadOffice = async () => (await import("office-text-extractor")).getTextExtractor;
+
 /**
- * Optional fallback: when Tesseract's output is unusable, ask Gemini (vision)
- * to transcribe the image(s). Off unless OCR_GEMINI_FALLBACK=true, because it
- * sends the document to an external service.
+ * OCR provider (OCR_PROVIDER): "tesseract" (development default, runs locally) or
+ * "gemini" (production default when NODE_ENV=production: Gemini vision, no 100+ MB
+ * Tesseract worker in memory). The other one is the fallback when the first fails or
+ * reads nothing usable. OCR_GEMINI_FALLBACK=true keeps the old behaviour of allowing
+ * Gemini as the fallback in development; it sends the document to Google either way.
  */
+export const ocrProvider = () =>
+  (process.env.OCR_PROVIDER || (process.env.NODE_ENV === "production" ? "gemini" : "tesseract")).toLowerCase() === "gemini" ? "gemini" : "tesseract";
+
 export const ocrFallback = {
-  enabled: () => String(process.env.OCR_GEMINI_FALLBACK || "").toLowerCase() === "true",
+  enabled: () => ocrProvider() === "gemini" || String(process.env.OCR_GEMINI_FALLBACK || "").toLowerCase() === "true",
   transcribe: async (images) => {
     const parts = images.map((buffer) => ({ mimeType: "image/png", data: Buffer.from(buffer).toString("base64") }));
     return generateContent(
@@ -34,7 +41,8 @@ export const MAX_OCR_PAGES = 20;
 const MIN_PDF_TEXT_CHARS = 200;
 
 
-const officeExtractor = getTextExtractor();
+let officeExtractor = null;
+const office = async () => (officeExtractor ??= (await loadOffice())());
 
 const QUALITY_MESSAGES = {
   empty: "No readable text was found in this file. If it is a scan, try a clearer image.",
@@ -49,6 +57,7 @@ const unreadable = (message) => new AppError("UNREADABLE_DOCUMENT", 422, message
  * One worker per call, always terminated.
  */
 export const runOCR = async (images) => {
+  const createWorker = await loadTesseract();
   const worker = await createWorker(OCR_LANGUAGES, 1, {
     langPath: TESSDATA_DIR,
     gzip: false,
@@ -96,8 +105,17 @@ export const cleanText = (text = "") =>
     .replace(/\p{Cc}+/gu, (m) => (m.includes("\n") ? "\n" : " "))
     .trim();
 
-/** OCR images with Tesseract; if the result is unusable and the fallback is enabled, use Gemini. */
+/** OCR images: Gemini first in production (Tesseract as the fallback), Tesseract first otherwise. */
 const ocrImages = async (images) => {
+  if (ocrProvider() === "gemini") {
+    try {
+      const transcribed = cleanText(await ocrFallback.transcribe(images));
+      if (assessTextQuality(transcribed).ok) return { text: transcribed, method: "ocr_gemini" };
+    } catch (error) {
+      console.error(`[ocr] Gemini OCR failed, using Tesseract: ${error.message}`);
+    }
+    return { text: cleanText(await runOCR(images)), method: "ocr_tesseract" };
+  }
   const text = cleanText(await runOCR(images));
   if (assessTextQuality(text).ok || !ocrFallback.enabled()) return { text, method: "ocr_tesseract" };
   try {
@@ -122,11 +140,11 @@ export const extractTextWithMethod = async (buffer, mimeType) => {
   let result;
 
   if (mimeType.includes("officedocument") || mimeType.includes("msword") || mimeType.includes("presentation")) {
-    result = { text: cleanText(await officeExtractor.extractText({ input: buffer, type: "buffer" })), method: "office" };
+    result = { text: cleanText(await (await office()).extractText({ input: buffer, type: "buffer" })), method: "office" };
   } else if (mimeType === "application/pdf") {
     let parsedText;
     try {
-      parsedText = cleanText((await pdfParse(buffer)).text);
+      parsedText = cleanText((await (await loadPdfParse())(buffer)).text);
     } catch {
       parsedText = "";
     }

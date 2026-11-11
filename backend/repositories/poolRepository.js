@@ -1,4 +1,5 @@
 import db from "../DB/db.js";
+import { EMBEDDING_MODEL } from "../helper/embeddingGenerator.js";
 
 const BUCKET_FILTER = `
   assessment_id = $1 AND language = $2 AND objective_id = $3 AND question_type = $4 AND difficulty = $5
@@ -46,8 +47,8 @@ export const insertPoolQuestionQuery = async (assessmentId, q, client = db) => {
     `INSERT INTO question_pool
        (assessment_id, objective_id, question_type, difficulty, language, question_text, options, correct_answer,
         stem_hash, embedding, source_chunk_ids, origin, version, previous_version_id, approved_at, approved_by, created_by,
-        image, option_images)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::vector, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+        image, option_images, embedding_model)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::vector, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
      ON CONFLICT (assessment_id, language, stem_hash) WHERE status = 'active' DO NOTHING
      RETURNING id`,
     [
@@ -70,6 +71,7 @@ export const insertPoolQuestionQuery = async (assessmentId, q, client = db) => {
       q.created_by || null,
       q.image ? JSON.stringify(q.image) : null,
       q.option_images ? JSON.stringify(q.option_images) : null,
+      q.embedding ? EMBEDDING_MODEL : null,
     ]
   );
   return rows[0] || null;

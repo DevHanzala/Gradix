@@ -1,10 +1,12 @@
 import { isAppError } from "../utils/AppError.js"
+import { logError } from "./requestLogger.js"
+import { captureError } from "../services/monitoring.js"
 
 // Error handling middleware
 // eslint-disable-next-line no-unused-vars -- Express identifies error handlers by arity
 export const errorHandler = (err, req, res, next) => {
   if (isAppError(err)) {
-    return res.status(err.status).json({ success: false, code: err.code, message: err.message })
+    return res.status(err.status).json({ success: false, code: err.code, message: err.message, ...(err.details ? { details: err.details } : {}) })
   }
 
   // Upload errors (wrong field name, file too large, unsupported type)
@@ -168,13 +170,15 @@ export const errorHandler = (err, req, res, next) => {
   const message = error.message || "Server Error"
 
   if (statusCode >= 500) {
-    console.error(`[${req.method} ${req.originalUrl}]`, err.message)
+    logError(req, err)
+    captureError(err, req)
   }
 
   // Never send stack traces or raw error objects to clients.
   res.status(statusCode).json({
     success: false,
     message: statusCode >= 500 && !error.statusCode ? "Server Error" : message,
+    ...(statusCode >= 500 && req.id ? { requestId: req.id } : {}),
   })
 }
 

@@ -6,6 +6,7 @@ import useAssessmentStore from "../../store/assessmentStore.js";
 import useInstructorAnalyticsStore from "../../store/useInstructorAssessmentAnalyticsStore.js";
 import AssessmentStatus from "../../components/assessment/AssessmentStatus.jsx";
 import { Alert, Button, Card, CardHeader, EmptyState, PageHeader, SkeletonList, StatCard } from "../../components/ui";
+import UsageCard from "../../components/plans/UsageCard.jsx";
 import { errorMessage } from "../../utils/forms.js";
 import { formatNumber } from "../../utils/format.js";
 
@@ -41,6 +42,8 @@ function InstructorDashboard() {
           </Button>
         }
       />
+
+      <UsageCard />
 
       {loadError && (
         <Alert tone="danger" className="mb-6">

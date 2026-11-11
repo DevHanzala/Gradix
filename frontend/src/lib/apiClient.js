@@ -1,4 +1,5 @@
 import axios from "axios";
+import { requestStarted, requestFinished, isWakeError, markWaking, WAKE_RETRY } from "./serverWake.js";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL;
@@ -6,6 +7,31 @@ const API_BASE_URL =
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
 });
+
+// Waking-up detection and retry while the free-tier server starts (see serverWake.js).
+apiClient.interceptors.request.use((config) => {
+  requestStarted();
+  return config;
+});
+apiClient.interceptors.response.use(
+  (response) => {
+    requestFinished();
+    return response;
+  },
+  async (error) => {
+    requestFinished();
+    const config = error.config;
+    // Retry when the server is not up yet. Only GETs, or any request that never reached it.
+    const safe = config && (config.method === "get" || !error.response);
+    if (safe && isWakeError(error) && (config.__wakeRetries || 0) < WAKE_RETRY.attempts) {
+      config.__wakeRetries = (config.__wakeRetries || 0) + 1;
+      markWaking();
+      await new Promise((r) => setTimeout(r, WAKE_RETRY.delayMs));
+      return apiClient(config);
+    }
+    return Promise.reject(error);
+  }
+);
 
 
 /**

@@ -17,7 +17,8 @@ import { listJobDefinitions } from "./registry.js";
 export const STALE_AFTER_MINUTES = 5;
 const WATCHDOG_MS = 5 * 60 * 1000;
 
-export const jobsRunInApi = () => String(process.env.JOBS_IN_API ?? "true").toLowerCase() !== "false";
+/** RUN_WORKER_IN_PROCESS (Phase 3 name) or JOBS_IN_API (older name); on by default. */
+export const jobsRunInApi = () => String(process.env.RUN_WORKER_IN_PROCESS ?? process.env.JOBS_IN_API ?? "true").toLowerCase() !== "false";
 
 /** Re-queue work that should be running but may have been lost. Returns what was re-queued. */
 export const recoverStuckWork = async ({ olderThanMinutes = 0 } = {}) => {
@@ -42,7 +43,9 @@ export const recoverStuckWork = async ({ olderThanMinutes = 0 } = {}) => {
 
 let watchdog = null;
 
-export const startJobWorkers = async ({ concurrency = Number(process.env.WORKER_CONCURRENCY) || 2 } = {}) => {
+// Production (one small instance): one job at a time by default to keep memory low.
+const defaultConcurrency = () => Number(process.env.WORKER_CONCURRENCY) || (process.env.NODE_ENV === "production" ? 1 : 2);
+export const startJobWorkers = async ({ concurrency = defaultConcurrency() } = {}) => {
   const boss = await getBoss();
   for (const def of listJobDefinitions()) {
     await boss.work(def.name, { batchSize: 1, localConcurrency: concurrency }, async ([job]) =>

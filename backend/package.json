@@ -16,7 +16,9 @@
     "lint": "eslint .",
     "seed": "node scripts/seed.js",
     "rechunk": "node scripts/rechunkResources.js",
-    "storage:migrate": "node scripts/migrateStorage.js"
+    "storage:migrate": "node scripts/migrateStorage.js",
+    "backup": "node scripts/backup.js",
+    "restore": "node scripts/restore.js"
   },
   "keywords": [
     "education",
@@ -33,6 +35,7 @@
     "@huggingface/transformers": "^4.3.1",
     "@mozilla/readability": "^0.6.0",
     "@napi-rs/canvas": "^1.0.11",
+    "@sentry/node": "^11.12.0",
     "axios": "^1.13.5",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.5",
