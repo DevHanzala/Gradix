@@ -78,6 +78,8 @@ if (!resume) {
   await resetDatabase();
   const mk = (name, role, email) => createUser({ name, role, email });
   ids.instructor = (await mk("Iqra Instructor", "instructor", "instructor@demo.io")).id;
+  ids.superAdmin = (await mk("Sara Super", "super_admin", "super@demo.io")).id;
+  ids.admin = (await mk("Adam Admin", "admin", "admin@demo.io")).id;
   ids.students = [];
   for (const [n, e] of [
     ["Ali Raza", "ali@demo.io"],
