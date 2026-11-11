@@ -1,0 +1,18 @@
+# Memory test image: the backend on Linux like Render (Node 22 + Chromium for PDFs).
+# Built from the repository root:  docker build -f docs/phase3-evidence/scripts/Dockerfile.memtest -t gradix-memtest .
+FROM node:22.20.0-bookworm-slim
+WORKDIR /app
+# Chromium's system libraries and the fonts the PDFs embed anyway.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      ca-certificates libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 \
+      libxdamage1 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2 libxshmfence1 \
+    && rm -rf /var/lib/apt/lists/*
+COPY package.json package-lock.json .puppeteerrc.cjs ./
+COPY backend/package.json backend/package.json
+COPY frontend/package.json frontend/package.json
+ENV RENDER=true
+RUN npm ci --workspace backend --include-workspace-root
+COPY backend backend
+COPY docs/phase3-evidence/scripts docs/phase3-evidence/scripts
+EXPOSE 5056
+CMD ["node", "--max-old-space-size=384", "docs/phase3-evidence/scripts/demoServer.mjs", "backend", "5056"]

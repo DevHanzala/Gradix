@@ -7,7 +7,8 @@
  * reaches its minimum. `target` is the full pool, sized so that at least
  * MIN_DISTINCT_SETS students can each get a different full question set.
  */
-export const MIN_DISTINCT_SETS = 30;
+// Raise POOL_MIN_DISTINCT_SETS for big classes (more questions pre-generated, fewer on-demand calls).
+export const MIN_DISTINCT_SETS = Number(process.env.POOL_MIN_DISTINCT_SETS) || 30;
 const MAX_EXTRA_PER_BUCKET = 30;
 /** Adaptive exams: every difficulty may be needed for every slot of an objective. */
 const ADAPTIVE_EXTRA = { 1: 1, 2: 1, 3: 2, 4: 1, 5: 1 };

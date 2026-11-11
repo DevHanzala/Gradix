@@ -1,0 +1,10 @@
+**/node_modules
+**/.env
+**/.env.*
+!**/.env.example
+.git
+.cache
+frontend/dist
+docs/phase3-evidence/live
+docs/phase3-evidence/engagement
+backend/storage

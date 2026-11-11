@@ -18,7 +18,8 @@
     "rechunk": "node scripts/rechunkResources.js",
     "storage:migrate": "node scripts/migrateStorage.js",
     "backup": "node scripts/backup.js",
-    "restore": "node scripts/restore.js"
+    "restore": "node scripts/restore.js",
+    "seed:demo": "node scripts/seedDemo.js"
   },
   "keywords": [
     "education",
@@ -49,7 +50,7 @@
     "helmet": "^8.3.0",
     "jsdom": "^26.1.0",
     "jsonwebtoken": "^9.0.2",
-    "multer": "^1.4.5-lts.1",
+    "multer": "^2.5.0",
     "node-pg-migrate": "^9.0.0",
     "nodemailer": "^10.1.7",
     "office-text-extractor": "^3.0.3",

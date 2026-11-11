@@ -289,11 +289,29 @@ export const retryPublish = async (assessmentId) => {
 const withTimeout = (promise, ms) =>
   Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(null), ms).unref?.())]);
 
+/**
+ * At most this many on-demand generations run at once in this process (memory on a 512 MB
+ * server: each one loads the pool's embeddings). Others wait their turn within the timeout,
+ * then fall back to a nearby difficulty.
+ */
+export const ON_DEMAND_CONCURRENCY = Number(process.env.POOL_ON_DEMAND_CONCURRENCY) || 2;
+let onDemandRunning = 0;
+const onDemandWaiting = [];
+const acquireOnDemand = () =>
+  onDemandRunning < ON_DEMAND_CONCURRENCY ? (onDemandRunning++, Promise.resolve()) : new Promise((resolve) => onDemandWaiting.push(resolve));
+const releaseOnDemand = () => {
+  const next = onDemandWaiting.shift();
+  if (next) next();
+  else onDemandRunning--;
+};
+
 /** Generate one question for a bucket right now (bounded by a timeout); stores it in the pool. */
 export const generateOnDemand = async (assessment, bucket, language, existingHashes) => {
   const objective = (await objectiveRepo.findObjectivesQuery(assessment.id)).find((o) => o.id === bucket.objective_id);
   if (!objective) return null;
   const work = (async () => {
+    await acquireOnDemand();
+    try {
     const { questions } = await generateObjectiveQuestions({
       assessment,
       objective,
@@ -306,6 +324,9 @@ export const generateOnDemand = async (assessment, bucket, language, existingHas
     if (!q) return null;
     const row = await poolRepo.insertPoolQuestionQuery(assessment.id, q);
     return row ? poolRepo.findPoolQuestionQuery(assessment.id, row.id) : null;
+    } finally {
+      releaseOnDemand();
+    }
   })().catch((error) => {
     console.error(`[pool] on-demand generation failed: ${error.message}`);
     return null;
@@ -343,7 +364,7 @@ export const selectPoolQuestion = async ({ assessment, language, bucket, servedI
   const exact = (await poolRepo.findBucketCandidatesQuery(assessment.id, language, bucket, exclude, client)).find(acceptable);
   if (exact) return exact;
 
-  const hashes = new Set((await poolRepo.findActiveHashesQuery(assessment.id, language, client)).map((h) => h.stem_hash));
+  const hashes = new Set((await poolRepo.findActiveStemHashesQuery(assessment.id, language, client)).map((h) => h.stem_hash));
   const fresh = await generateOnDemand(assessment, bucket, language, hashes);
   if (fresh) return fresh;
 

@@ -22,7 +22,10 @@
     "dev:worker": "npm run dev:worker --workspace backend",
     "worker": "npm run worker --workspace backend",
     "rechunk": "npm run rechunk -w backend",
-    "i18n:check": "npm run i18n:check -w frontend"
+    "i18n:check": "npm run i18n:check -w frontend",
+    "seed:demo": "npm run seed:demo --workspace backend",
+    "backup": "npm run backup --workspace backend",
+    "restore": "npm run restore --workspace backend --"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

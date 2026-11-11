@@ -101,11 +101,43 @@ if (!resume) {
   ids.assessment = created.body.data.id;
   await request(app).post(`/api/assessments/${ids.assessment}/publish`).set("Authorization", auth(instructor)).send({ languages: ["en", "ur"] });
   for (const sid of ids.students) await enroll({ id: ids.assessment }, { id: sid });
+
+  // Load test: DEMO_LOAD_STUDENTS students enrolled in a 10-question exam whose pool is pre-generated.
+  const loadStudents = Number(process.env.DEMO_LOAD_STUDENTS) || 0;
+  if (loadStudents) {
+    await pool.query("UPDATE users SET plan = 'institution' WHERE id = $1", [ids.instructor]);
+    const load = await request(app)
+      .post("/api/assessments")
+      .set("Authorization", auth(instructor))
+      .field("title", "Load test exam")
+      .field("prompt", "How plants make food")
+      .field(
+        "question_blocks",
+        JSON.stringify([{ question_type: "multiple_choice", question_count: 10, duration_per_question: 30, num_options: 4, positive_marks: 1, negative_marks: 0 }])
+      )
+      .attach("files", Buffer.from(lesson), { filename: "lesson.txt", contentType: "text/plain" });
+    ids.loadAssessment = load.body.data.id;
+    await request(app).post(`/api/assessments/${ids.loadAssessment}/publish`).set("Authorization", auth(instructor)).send({ languages: ["en"] });
+    const { rows } = await pool.query(
+      `INSERT INTO users (name, email, password, role, verified, provider)
+       SELECT 'Load ' || g, 'load-' || g || '@demo.io', (SELECT password FROM users WHERE id = $1), 'student', TRUE, 'manual'
+       FROM generate_series(1, $2) g RETURNING id, email`,
+      [ids.instructor, loadStudents]
+    );
+    await pool.query(`INSERT INTO enrollments (assessment_id, student_id) SELECT $1, unnest($2::int[])`, [ids.loadAssessment, rows.map((r) => r.id)]);
+    ids.loadStudents = rows.map((r) => ({ id: r.id, email: r.email }));
+    const poolSize = (await pool.query("SELECT count(*)::int AS n FROM question_pool WHERE assessment_id = $1", [ids.loadAssessment])).rows[0].n;
+    console.log(`load test: ${loadStudents} students, pool of ${poolSize} questions`);
+  }
 }
+
+// Under load, background top-ups are queued (as in production, where the worker runs them one at a
+// time) instead of running inline inside each request, which is a test shortcut.
+if (Number(process.env.DEMO_LOAD_STUDENTS)) queueAdapter.mode = "record";
 
 const server = createServer(app);
 await attachRealtime(server);
-server.listen(port, "127.0.0.1", () => console.log(`DEMO READY ${port} ${JSON.stringify(ids)}`));
+server.listen(port, process.env.DEMO_HOST || "127.0.0.1", () => console.log(`DEMO READY ${port} ${JSON.stringify(ids)}`));
 const stop = () => server.close(() => process.exit(0));
 process.on("SIGTERM", stop);
 process.on("SIGINT", stop);

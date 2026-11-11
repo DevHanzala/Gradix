@@ -30,7 +30,7 @@ export const pdfQueueLength = () => waiting;
 const renderNow = async (html, { format = "A4" } = {}) => {
   const { default: puppeteer } = await import("puppeteer");
   const browser = await puppeteer.launch({
-    headless: "new",
+    headless: "shell", // chrome-headless-shell: the light headless build, far less memory than full Chrome
     executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     args: LOW_MEMORY_ARGS,
   });

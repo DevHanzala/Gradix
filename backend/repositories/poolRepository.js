@@ -33,6 +33,10 @@ export const countActiveByBucketQuery = async (assessmentId, language, client = 
   return rows;
 };
 
+/** Only the stem hashes of the active pool (cheap: no embeddings), for duplicate checks while serving. */
+export const findActiveStemHashesQuery = async (assessmentId, language, client = db) =>
+  (await client.query(`SELECT stem_hash FROM question_pool WHERE assessment_id = $1 AND language = $2 AND status = 'active'`, [assessmentId, language])).rows;
+
 export const findActiveHashesQuery = async (assessmentId, language, client = db) => {
   const { rows } = await client.query(
     `SELECT stem_hash, question_text, embedding::text AS embedding
