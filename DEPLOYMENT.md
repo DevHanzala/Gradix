@@ -35,6 +35,17 @@ npm run migrate
 Run `npm run migrate` again after every update that adds a migration (it only applies what is missing).
 Before migrating a database with real data, make a Neon branch (Neon > Branches > Create) as a safety copy.
 
+**Upgrading a database that already has Phase 1–2 data:** after migrating, and once the R2 and Gemini variables
+are set in `backend/.env`, run these two once:
+
+```bash
+npm run storage:migrate --workspace backend   # moves cached PDF reports out of Postgres into R2
+npm run rechunk --workspace backend           # re-embeds old material and pool questions with Gemini (EMBEDDING_PROVIDER=gemini)
+```
+
+The re-embedding runs as background jobs in the deployed API. Until it finishes, passages from old material
+are matched less accurately (old and new vectors are not comparable), so run it before the first real class.
+
 ### Create the Super Admin
 
 ```bash

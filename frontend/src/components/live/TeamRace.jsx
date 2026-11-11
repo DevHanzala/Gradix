@@ -15,7 +15,7 @@ function TeamRace({ teams, myTeam = null, large = false }) {
       <ul className="space-y-3">
         {teams.map((team, i) => (
           <li key={team.team}>
-            <div className={`mb-1 flex items-baseline justify-between gap-3 ${large ? "text-2xl" : "text-sm"}`}>
+            <div className={`mb-1 flex flex-wrap items-baseline justify-between gap-x-3 ${large ? "text-lg sm:text-2xl" : "text-sm"}`}>
               <span className={`font-semibold ${team.team === myTeam ? "text-primary-700" : "text-ink"}`}>
                 {t("live.teamName", { n: team.team })}
                 {team.team === myTeam && ` · ${t("live.yourTeam")}`}

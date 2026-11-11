@@ -118,7 +118,7 @@ under `frontend/src/`. Tests are in `backend/tests/` (334 tests; browser evidenc
 | NFR-3 | Scalability to 200 concurrent users | stateless API, state in Postgres, queue | load test 200 and 400 users, 0 errors | Partial: free tier's CPU is the open question |
 | NFR-4 | Security (auth, roles, secrets, rate limits) | helmet, CORS, rate limiters, RBAC, signed file links, no answers before submit/reveal | auth, rbac, storage, live ("token never a login") | Done |
 | NFR-5 | Availability / resilience | jobs and live sessions survive restarts, graceful shutdown, health check, backups | live ("survives restart"), liveFlow 14/14, production (backup round trip) | Done |
-| NFR-6 | Usability / accessibility | design system, keyboard, read aloud, dyslexia font, low-bandwidth, PWA, tour, help | screenshot + axe checks (final verification) | Partial: see PHASE3_REPORT for axe results |
+| NFR-6 | Usability / accessibility | design system, keyboard, read aloud, dyslexia font, low-bandwidth, PWA, tour, help | 336 captures (28 pages × 360/768/1280 × en/ur/ar/sd), axe-core WCAG 2 A/AA: 0 serious or critical (`docs/phase3-evidence/visual-check`) | Partial: automated checks only; no test with screen-reader users |
 | NFR-7 | Localization (en/ur/ar/fa, RTL) | i18n catalogs, Noto fonts in app/PDF/DOCX | i18n check, engagementFlow (Urdu RTL) | Partial: native review pending |
 | NFR-8 | Maintainability (tests, CI, docs) | 334 tests, GitHub Actions CI, README, DEPLOYMENT, USER_MANUAL | CI workflow | Done |
 | NFR-9 | Privacy (minimal data, no camera, consent) | proctoring events only with consent, Sentry scrubbing, Privacy Policy, anonymised deletion | examControls, production ("Sentry events…") | Done |

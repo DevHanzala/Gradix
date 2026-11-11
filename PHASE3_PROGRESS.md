@@ -14,20 +14,18 @@ Gate after every section: `npm run lint`, `npm run i18n:check`, `npm run build`,
 | 1. File storage (R2) | done | 3c7716f |
 | 2. Live classroom mode | done | 413e41c, 4d5095e |
 | 3. Engagement: game mode, polls, exit tickets | done | 5a29580 |
-| 4. More question types | done (browser check pending) | 6a4109f + frontend commit |
-| 5. Light proctoring and exam controls | done | (section 5 commit) |
-| 6. Polish, help and accessibility | not started | |
-| 7. Plans and usage limits | not started | |
-| 8. Production readiness (Render free tier) | not started | |
-| 9. Load test | not started | |
-| 10. Pilot kit and FYP deliverables | not started | |
-| Final verification | not started | |
+| 4. More question types | done | 6a4109f, af0ea15; browser check e1cb091 |
+| 5. Light proctoring and exam controls | done | 60e6e95 |
+| 6. Polish, help and accessibility | done (Sindhi partial) | ea2986e |
+| 7. Plans and usage limits | done | 0b0328a |
+| 8. Production readiness (Render free tier) | done (512 MB container run pending) | 0b0328a, 75c810b |
+| 9. Load test | done (local, single-connection DB) | 75c810b |
+| 10. Pilot kit and FYP deliverables | done | e415e96 |
+| Final verification | done | e1cb091 + final commit |
 
 ## Next
 
-1. Section 4 leftover: run a browser check of fill-in-the-blank / matching / images in exam, review, live and
-   the bank editor (screens are built; lint, build and 314 backend tests pass).
-2. Section 6 onwards, then final verification.
+Phase 3 is complete; see PHASE3_REPORT.md and FINAL_STATUS.md (your to-do list).
 
 Browser checks: `docs/phase3-evidence/scripts/liveFlow.mjs` and `engagementFlow.mjs` (need `demoServer.mjs`,
 a throwaway Postgres in PG* env, and the frontend built with VITE_API_URL=http://127.0.0.1:5056/api served
@@ -123,7 +121,32 @@ the file tool rather than heredocs.
   images are no longer published on Docker Hub/Quay, hence S3Mock; S3Mock does not check signatures, so
   signature tampering is covered by real R2 behaviour and the presign unit test only.
 
+- **D6.1** The onboarding tour runs once per user (stored per user id in the browser), can be skipped and replayed
+  from the Help menu. Help content lives in the UI catalogs, so it is translated like every other string.
+- **D6.2** The service worker caches static files only, never API responses: an exam must never show a stale
+  question or a cached answer. Offline, the app shows an offline page; saving answers still retries as before.
+- **D6.3** Sindhi uses the Naskh font (Nastaliq is wrong for Sindhi) and is marked PARTIAL in the i18n check, so
+  missing keys fall back to English without failing CI. Machine-filled strings are listed for native review.
+- **D7.1** The effective plan is the better of the user's own plan and their groups' plans. Limits are checked when
+  something new starts (assessment, enrollment, publish, AI quick set, upload, joining a live session); nothing
+  already running is ever stopped. There is no payment gateway; the Super Admin assigns plans.
+- **D8.1** Production fits 512 MB by moving embeddings and OCR to Gemini (same 384-d column, so no schema change;
+  token counts are estimated), loading heavy libraries on first use, running jobs one at a time inside the API, and
+  rendering PDFs one at a time with chrome-headless-shell (peak 327 MB vs 401-452 MB with full Chrome).
+- **D8.2** Sentry is optional and scrubbed (`scrubEvent`): of the request only the method and the URL without its
+  query string are kept (no body, so no answers or passwords; no headers, so no tokens); user and extra data are
+  removed, and HTTP/console breadcrumbs are dropped.
+- **D9.1** k6 could not be downloaded in this environment, so `run-load.mjs` (same scenarios as the k6 scripts) was
+  used. The demo server runs on PGlite with one connection; that makes the database the bottleneck, which is
+  pessimistic for latency and says nothing about Render's 0.1 CPU.
+- **D9.2** Fixes from the load test: serving uses a stem-hash-only query (not every embedding), and at most
+  `POOL_ON_DEMAND_CONCURRENCY` (2) on-demand generations run at once; the rest wait their turn.
+- **D10.1** Quick-start PDFs are rendered with the app's own PDF renderer and fonts, so Urdu shapes correctly.
+
 ## Open issues
 
 - YouTube transcripts cannot be fetched server-side today (D0.3). Live test fails by design until YouTube
   changes or an official route exists.
+- Sindhi ~772 strings missing (quota); machine translations need native review.
+- 512 MB Docker run not done (disk); load test not yet on Render/Neon; seed:demo not run end to end.
+- glob/minimatch moderate advisories in dev tooling (overrides unsafe, reverted).
