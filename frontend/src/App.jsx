@@ -86,6 +86,10 @@ const StudentAnalytics = lazy(() =>
   import("./Pages/Student/StudentAnalytics")
 );
 
+/* Help and legal */
+const Help = lazy(() => import("./Pages/Help"));
+const Legal = lazy(() => import("./Pages/Legal"));
+
 /* Live sessions */
 const JoinLive = lazy(() => import("./Pages/Live/JoinLive"));
 const LivePlay = lazy(() => import("./Pages/Live/LivePlay"));
@@ -160,6 +164,22 @@ function App() {
           <Route path="/forgot-password" element={<ResetPassword />} />
           <Route path="/reset-password/:resetId" element={<SetNewPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
+
+          {/* TERMS AND PRIVACY – public */}
+          <Route path="/terms" element={<PublicLayout><Legal doc="terms" /></PublicLayout>} />
+          <Route path="/privacy" element={<PublicLayout><Legal doc="privacy" /></PublicLayout>} />
+
+          {/* HELP CENTER – any signed-in user */}
+          <Route
+            path="/help"
+            element={
+              <ProtectedRoute>
+                <MainLayout>
+                  <Help />
+                </MainLayout>
+              </ProtectedRoute>
+            }
+          />
 
           {/* LIVE SESSIONS – open to guests (nickname only) and signed-in users */}
           <Route path="/join" element={<JoinLive />} />

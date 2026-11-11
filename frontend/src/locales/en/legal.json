@@ -1,0 +1,80 @@
+{
+  "updated": "Last updated: November 2026",
+  "footerNav": "Legal and help",
+  "terms": {
+    "title": "Terms of Service",
+    "intro": "These terms apply to everyone who uses Gradix: instructors, students, administrators and guests in live sessions.",
+    "s1": {
+      "title": "Accounts",
+      "body": "Keep your password private. You are responsible for what happens in your account. Guests may take part only in live sessions."
+    },
+    "s2": {
+      "title": "Your material",
+      "body": "Instructors must hold the rights to the material they upload or link (or be allowed to use it for teaching). Gradix uses it only to prepare your assessments and does not sell it."
+    },
+    "s3": {
+      "title": "AI-generated questions",
+      "body": "Questions, objectives and study plans are written by AI from your material and checked automatically. Instructors remain responsible for reviewing what they publish."
+    },
+    "s4": {
+      "title": "Fair use",
+      "body": "Do not try to see answers before they are revealed, take another person's exam, or disrupt the service."
+    },
+    "s5": {
+      "title": "Proctoring",
+      "body": "When an instructor turns on proctoring, Gradix records only the events described in the Privacy Policy and shows them to that instructor."
+    },
+    "s6": {
+      "title": "Plans",
+      "body": "Plans and their limits are shown on the home page. Limits never stop an exam that is already running."
+    },
+    "s7": {
+      "title": "Availability",
+      "body": "Gradix is provided as is during the pilot. We aim to keep it available and to keep your data safe, but cannot promise uninterrupted service."
+    },
+    "s8": {
+      "title": "Contact",
+      "body": "Questions about these terms: use the contact form on the home page."
+    }
+  },
+  "privacy": {
+    "title": "Privacy Policy",
+    "intro": "This explains what Gradix stores, why, and who can see it.",
+    "s1": {
+      "title": "What we store",
+      "body": "Your name, email, role, language and, for students, answers, scores and results. Instructors' uploaded files and the questions made from them."
+    },
+    "s2": {
+      "title": "Who sees it",
+      "body": "Students see their own results. Instructors see the results of their own assessments. Administrators see the members of their groups. Nobody else."
+    },
+    "s3": {
+      "title": "Proctoring records",
+      "body": "Only when the instructor turns proctoring on: leaving the exam tab or window, leaving fullscreen, and copy/paste/right-click attempts, each with its time. No camera, microphone or screen recording, ever."
+    },
+    "s4": {
+      "title": "AI providers",
+      "body": "To write questions, Gradix sends passages of the instructor's material to Google Gemini or Groq. Student answers and personal data are not sent."
+    },
+    "s5": {
+      "title": "Files",
+      "body": "Files are stored privately (Cloudflare R2) and opened only through links that expire after a few minutes."
+    },
+    "s6": {
+      "title": "Live sessions",
+      "body": "Guests give only a nickname. Session results are kept for the teacher."
+    },
+    "s7": {
+      "title": "Deleting your account",
+      "body": "When an account is deleted its personal data is removed; results stay only in anonymous form for the instructor's statistics."
+    },
+    "s8": {
+      "title": "Security",
+      "body": "Passwords are hashed, connections are encrypted, and access is checked on every request."
+    },
+    "s9": {
+      "title": "Contact",
+      "body": "Questions or requests about your data: use the contact form on the home page."
+    }
+  }
+}

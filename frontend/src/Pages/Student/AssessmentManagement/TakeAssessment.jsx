@@ -7,6 +7,7 @@ import LoadingSpinner from "../../../components/ui/LoadingSpinner";
 import { Button } from "../../../components/ui";
 import { FillBlankInput, MatchingInput, QuestionImage } from "../../../components/questions/QuestionParts.jsx";
 import ProctoringGuard from "../../../components/exam/ProctoringGuard.jsx";
+import ReadAloud from "../../../components/exam/ReadAloud.jsx";
 import { LANGUAGES, isRtl } from "../../../utils/languages.js";
 import { formatClock, formatDuration, formatNumber, formatPercent } from "../../../utils/format.js";
 
@@ -121,6 +122,24 @@ function TakeAssessment() {
       advance();
     }
   }, [phase, questionRemaining, overallRemaining, currentIndex, currentQuestion, preparing, advance, submit]);
+
+  // Keyboard: 1-6 (or A-F) choose a multiple-choice option, 1/2 true/false; never while typing in a field.
+  useEffect(() => {
+    if (phase !== "in_progress" || !currentQuestion) return undefined;
+    const onKey = (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+      const key = e.key.toLowerCase();
+      const index = /^[1-6]$/.test(key) ? Number(key) - 1 : /^[a-f]$/.test(key) ? key.charCodeAt(0) - 97 : -1;
+      if (index < 0) return;
+      if (currentQuestion.question_type === "multiple_choice" && currentQuestion.options?.[index] !== undefined) {
+        setAnswer(currentQuestion.id, currentQuestion.options[index], currentQuestion.question_type);
+      } else if (currentQuestion.question_type === "true_false" && index < 2) {
+        setAnswer(currentQuestion.id, index === 0, currentQuestion.question_type);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [phase, currentQuestion, setAnswer]);
 
   // During (and right after) an attempt the interface speaks the exam's language.
   const examLanguage = inProgress || phase === "completed" ? language || selectedLanguage : selectedLanguage;
@@ -345,6 +364,15 @@ function TakeAssessment() {
           <h1 className="text-xl font-semibold leading-relaxed text-ink sm:text-2xl">{question.question_text}</h1>
         )}
         <QuestionImage image={question.image} />
+        <ReadAloud
+          key={question.id}
+          language={language || selectedLanguage}
+          t={t}
+          text={[
+            question.question_text.replace(/\[\[(\d+)\]\]/g, "…"),
+            ...(question.question_type === "multiple_choice" ? (question.options || []).map((o, i) => `${String.fromCharCode(65 + i)}. ${o}`) : []),
+          ].join(". ")}
+        />
 
         <ProctoringGuard attemptId={attemptId} level={proctoring} questionIndex={currentIndex} t={t} onAutoSubmitted={() => loadAttempt(assessmentId)} />
 

@@ -35,5 +35,7 @@
   "seconds": "{{count}} s",
   "hide": "Hide",
   "choose": "Choose…",
-  "pages": "Pages"
+  "pages": "Pages",
+  "wakingTitle": "Waking up the server…",
+  "wakingBody": "After a quiet spell the server needs up to a minute to start. Your request will go through automatically."
 }

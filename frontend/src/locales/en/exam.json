@@ -57,5 +57,7 @@
     "accept": "I have read this and agree",
     "warn": "Recorded: you left the exam or tried to copy. Events so far: {{count}}.",
     "warnAuto": "Recorded: {{count}} of {{max}}. At {{max}} your exam is submitted automatically."
-  }
+  },
+  "readAloud": "Read aloud",
+  "stopReading": "Stop reading"
 }

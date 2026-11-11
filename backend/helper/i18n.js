@@ -6,8 +6,8 @@ import { fileURLToPath } from "url";
  * Server-side translations (emails, notifications). Catalogs live in
  * backend/locales/<lang>.json; a missing key falls back to English.
  */
-export const LANGUAGES = ["en", "ur", "ar", "fa"];
-export const RTL_LANGUAGES = ["ur", "ar", "fa"];
+export const LANGUAGES = ["en", "ur", "ar", "fa", "sd"];
+export const RTL_LANGUAGES = ["ur", "ar", "fa", "sd"];
 const LOCALES = { en: "en-GB", ur: "ur-PK", ar: "ar", fa: "fa-IR" };
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "locales");

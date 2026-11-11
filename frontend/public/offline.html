@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gradix - offline</title>
+    <style>
+      body { font-family: system-ui, sans-serif; background: #f8fafc; color: #111827; margin: 0; display: grid; place-items: center; min-height: 100vh; padding: 16px; box-sizing: border-box; }
+      main { max-width: 32rem; text-align: center; }
+      h1 { font-size: 1.5rem; } p { color: #4b5563; line-height: 1.7; }
+      [dir="rtl"] { font-family: "Noto Nastaliq Urdu", "Noto Naskh Arabic", system-ui, sans-serif; }
+      button { margin-top: 1rem; min-height: 44px; padding: 0 1.25rem; border: 0; border-radius: 8px; background: #4f46e5; color: #fff; font-size: 1rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>You are offline</h1>
+      <p>Gradix needs a connection. Your exam answers are saved on the server as you go; reconnect and continue where you left off.</p>
+      <p dir="rtl" lang="ur">آپ آف لائن ہیں۔ دوبارہ کنکشن پر آپ وہیں سے جاری رکھ سکیں گے۔</p>
+      <p dir="rtl" lang="ar">أنت غير متصل. أعد الاتصال وتابع من حيث توقفت.</p>
+      <button type="button" onclick="location.reload()">Try again / دوبارہ کوشش کریں</button>
+    </main>
+  </body>
+</html>

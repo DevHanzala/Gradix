@@ -63,6 +63,17 @@ function PublicLayout({ children }) {
           <p>
             © {new Date().getFullYear()} <span lang="en">{BRAND.name}</span>
           </p>
+          <nav aria-label={t("legal.footerNav")} className="flex flex-wrap gap-4">
+            <Link to="/terms" className="inline-flex min-h-11 items-center hover:underline">
+              {t("legal.terms.title")}
+            </Link>
+            <Link to="/privacy" className="inline-flex min-h-11 items-center hover:underline">
+              {t("legal.privacy.title")}
+            </Link>
+            <Link to="/join" className="inline-flex min-h-11 items-center hover:underline">
+              {t("nav.joinLive")}
+            </Link>
+          </nav>
           <RecaptchaNotice />
         </div>
       </footer>

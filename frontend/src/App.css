@@ -69,7 +69,8 @@
   line-height: 2.1;
 }
 :lang(ar),
-:lang(fa) {
+:lang(fa),
+:lang(sd) {
   font-family: "Noto Naskh Arabic", Tahoma, serif;
   line-height: 1.8;
 }
@@ -111,4 +112,24 @@
   .btn-danger {
     @apply btn bg-danger-600 text-white hover:bg-danger-700 focus-visible:ring-danger-100;
   }
+}
+
+/* ---- Low-bandwidth mode: no motion, no decorative extras ---- */
+.low-data *,
+.low-data *::before,
+.low-data *::after {
+  animation: none !important;
+  transition: none !important;
+  scroll-behavior: auto !important;
+}
+.low-data [data-decorative] {
+  display: none !important;
+}
+
+/* ---- Dyslexia-friendly reading (Latin text only; Urdu/Arabic keep their script fonts) ---- */
+.dyslexia-font :lang(en) {
+  font-family: Verdana, Tahoma, "Segoe UI", sans-serif;
+  letter-spacing: 0.05em;
+  word-spacing: 0.16em;
+  line-height: 1.8;
 }

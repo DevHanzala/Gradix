@@ -6,6 +6,9 @@ import useAuthStore from "../store/authStore.js";
 import { dashboardPathForRole } from "../utils/redirectByRole.js";
 import LanguageSwitcher from "../components/LanguageSwitcher.jsx";
 import NotificationBell from "../components/NotificationBell.jsx";
+import HelpMenu from "../components/help/HelpMenu.jsx";
+import OnboardingTour from "../components/help/OnboardingTour.jsx";
+import usePreferences, { slowConnection } from "../store/preferencesStore.js";
 import { ACCOUNT_LINKS, BRAND, NAVIGATION } from "./navigation.js";
 
 function Brand({ to }) {
@@ -81,6 +84,26 @@ function SidebarContent({ user, onNavigate, onLogout }) {
  * Layout for signed-in users: sidebar on desktop (lg+), drawer behind a
  * hamburger on smaller screens, and a consistent top bar.
  */
+/** Suggest low-bandwidth mode once when the connection is slow or data saving is on. */
+function LowDataSuggestion() {
+  const { t } = useTranslation();
+  const { lowData, lowDataSuggestionDismissed, setPreference } = usePreferences();
+  if (lowData || lowDataSuggestionDismissed || !slowConnection()) return null;
+  return (
+    <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-control bg-primary-50 p-3 text-sm text-primary-800">
+      <span>{t("help.lowDataSuggestion")}</span>
+      <span className="flex gap-2">
+        <button type="button" className="btn-primary" onClick={() => setPreference("lowData", true)}>
+          {t("help.turnOn")}
+        </button>
+        <button type="button" className="btn-ghost" onClick={() => setPreference("lowDataSuggestionDismissed", true)}>
+          {t("help.notNow")}
+        </button>
+      </span>
+    </div>
+  );
+}
+
 function AppShell({ children, topBarExtras = null }) {
   const { t } = useTranslation();
   const { user, logout } = useAuthStore();
@@ -180,6 +203,7 @@ function AppShell({ children, topBarExtras = null }) {
           </div>
           <div className="ms-auto flex items-center gap-2 sm:gap-3">
             <LanguageSwitcher compact />
+            <HelpMenu />
             <NotificationBell />
             {topBarExtras}
             <div className="hidden text-end md:block">
@@ -197,8 +221,10 @@ function AppShell({ children, topBarExtras = null }) {
         </header>
 
         <main id="main-content" tabIndex={-1} className="w-full px-4 py-6 focus:outline-none sm:px-6 sm:py-8 lg:px-8">
+          <LowDataSuggestion />
           {children}
         </main>
+        <OnboardingTour user={user} />
       </div>
     </div>
   );

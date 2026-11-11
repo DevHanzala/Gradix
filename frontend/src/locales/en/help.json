@@ -1,0 +1,138 @@
+{
+  "menu": "Help and settings",
+  "center": "Help center",
+  "centerDescription": "Short guides for each role. Your own guide comes first.",
+  "replayTour": "Replay the tour",
+  "sendFeedback": "Send feedback",
+  "feedbackLabel": "Your feedback",
+  "feedbackHint": "What works, what doesn't, what you need. The page you are on is included.",
+  "send": "Send",
+  "feedbackThanks": "Thank you! The Gradix team will read it.",
+  "feedbackFailed": "Your feedback could not be sent.",
+  "lowData": "Low-bandwidth mode",
+  "lowDataHint": "No animations and lighter pages for slow connections.",
+  "dyslexiaFont": "Dyslexia-friendly font",
+  "dyslexiaFontHint": "A plainer font with wider spacing (English text).",
+  "lowDataSuggestion": "Your connection looks slow. Turn on low-bandwidth mode for lighter pages?",
+  "turnOn": "Turn on",
+  "notNow": "Not now",
+  "tourStep": "Step {{n}} of {{total}}",
+  "skipTour": "Skip",
+  "finishTour": "Done",
+  "keyboardTitle": "Keyboard and accessibility",
+  "keyboard": {
+    "options": "In an exam, press 1-6 (or A-F) to choose an option, and 1 or 2 for true/false.",
+    "tab": "Tab moves through every button and field; Enter or Space presses the focused button.",
+    "readAloud": "Read aloud reads the question with your device's voice, when one exists for the exam language."
+  },
+  "tour": {
+    "instructor": {
+      "1": {
+        "title": "Welcome to Gradix",
+        "body": "Gradix writes a different, fair question set for every student from your own material, in English, Urdu, Arabic or Persian."
+      },
+      "2": {
+        "title": "Create an assessment",
+        "body": "Upload notes, pick resources or add links, choose question types and counts. The learning objectives are found for you."
+      },
+      "3": {
+        "title": "Review and publish",
+        "body": "Check the objectives, then publish in the languages your class needs. Students can start once their language is ready."
+      },
+      "4": {
+        "title": "Run live sessions",
+        "body": "In Live sessions you start a class quiz with a join code or QR, with polls, exit tickets and an optional game mode."
+      },
+      "5": {
+        "title": "See the results",
+        "body": "Analytics shows each objective, the hardest questions, every student's answers and proctoring events."
+      },
+      "6": {
+        "title": "Help is always here",
+        "body": "The question mark at the top opens the help center, this tour, feedback and display settings."
+      }
+    },
+    "student": {
+      "1": {
+        "title": "Welcome to Gradix",
+        "body": "Your exams and results live here, in your language."
+      },
+      "2": {
+        "title": "Your exams",
+        "body": "The dashboard lists the exams your teachers enrolled you in. Choose your language and start when you are ready."
+      },
+      "3": {
+        "title": "One question at a time",
+        "body": "Each question has its own timer. Answers save as you go, and you cannot go back. You get one attempt."
+      },
+      "4": {
+        "title": "Results and practice",
+        "body": "Right after you submit you see your results, a study plan and unlimited practice that does not count."
+      },
+      "5": {
+        "title": "Live quizzes",
+        "body": "When your teacher shows a code, open Join live session and type it."
+      }
+    },
+    "admin": {
+      "1": {
+        "title": "Welcome, administrator",
+        "body": "You manage the members of your groups: students and instructors."
+      },
+      "2": {
+        "title": "Users",
+        "body": "Change roles and help members of your groups from the users page."
+      },
+      "3": {
+        "title": "Groups",
+        "body": "Groups bring students and instructors together; instructors can enroll a whole group at once."
+      }
+    },
+    "super_admin": {
+      "1": {
+        "title": "Welcome, super administrator",
+        "body": "You manage every account, group and role."
+      },
+      "2": {
+        "title": "AI usage",
+        "body": "The dashboard shows today's AI usage per key against the free limits."
+      },
+      "3": {
+        "title": "Plans",
+        "body": "Assign Free, Pro or Institution plans to instructors or whole groups and watch their usage."
+      },
+      "4": {
+        "title": "Feedback",
+        "body": "Feedback from users and messages from the contact form arrive at the bottom of the dashboard."
+      }
+    }
+  },
+  "guides": {
+    "instructor": {
+      "title": "Instructor guide",
+      "s1": "Open New assessment and give it a title and, if you like, a short prompt.",
+      "s2": "Add source material: upload files, pick from your resource library, or add web and YouTube links.",
+      "s3": "Add question blocks: type (multiple choice, true/false, short answer, fill in the blank, matching), count, seconds per question and marks.",
+      "s4": "Save. Gradix finds the learning objectives in a few seconds; review, edit, weight or remove them.",
+      "s5": "Publish in one or more languages. The question pool is prepared in the background.",
+      "s6": "Enroll students one by one or a whole group, and set exam controls: proctoring, exam window, extra time.",
+      "s7": "Follow results in Analytics and export them as CSV or Excel. Print papers as PDF or Word.",
+      "s8": "For a class quiz, open Live sessions, create a session and show the code or QR on the projector."
+    },
+    "student": {
+      "title": "Student guide",
+      "s1": "Sign in and open your dashboard to see your exams.",
+      "s2": "Choose the exam language and read the rules; if the exam is monitored, read what is recorded and accept.",
+      "s3": "Answer one question at a time before its timer ends. Your answers save automatically.",
+      "s4": "After submitting, open your results: per-objective scores, review, study plan and PDF report.",
+      "s5": "Use Practice as often as you like; it never changes your score.",
+      "s6": "To join a live quiz, open Join live session and type the code your teacher shows."
+    },
+    "admin": {
+      "title": "Administrator guide",
+      "s1": "The Users page lists the members of your groups.",
+      "s2": "Change a member's role between student and instructor when needed.",
+      "s3": "The Super Admin creates groups, sets plans and reads feedback."
+    }
+  }
+}

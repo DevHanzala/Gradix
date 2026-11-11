@@ -1,0 +1,12 @@
+{
+  "loadFailed": "توهان جو ڊيش بورڊ لوڊ نه ٿي سگهيو.",
+  "welcome": "ڀلي ڪري آيا",
+  "welcomeName": "ڀلي ڪري آيا، {{name}}",
+  "instructorDescription": "ٽيسٽ ٺاهيو، شاگردن کي داخلا ڏيو ۽ نتيجن جو جائزو وٺو.",
+  "summary": "خلاصو",
+  "startedByStudents": "شاگردن پاران شروع ڪيا ويا",
+  "recentAssessments": "تازا ٽيسٽ",
+  "quickActions": "تڪڙا عمل",
+  "uploadResources": "ذريعا اپلوڊ ڪريو",
+  "resultsByAssessment": "ٽيسٽ جا نتيجا"
+}

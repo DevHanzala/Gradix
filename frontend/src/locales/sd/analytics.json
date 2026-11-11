@@ -1,0 +1,33 @@
+{
+  "titleFor": "نتيجو: {{title}}",
+  "description": "شاگردن جا نمبر جن هي امتحان مڪمل ڪيو. هر شاگرد وٽ پنهنجا سوال هئا.",
+  "averageScore": "سراسري نمبر",
+  "averageTime": "سراسري وقت",
+  "students": "شاگرد",
+  "none": "اڃا تائين ڪا به ڪوشش مڪمل نه ٿي آهي",
+  "noneDescription": "نتيجو هتي ظاهر ٿيندو جيئن ئي شاگرد جمع ڪندا.",
+  "studentResults": "شاگردن جا نتيجا",
+  "student": "شاگرد",
+  "correct": "صحيح",
+  "correctOf": "{{correct}} / {{total}}",
+  "score": "نمبر",
+  "time": "وقت",
+  "reviewAnswers": "جوابن جو جائزو وٺو",
+  "loadingAnswers": "جواب لوڊ ٿي رهيا آهن…",
+  "answersOf": "جواب: {{name}}",
+  "answersSummary": "{{correct}} صحيح · {{score}}",
+  "integrity": "ايمانداري",
+  "violations": "واقعا: {{value}}",
+  "autoSubmitted": "خودڪار جمع ٿيل",
+  "timelineTitle": "ايمانداري جي ٽائم لائن: {{name}}",
+  "timelineFailed": "ٽائم لائن لوڊ نه ٿي سگهي.",
+  "onQuestion": "سوال {{n}}",
+  "events": {
+    "tab_hidden": "ٽيب ڇڏي ويو",
+    "window_blur": "ونڊو ڇڏي ويو",
+    "fullscreen_exit": "فل اسڪرين ڇڏي ويو",
+    "copy": "ڪاپي ڪرڻ جي ڪوشش ڪئي",
+    "paste": "پيسٽ ڪرڻ جي ڪوشش ڪئي",
+    "context_menu": "ساڄي ڪلڪ"
+  }
+}

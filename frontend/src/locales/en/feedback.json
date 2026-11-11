@@ -1,0 +1,16 @@
+{
+  "title": "Feedback and messages",
+  "description": "From the in-app feedback button and the contact form.",
+  "loadFailed": "Could not load feedback.",
+  "empty": "No messages yet.",
+  "status": "Status",
+  "kinds": {
+    "feedback": "Feedback",
+    "contact": "Contact form"
+  },
+  "statuses": {
+    "new": "New",
+    "read": "Read",
+    "done": "Done"
+  }
+}

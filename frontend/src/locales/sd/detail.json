@@ -1,0 +1,16 @@
+{
+  "blocks": "سوالن جا بلاڪ",
+  "blocksSummary": "سوال: {{questions}} · {{duration}} · مارڪون: {{marks}}",
+  "correctMarks": "صحيح",
+  "wrongMarks": "غلط",
+  "secondsEach": "ھر ھڪ لاءِ سيڪنڊ",
+  "editableDescription": "اڃا شايع نه ٿيو آھي: توھان ان کي ايڊٽ ڪري سگھو ٿا.",
+  "lockedDescription": "شاگردن پاران شايع ٿيل يا شروع ڪيل، تنھنڪري ان جون سيٽنگون لاڪ ٿيل آھن.",
+  "fixedDifficulty": "مقرر مشڪل جو ميلاپ",
+  "mode": "موڊ",
+  "noPrompt": "ڪو به پرامپٽ ناهي. سوال چونڊيل مواد مان ٺاهيا ويا آهن.",
+  "noSources": "ڪو به ذريعو يا لنڪ ناهي.",
+  "objectivesAndPublishing": "مقصد ۽ اشاعت",
+  "printPaper": "پيپر پرنٽ ڪريو",
+  "state": "حالت"
+}

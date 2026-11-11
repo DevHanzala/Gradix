@@ -37,7 +37,7 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
   const [step, setStep] = useState("language");
   const { i18n } = useTranslation();
   // Start in the reader's own language so the first step is readable to them.
-  const uiLanguage = LANGUAGES.some((l) => l.code === i18n.language) ? i18n.language : "en";
+  const uiLanguage = LANGUAGES.some((l) => l.code === i18n.language && !l.uiOnly) ? i18n.language : "en";
   const [language, setLanguage] = useState(uiLanguage);
   const [form, setForm] = useState(INITIAL_FORM);
   const [loading, setLoading] = useState(false);
@@ -105,7 +105,7 @@ const PhysicalPaperModal = ({ isOpen, onClose, assessmentId, assessmentTitle }) 
         <div>
           <p className="mb-4 text-ink-muted">{tp("selectLanguageDesc")}</p>
           <div className="grid gap-3 sm:grid-cols-2" role="group" aria-label={tp("selectLanguage")}>
-            {LANGUAGES.map((lang) => (
+            {LANGUAGES.filter((l) => !l.uiOnly).map((lang) => (
               <button
                 key={lang.code}
                 lang={lang.code}

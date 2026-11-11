@@ -16,8 +16,11 @@ import { fileURLToPath } from "url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const localesDir = path.join(root, "src", "locales");
-const LANGS = ["en", "ur", "ar", "fa"];
+const LANGS = ["en", "ur", "ar", "fa", "sd"];
 const FULL = ["en", "ur", "ar"];
+// Sindhi is filled by machine translation (backend/scripts/translateUi.js sd) and awaits native review;
+// until every string is filled, missing ones fall back to English and are not an error.
+const PARTIAL = ["sd"];
 const REQUIRED_FA = ["common", "errors", "validation", "exam", "results", "reports", "status", "nav", "roles"];
 const problems = [];
 
@@ -49,7 +52,7 @@ for (const lang of LANGS.filter((l) => l !== "en")) {
   for (const key of keys) if (!(key in en)) problems.push(`${lang}: unknown key "${key}" (not in en)`);
   for (const key of enKeys) {
     const area = key.split(".")[0];
-    const required = FULL.includes(lang) || REQUIRED_FA.includes(area);
+    const required = FULL.includes(lang) || (!PARTIAL.includes(lang) && REQUIRED_FA.includes(area));
     if (required && !(key in catalogs[lang])) problems.push(`${lang}: missing "${key}"`);
   }
   const placeholders = (s) => [...s.matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map((m) => m[1]).sort().join(",");

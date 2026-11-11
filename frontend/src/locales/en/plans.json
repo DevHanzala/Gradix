@@ -1,0 +1,40 @@
+{
+  "names": {
+    "free": "Free",
+    "pro": "Pro",
+    "institution": "Institution"
+  },
+  "audience": {
+    "free": "For an individual tutor",
+    "pro": "For a tutor or small center",
+    "institution": "For schools and colleges"
+  },
+  "free": "Free",
+  "pricePerMonth": "Rs {{price}} / month",
+  "unlimited": "Unlimited",
+  "metrics": {
+    "assessmentsPerMonth": "New assessments per month",
+    "students": "Students",
+    "aiQuestionsPerMonth": "AI questions per month",
+    "liveSessionSize": "Live session size",
+    "storageMb": "Storage (MB)"
+  },
+  "yourPlan": "Your plan: {{plan}}",
+  "usageDescription": "Limits apply to new work only; running exams are never stopped.",
+  "usedOf": "{{used}} of {{limit}}",
+  "usedUnlimited": "{{used}} (no limit)",
+  "upgradeHint": "You are close to a limit. Ask your administrator or use the contact form on the home page to upgrade.",
+  "adminTitle": "Plans and usage",
+  "adminDescription": "Assign a plan to an instructor or a whole group. A user gets the better of their own plan and their groups' plans.",
+  "loadFailed": "Could not load plans.",
+  "saveFailed": "Could not change the plan.",
+  "accounts": "Instructor accounts",
+  "account": "Instructor",
+  "ownPlan": "Own plan",
+  "effectivePlan": "Applies",
+  "groups": "Groups",
+  "group": "Group",
+  "groupPlan": "Group plan",
+  "noGroupPlan": "No group plan",
+  "planFor": "Plan for {{name}}"
+}

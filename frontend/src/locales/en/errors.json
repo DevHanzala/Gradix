@@ -96,6 +96,10 @@
     "PROCTORING_CONSENT_REQUIRED": "Read what is monitored and accept it to start.",
     "INVALID_EXAM_SETTINGS": "Check the exam controls.",
     "INVALID_EXTRA_TIME": "Extra time must be between 1x and 3x.",
-    "INVALID_IMAGE": "Check the image."
+    "INVALID_IMAGE": "Check the image.",
+    "PLAN_LIMIT_REACHED": "You have reached a limit of your plan. Ask your administrator to upgrade, or use the contact form on the home page.",
+    "FEEDBACK_EMPTY": "Write a message first.",
+    "FEEDBACK_EMAIL": "Enter a valid email address.",
+    "INVALID_PLAN": "Unknown plan."
   }
 }

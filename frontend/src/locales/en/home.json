@@ -32,6 +32,26 @@
     "fair": {
       "title": "Fair, timed, one attempt",
       "text": "Per-question timers enforced by the server, one attempt per student, and answers saved as you go."
+    },
+    "integrity": {
+      "title": "Integrity first",
+      "text": "Unique question sets, server-side timers, one attempt and optional light proctoring without cameras."
+    },
+    "live": {
+      "title": "Live classroom",
+      "text": "Join by code or QR, real-time results, polls, exit tickets, team race and game mode."
     }
+  },
+  "plansTitle": "Plans",
+  "plansLead": "Prices in Pakistani rupees. Plans are set up by the Gradix team; there is no online payment yet.",
+  "contact": {
+    "title": "Contact us",
+    "lead": "Questions, a pilot for your school, or a plan upgrade: write to us.",
+    "name": "Name",
+    "email": "Email",
+    "message": "Message",
+    "send": "Send",
+    "thanks": "Thank you! We will reply by email.",
+    "failed": "Your message could not be sent."
   }
 }

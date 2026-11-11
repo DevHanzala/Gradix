@@ -24,8 +24,8 @@ export const pdfFontCss = (language) => {
   const family =
     language === "ur"
       ? "'Noto Nastaliq Urdu', 'Noto Naskh Arabic', serif"
-      : ["ar", "fa"].includes(language)
+      : ["ar", "fa", "sd"].includes(language)
         ? "'Noto Naskh Arabic', serif"
         : "Arial, Helvetica, sans-serif";
-  return { css, family, lineHeight: language === "ur" ? 2.2 : ["ar", "fa"].includes(language) ? 1.8 : 1.5 };
+  return { css, family, lineHeight: language === "ur" ? 2.2 : ["ar", "fa", "sd"].includes(language) ? 1.8 : 1.5 };
 };

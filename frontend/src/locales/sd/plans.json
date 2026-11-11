@@ -1,0 +1,40 @@
+{
+  "names": {
+    "free": "مفت",
+    "pro": "پرو",
+    "institution": "ادارو"
+  },
+  "audience": {
+    "free": "هڪ انفرادي استاد لاءِ",
+    "pro": "هڪ استاد يا ننڍي مرڪز لاءِ",
+    "institution": "اسڪولن ۽ ڪاليجن لاءِ"
+  },
+  "free": "مفت",
+  "pricePerMonth": "رپيا {{price}} / مهينو",
+  "unlimited": "لامحدود",
+  "metrics": {
+    "assessmentsPerMonth": "هر مهيني نوان امتحان",
+    "students": "شاگرد",
+    "aiQuestionsPerMonth": "هر مهيني AI سوال",
+    "liveSessionSize": "لائيو سيشن جي ماپ",
+    "storageMb": "اسٽوريج (MB)"
+  },
+  "yourPlan": "توهان جو پلان: {{plan}}",
+  "usageDescription": "حدون صرف نئين ڪم تي لاڳو ٿين ٿيون؛ هلندڙ امتحان ڪڏهن به روڪيا نه ويندا.",
+  "usedOf": "{{limit}} مان {{used}} استعمال ٿيل",
+  "usedUnlimited": "{{used}} (ڪا حد ناهي)",
+  "upgradeHint": "توهان حد جي ويجهو آهيو. پنهنجي منتظم کان پڇو يا اپ گريڊ ڪرڻ لاءِ هوم پيج تي رابطي جو فارم استعمال ڪريو.",
+  "adminTitle": "پلان ۽ استعمال",
+  "adminDescription": "هڪ استاد يا سڄي گروپ کي پلان ڏيو. هڪ صارف پنهنجي پلان ۽ پنهنجي گروپن جي پلان مان بهترين حاصل ڪري ٿو.",
+  "loadFailed": "پلان لوڊ نه ٿي سگهيا.",
+  "saveFailed": "پلان تبديل نه ٿي سگهيو.",
+  "accounts": "استاد جا اڪائونٽ",
+  "account": "استاد",
+  "ownPlan": "پنهنجو پلان",
+  "effectivePlan": "لاڳو ٿئي ٿو",
+  "groups": "گروپ",
+  "group": "گروپ",
+  "groupPlan": "گروپ پلان",
+  "noGroupPlan": "ڪو به گروپ پلان ناهي",
+  "planFor": "{{name}} لاءِ پلان"
+}
